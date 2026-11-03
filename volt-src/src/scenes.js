@@ -880,7 +880,8 @@ class GameScene extends Phaser.Scene {
     }
     if (this.capLeft <= 0 && this.cap.visible) this.cap.setVisible(false);
   }
-  render() {
+  render() { if (this.match && this.match.drawBetween) return this.match.drawBetween(() => this.renderNow()); return this.renderNow(); }   // smooth: carts and ball drawn between simulation steps
+  renderNow() {
     if (!this.clockText || !this.clockText.active || !this.banner || !this.banner.active) return;
     const m = this.match, g = this.dyn, B = CONFIG.ball, V = CONFIG.view, dt3 = this.game.loop.delta / 1000; this.sync3d(); this.commentary(dt3);
     if (!this.flat) { if (this.crowd) this.crowd.update(Math.min(dt3, 0.05)); this.render3d(dt3); }        // the 3D view (first / third person, broadcast)

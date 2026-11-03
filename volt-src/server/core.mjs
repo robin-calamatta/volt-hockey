@@ -35,6 +35,18 @@ const bad = (msg, status = 400) => { throw new HttpError(status, msg); };
 const str = (v, max) => typeof v === 'string' ? v.slice(0, max) : '';
 
 export function createApi(store, opts = {}) {
+  /* TURN_CREDENTIALS_URL: a URL that returns an iceServers list, e.g. Metered's free Open Relay
+     (https://<yourapp>.metered.live/api/v1/turn/credentials?apiKey=...). Fetched here so the key stays on the server; kept for 30 minutes. */
+  let turnCache = { at: 0, list: [] };
+  async function turnCredentials() {
+    const url = typeof opts.turnUrl === 'function' ? opts.turnUrl() : opts.turnUrl; if (!url) return [];
+    if (now() - turnCache.at < 30 * 60 * 1000) return turnCache.list;
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(4000) }); const j = await r.json();
+      const list = (Array.isArray(j) ? j : Array.isArray(j.iceServers) ? j.iceServers : []).filter(x => x && x.urls).slice(0, 8);
+      turnCache = { at: now(), list }; return list;
+    } catch (e) { console.error('TURN credentials:', e.message); return turnCache.list; }
+  }
   const iceServers = () => { try { return JSON.parse((typeof opts.ice === 'function' ? opts.ice() : opts.ice) || 'null'); } catch (e) { return null; } };   // TURN relay for voice / parties on strict networks (ICE_SERVERS)
   const sendEmail = opts.sendEmail || null, siteUrl = () => (typeof opts.siteUrl === 'function' ? opts.siteUrl() : opts.siteUrl) || '';
   const getUser = name => name ? store.get(key(name)) : null;
@@ -308,7 +320,7 @@ export function createApi(store, opts = {}) {
     'POST /password': async (b, q, h) => changePassword((await auth(h)).u, b), 'POST /email': async (b, q, h) => setEmail((await auth(h)).u, b),
     'POST /reset/request': (b) => requestReset(b), 'POST /reset/confirm': (b) => confirmReset(b),
     'PUT /prefs': async (b, q, h) => putPrefs((await auth(h)).u, b), 'PUT /progress': async (b, q, h) => putProgress((await auth(h)).u, b),
-    'GET /ice': () => ({ iceServers: iceServers() }),
+    'GET /ice': async () => ({ iceServers: [...(iceServers() || []), ...(await turnCredentials())] }),
     'GET /leaderboard': () => leaderboard(), 'GET /profile': (b, q) => profile(q.name), 'GET /search': async (b, q, h) => search((await auth(h)).u, q),
     'POST /sync': async (b, q, h) => sync((await auth(h)).u, b),
     'POST /friends/request': async (b, q, h) => friendRequest((await auth(h)).u, b), 'POST /friends/accept': async (b, q, h) => acceptFriend((await auth(h)).u, b),

@@ -146,13 +146,28 @@ const Party = {
   join(id) {                                                   // member: join a friend's party
     if (this.role) this.leave(true);
     if (!Account.loggedIn) { Toasts.show('Log in to join a party.', [], 4000); return; }
-    const peer = new Peer(PEER_OPTS()); this.peer = peer;
-    peer.on('error', e => { Toasts.show('Could not join the party: ' + esc(netErrorText(e)), [], 5000); this.reset(); });
+    const peer = new Peer(PEER_OPTS()); this.peer = peer; let joined = false, failed = false;
+    Toasts.show('Joining the party...', [], 3000);
+    // before the link opens, every way it can fail ends in one clear message (it used to fail silently when the two computers could not connect)
+    const fail = why => {
+      if (joined || failed) return; failed = true; clearTimeout(timer);
+      const text = why === 'ice' || why === 'timeout'
+        ? 'Could not connect to the party. The two computers could not reach each other directly (a router or firewall is blocking it). Try again; if it keeps happening, the game needs a relay server (see DEPLOY.md, "TURN relay").'
+        : why === 'gone' ? 'That party is no longer open (the leader may have left or restarted it).' : 'Could not join the party: ' + netErrorText(why);
+      Toasts.show(esc(text), [], 9000); console.warn('[party] join failed:', why && why.type || why);
+      try { peer.destroy(); } catch (e) { /* gone */ } if (this.peer === peer) this.reset();
+    };
+    const timer = setTimeout(() => fail('timeout'), 20000);
+    peer.on('error', e => { if (!joined) fail(e && e.type === 'peer-unavailable' ? 'gone' : e); else Toasts.show('Party connection problem: ' + esc(netErrorText(e)), [], 5000); });
     peer.on('open', () => {
       const conn = peer.connect(id, { reliable: true, serialization: 'json' });
-      conn.on('open', () => { this.role = 'member'; this.id = id; this.link = conn; conn.send({ t: 'hello', ...this.meInfo() }); this.emit(); });
+      const watch = (n = 0) => { const pc = conn.peerConnection; if (!pc) { if (n < 50 && !joined && !failed) setTimeout(() => watch(n + 1), 200); return; }
+        pc.addEventListener('iceconnectionstatechange', () => { if (pc.iceConnectionState === 'failed') fail('ice'); }); };
+      watch();
+      conn.on('open', () => { if (failed) return; joined = true; clearTimeout(timer); this.role = 'member'; this.id = id; this.link = conn; conn.send({ t: 'hello', ...this.meInfo() }); this.emit(); });
+      conn.on('error', e => fail(e));
       conn.on('data', msg => this.fromLeader(msg));
-      conn.on('close', () => { if (this.role === 'member') { Toasts.show('You left the party (the leader is gone).', [], 4000); this.reset(); } });
+      conn.on('close', () => { if (!joined) return fail('ice'); if (this.role === 'member' && this.link === conn) { Toasts.show('You left the party (the leader is gone).', [], 4000); this.reset(); } });
     });
   },
   fromLeader(msg) {

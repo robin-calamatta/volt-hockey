@@ -30,6 +30,11 @@ Phaser loads from a CDN; download `phaser.min.js` and change the first script ta
   sideways" screen when a phone is held upright. During a match on a touch screen the 👥 button steps aside (it covered the speed +
   button); the pause menu has **Friends and party** on every device.
 - **Log in with your username or your email.**
+- **Connections that fail now say so**: joining a party or room used to hang silently when the two computers could not connect
+  directly. It now says why within seconds. Add a free TURN relay to fix such networks: `TURN_CREDENTIALS_URL` (DEPLOY.md).
+- **Smoother motion (v8.2)**: carts and the ball are drawn exactly between the fixed 240 Hz simulation steps (`Match.drawBetween`,
+  `CONFIG.render.smooth`). Before, first and third person juddered, worst on 120 / 144 Hz monitors (frame-to-frame unevenness 41% -> 3%).
+- **⚡ quick chat button** next to 💬 and 🎙 (it used to be hidden inside the chat window). Keys 1-9 and D-pad up in a match still work.
 - **Long menu text** shrinks to fit its box.
 - **Server errors fixed** (the Netlify Function now opens its storage fresh on each call), quieter background traffic.
 - **Admin page** at `/admin.html` (DEPLOY.md): players, reports, and every stored item.

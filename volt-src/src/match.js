@@ -140,7 +140,22 @@ class Match {
   update(dt) {                                      // call every frame; runs fixed physics steps
     if (this.remote) return;                        // an online client's copy is driven by snapshots (see net.js)
     this.accumulator += dt; const h = 1 / CONFIG.physics.hz;
-    while (this.accumulator >= h) { this.step(h); this.accumulator -= h; }
+    while (this.accumulator >= h) { this.savePrev(); this.step(h); this.accumulator -= h; }
+    this.alpha = this.accumulator / h;               // how far the screen is between the last two steps (see drawBetween)
+  }
+  /* Smooth motion: the simulation moves in fixed steps, and a frame on screen usually falls between two of them. Drawing the last step
+     as-is makes carts (and a camera riding on one) advance by uneven amounts each frame: judder, worst on 120 / 144 Hz screens.
+     drawBetween(fn) runs fn (the drawing) with every cart and the ball placed exactly between the last two steps, then puts them back. */
+  savePrev() { for (const c of this.chairs) { c.px = c.x; c.py = c.y; c.ph = c.heading; } const b = this.ball; b.px = b.x; b.py = b.y; }
+  drawBetween(fn) {
+    const a = this.alpha; if (this.remote || a === undefined || !CONFIG.render.smooth) return fn();
+    const items = [...this.chairs, this.ball], keep = items.map(o => [o.x, o.y, o.heading]);
+    for (const o of items) {
+      if (o.px === undefined || Math.hypot(o.x - o.px, o.y - o.py) > 0.5) continue;          // a jump (kickoff, the sin bin): no smoothing across it
+      o.x = o.px + (o.x - o.px) * a; o.y = o.py + (o.y - o.py) * a;
+      if (o.ph !== undefined && o.heading !== undefined) o.heading = o.ph + normalizeAngle(o.heading - o.ph) * a;
+    }
+    try { return fn(); } finally { items.forEach((o, i) => { o.x = keep[i][0]; o.y = keep[i][1]; if (keep[i][2] !== undefined) o.heading = keep[i][2]; }); }
   }
   step(h) {
     this.bannerLeft -= h; this.noticeLeft -= h;

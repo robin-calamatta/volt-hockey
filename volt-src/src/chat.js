@@ -38,8 +38,8 @@ const Chat = {
     this.root.addEventListener('click', e => { const a = e.target.dataset && e.target.dataset.a; if (a === 'switch') { this.want = this.channel() === 'party' ? 'room' : 'party'; this.render(); } else if (a === 'close') this.close(); else if (a === 'send') this.sendTyped(); else if (a === 'quick') this.showQuick(null); });
     this.input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); this.sendTyped(); } else if (e.key === 'Escape') { e.preventDefault(); this.close(); } });
     this.quickEl = el('div', 'chatq'); this.menuEl = el('div', 'chatmenu'); this.voiceEl = el('div', 'voicelist');
-    this.btns = el('div', 'chatbtns', `<button data-a="chat">💬<span class="dot" style="display:none"></span></button><button data-a="mic">🎙</button>`);
-    this.btns.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.a === 'chat') (this.open ? this.close() : this.openChat()); });
+    this.btns = el('div', 'chatbtns', `<button data-a="chat">💬<span class="dot" style="display:none"></span></button><button data-a="quick" title="Quick chat (keys 1-9)">⚡</button><button data-a="mic">🎙</button>`);
+    this.btns.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.a === 'chat') (this.open ? this.close() : this.openChat()); else if (b.dataset.a === 'quick') (this.quickOpen ? this.hideQuick() : this.showQuick(null)); });
     const mic = this.btns.querySelector('[data-a=mic]');                         // touch: hold to talk (push to talk), tap to switch mic on / off in open-mic mode
     mic.addEventListener('pointerdown', e => { e.preventDefault(); Voice.touchTalk = true; });
     for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) mic.addEventListener(ev, () => { Voice.touchTalk = false; });

@@ -48,12 +48,24 @@ The game finds the services on the site it was loaded from. If it is shown insid
   (the friends list refreshes every 10 seconds, every 30 when the tab is hidden; `CONFIG.server.syncSeconds`). That is roughly
   350 player-hours a month. Raise `syncSeconds` to stretch it. Guests use none.
 - Netlify Blobs: free storage, far more than accounts and leaderboards need.
-- Voice, parties and online rooms connect players' browsers directly (WebRTC through the free public PeerJS server). Between two
-  home networks this usually works, but some routers, phone networks, schools and offices block direct connections: then voice shows
-  "can't connect" in the friends panel. A **TURN relay** fixes that. Get free TURN credentials (for example metered.ca's free tier,
-  or Cloudflare's TURN service), then in Netlify add an environment variable and redeploy:
-  `ICE_SERVERS` = `[{"urls":"turn:<host>:443?transport=tcp","username":"<user>","credential":"<password>"}]`
-  The game picks it up automatically; nothing else to change.
+- Voice, parties, party / room chat and online rooms connect players' browsers directly (WebRTC; the free public PeerJS server only
+  introduces them). Some routers, phone networks, schools and offices block direct connections, even between two computers in the
+  same house. Then joining says "the two computers could not reach each other directly" (or times out) and voice shows "can't connect".
+
+## TURN relay (fixes "could not connect" between computers)
+
+A relay passes the traffic along when a direct connection is blocked. Free with Metered's Open Relay (20 GB a month, plenty for
+parties, chat and game data; voice uses more):
+1. Sign up free at **metered.ca** (Open Relay / TURN server). In the dashboard, create an app and copy its **TURN credentials API URL**.
+   It looks like `https://<yourapp>.metered.live/api/v1/turn/credentials?apiKey=<key>`.
+2. In Netlify: *Site configuration > Environment variables*, add `TURN_CREDENTIALS_URL` = that URL. Redeploy.
+3. Check: `https://<your-site>/api/ice` should list `turn:` servers. Reload the game on both computers.
+
+The server fetches fresh credentials itself (the key never goes in the game files). Any other TURN service works too: put its servers in
+`ICE_SERVERS` as JSON, e.g. `[{"urls":"turn:<host>:443?transport=tcp","username":"<user>","credential":"<password>"}]`.
+
+If joining still fails with a relay set up, check the matchmaking server: open `https://0.peerjs.com/` in a browser; it should show a
+short line of text mentioning PeerJS. If it does not load, the free public server is down; try again later.
 
 ## Admin page (manage players and data)
 

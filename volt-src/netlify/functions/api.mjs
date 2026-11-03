@@ -15,7 +15,7 @@ function blobStore() {
 
 export default async (req) => {
   // a fresh store for every request: Netlify hands each request its own access to Blobs (reusing one between requests fails)
-  const api = createApi(blobStore(), { sendEmail: mailer(), siteUrl: () => process.env.SITE_URL || process.env.URL || new URL(req.url).origin, ice: () => process.env.ICE_SERVERS, admin: () => ({ user: process.env.ADMIN_USER, pass: process.env.ADMIN_PASSWORD }) });
+  const api = createApi(blobStore(), { sendEmail: mailer(), siteUrl: () => process.env.SITE_URL || process.env.URL || new URL(req.url).origin, ice: () => process.env.ICE_SERVERS, turnUrl: () => process.env.TURN_CREDENTIALS_URL, admin: () => ({ user: process.env.ADMIN_USER, pass: process.env.ADMIN_PASSWORD }) });
   const url = new URL(req.url), path = url.pathname.replace(/^\/api/, '') || '/', headers = Object.fromEntries(req.headers);
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors() });
   let body = {}; if (req.method !== 'GET') { try { body = await req.json(); } catch (e) { body = {}; } }

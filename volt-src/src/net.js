@@ -44,6 +44,7 @@ class PeerTransport {
         const conn = peer.connect(CONFIG.online.roomPrefix + code, { reliable: true, serialization: 'json' });
         conn.on('open', () => { if (!done) { done = true; resolve(this.wrap(conn, peer)); } });
         conn.on('error', fail);
+        watchIce(conn, () => fail({ type: 'ice' }));
       });
       setTimeout(() => fail({ type: 'timeout' }), CONFIG.online.joinTimeoutMs);
     });
@@ -131,11 +132,17 @@ function listPublicRooms() {
   });
 }
 
+// The direct link between two browsers failed (a router or firewall in the way): say so at once instead of waiting for a timeout.
+function watchIce(conn, onFail, n = 0) {
+  const pc = conn.peerConnection; if (!pc) { if (n < 50) setTimeout(() => watchIce(conn, onFail, n + 1), 200); return; }
+  pc.addEventListener('iceconnectionstatechange', () => { if (pc.iceConnectionState === 'failed') onFail(); });
+}
 // Human-readable text for the errors PeerJS (or we) can produce.
 function netErrorText(e) {
   const t = (e && (e.type || e.reason)) || 'unknown';
   return ({
-    'peer-unavailable': 'Room not found. Check the code.', timeout: 'Could not reach the room (timed out). Check the code and your connection.',
+    'peer-unavailable': 'Room not found. Check the code.', timeout: 'Could not reach the room (timed out). Check the code. If it is right, a router or firewall may be blocking the connection between the two computers.',
+    ice: 'Found the room, but the two computers could not connect to each other directly (a router or firewall is blocking it). The game needs a relay server for this network (DEPLOY.md, "TURN relay").',
     network: 'Could not reach the matchmaking server. Check your internet connection.', 'server-error': 'The matchmaking server had a problem. Try again in a moment.',
     'socket-error': 'Lost the matchmaking server. Try again.', 'socket-closed': 'Lost the matchmaking server. Try again.', 'unavailable-id': 'Could not create a room. Try again.',
     'browser-incompatible': 'This browser does not support online play.', full: 'That room is full.', started: 'That match has already started. Ask the host to return to the lobby.',
