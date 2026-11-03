@@ -1,0 +1,6 @@
+{
+  "name": "volt-hockey",
+  "private": true,
+  "description": "Volt Hockey. The game is static files; netlify/functions/api.mjs adds accounts, leaderboard, friends and messages (Netlify Functions + Netlify Blobs).",
+  "dependencies": { "@netlify/blobs": "^8.1.0" }
+}

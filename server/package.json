@@ -1,0 +1,8 @@
+{
+  "name": "volt-hockey-dev-server",
+  "private": true,
+  "type": "module",
+  "description": "Runs Volt Hockey locally with its online services (the same code Netlify runs) and a PeerJS server.",
+  "scripts": { "start": "node dev-server.mjs", "test": "node test-api.mjs" },
+  "dependencies": { "express": "^4.21.2", "peer": "^1.0.2" }
+}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0d151b"><link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen"><meta name="mobile-web-app-capable" content="yes">
+<title>Volt Hockey</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&display=swap">
+<style>html,body{margin:0;height:100%;background:#0d151b;overflow:hidden;touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}canvas{touch-action:none}#stage{position:fixed;left:0;top:0;width:100vw;height:100vh;height:100dvh;overflow:hidden}</style>
+</head><body>
+<div id="stage"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
+<script src="lib/three.min.js"></script>   <!-- Three.js r149 for the 3D view (bundled, no CDN needed) -->
+<!-- Load order matters: each file may use the ones above it. -->
+<script src="src/config.js"></script>
+<script src="src/teams.js"></script>
+<script src="src/settings.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/music.js"></script>
+<script src="src/input.js"></script>
+<script src="src/touch.js"></script>
+<script src="src/chatfilter.js"></script>
+<script src="src/physics.js"></script>
+<script src="src/chair.js"></script>
+<script src="src/brain.js"></script>
+<script src="src/ai.js"></script>
+<script src="src/tuned.js"></script>
+<script src="src/brain_weights.js"></script>
+<script src="src/learn.js"></script>
+<script src="src/commentary.js"></script>
+<script src="src/commentator.js"></script>
+<script src="src/match.js"></script>
+<script src="src/season.js"></script>
+<script src="lib/peerjs.min.js"></script>   <!-- WebRTC helper for online play (bundled, no CDN needed) -->
+<script src="src/net.js"></script>
+<script src="src/account.js"></script>   <!-- optional login, saves online (netlify/functions/api.mjs) -->
+<script src="src/social.js"></script>
+<script src="src/voice.js"></script>
+<script src="src/chat.js"></script>
+<script src="src/ui.js"></script>
+<script src="src/crowd.js"></script>
+<script src="src/view3d.js"></script>
+<script src="src/scenes.js"></script>
+<script src="src/scenes_3d.js"></script>
+<script src="src/scenes_online.js"></script>
+<script src="src/scenes_season.js"></script>
+<script src="src/scenes_social.js"></script>
+<script src="src/main.js"></script>
+</body></html>

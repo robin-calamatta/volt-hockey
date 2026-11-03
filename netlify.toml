@@ -1,0 +1,16 @@
+# Netlify: the game is the static files in this folder; the online services are one function (netlify/functions/api.mjs) at /api/*.
+# Data (accounts, leaderboard, friends, messages) is kept in Netlify Blobs, which every Netlify site has for free with no setup.
+# Deploy with Git (connect this folder's repo in Netlify) or with the CLI:  npx netlify-cli deploy --prod
+# (Drag-and-drop deploys do not include functions.)
+[build]
+  publish = "."
+  command = "npm install --no-audit --no-fund"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[[headers]]
+  for = "/server/*"
+  [headers.values]
+    X-Robots-Tag = "noindex"
