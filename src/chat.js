@@ -9,7 +9,7 @@ const QUICK = ['Nice shot!', 'Pass!', 'Shoot!', 'Defend!', 'Good game!', 'Thanks
 
 const Chat = {
   log: [], root: null, open: false, dmWith: '', dmAfter: 0, dmTimer: null, quickOpen: false, quickIdx: 0, quickSrc: null, quickAt: 0, shown: 0,
-  channel() { if (this.dmWith) return 'dm'; if (Online.current) return 'room'; if (Party.active) return 'party'; return ''; },
+  channel() { if (this.dmWith) return 'dm'; if (this.want === 'party' && Party.active) return 'party'; if (Online.current) return 'room'; if (Party.active) return 'party'; return ''; },   // want: 'party' to talk to your party while in a room
   canType() { return Account.loggedIn; },
   build() {
     if (this.root) return;
@@ -33,9 +33,9 @@ const Chat = {
       #chatmenu{position:fixed;z-index:41;display:none;flex-direction:column;gap:4px;background:rgba(13,21,27,.97);border:1px solid #2f4a5c;border-radius:10px;padding:8px;font-family:"Barlow Condensed",Arial,sans-serif;color:#ffe27a}`;
     document.head.append(css);
     const el = (tag, id, html) => { const e = document.createElement(tag); if (id) e.id = id; if (html) e.innerHTML = html; document.body.append(e); return e; };
-    this.root = el('div', 'chat', `<div class="head"><b></b><button data-a="quick">Quick chat</button><button data-a="close">✕</button></div><div class="log"></div><div class="bar"><input maxlength="200" placeholder="Type a message..." autocomplete="off"><button data-a="send">Send</button></div>`);
+    this.root = el('div', 'chat', `<div class="head"><b></b><button data-a="switch" style="display:none"></button><button data-a="quick">Quick chat</button><button data-a="close">✕</button></div><div class="log"></div><div class="bar"><input maxlength="200" placeholder="Type a message..." autocomplete="off"><button data-a="send">Send</button></div>`);
     this.logEl = this.root.querySelector('.log'); this.input = this.root.querySelector('input'); this.headEl = this.root.querySelector('.head b');
-    this.root.addEventListener('click', e => { const a = e.target.dataset && e.target.dataset.a; if (a === 'close') this.close(); else if (a === 'send') this.sendTyped(); else if (a === 'quick') this.showQuick(null); });
+    this.root.addEventListener('click', e => { const a = e.target.dataset && e.target.dataset.a; if (a === 'switch') { this.want = this.channel() === 'party' ? 'room' : 'party'; this.render(); } else if (a === 'close') this.close(); else if (a === 'send') this.sendTyped(); else if (a === 'quick') this.showQuick(null); });
     this.input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); this.sendTyped(); } else if (e.key === 'Escape') { e.preventDefault(); this.close(); } });
     this.quickEl = el('div', 'chatq'); this.menuEl = el('div', 'chatmenu'); this.voiceEl = el('div', 'voicelist');
     this.btns = el('div', 'chatbtns', `<button data-a="chat">💬<span class="dot" style="display:none"></span></button><button data-a="mic">🎙</button>`);
@@ -50,17 +50,19 @@ const Chat = {
   },
   key(e) {
     if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
-    if (!this.channel()) return;
+    if (!this.channel() || Controls.isModal()) return;                           // the friends window or a form is in front
     if (e.code === 'Tab') { e.preventDefault(); e.stopPropagation(); this.open ? this.close() : this.openChat(); return; }
     const n = /^Digit([1-9])$/.exec(e.code); if (n && !this.open && this.channel() !== 'dm') { e.preventDefault(); this.sendQuick(+n[1]); }
   },
-  openChat() {
-    this.build(); if (!this.channel()) return; this.open = true; this.root.classList.add('open'); this.render();
+  openChat(want) {
+    this.build(); if (want) this.want = want; if (!this.channel()) return; this.open = true; this.root.classList.add('open'); this.render();
+    PadNav.open(this.root, { onBack: () => this.close() });                     // a gamepad can use it too (A on the box opens the on-screen keyboard)
     Controls.keys = {};                                                          // nothing stays held while you type
     this.input.disabled = !this.canType(); this.input.placeholder = this.canType() ? 'Type a message...' : 'Log in to type. Guests can use quick chat.';
-    if (this.canType()) setTimeout(() => this.input.focus(), 0);
+    this.input.dataset.enter = '';                                              // the on-screen keyboard's Done sends
+    if (this.canType() && !PadNav.padRecently()) setTimeout(() => this.input.focus(), 0);
   },
-  close() { this.open = false; if (this.root) { this.root.classList.remove('open'); this.input.blur(); } this.quickOpen = false; if (this.quickEl) this.quickEl.style.display = 'none'; if (this.dmWith) this.closeDm(); else this.render(); },
+  close() { this.open = false; this.want = ''; if (this.root) { this.root.classList.remove('open'); this.input.blur(); PadNav.close(this.root); } this.quickOpen = false; if (this.quickEl) this.quickEl.style.display = 'none'; if (this.dmWith) this.closeDm(); else this.render(); },
   refresh() { this.build(); if (!this.channel() && this.open) this.close(); this.render(); },
 
   /* ---- who sees what ---- */
@@ -115,7 +117,7 @@ const Chat = {
     clearTimeout(this.dmTimer); if (!this.dmWith) return; const who = this.dmWith;
     try { const r = await Account.req('GET', '/dm', null, { with: who, after: this.dmAfter }); if (this.dmWith !== who) return; for (const m of r.msgs) { this.dmAfter = Math.max(this.dmAfter, m.at); this.push({ channel: 'dm', from: m.from, acct: m.from, text: m.text, me: m.from === Account.name, at: m.at }); } }
     catch (e) { this.say(e.message); }
-    this.dmTimer = setTimeout(() => this.pollDm(), 3000);
+    this.dmTimer = setTimeout(() => this.pollDm(), document.hidden ? 20000 : 6000);   // each check is a server call: not too often
   },
   async sendDm(text) { try { const r = await Account.req('POST', '/dm', { to: this.dmWith, text }); this.dmAfter = Math.max(this.dmAfter, r.msg.at); this.push({ channel: 'dm', from: r.msg.from, acct: r.msg.from, text: r.msg.text, me: true, at: r.msg.at }); } catch (e) { this.say(e.message); } },
 
@@ -140,6 +142,7 @@ const Chat = {
     for (const e of [this.root, this.btns, this.voiceEl]) e.classList.toggle('right', right);
     if (!show) return;
     this.headEl.textContent = ch === 'dm' ? 'Messages with ' + this.dmWith : ch === 'room' ? 'Room ' + (Online.current.code || '') + ' chat' : 'Party chat';
+    const sw = this.root.querySelector('[data-a=switch]'); if (sw) { sw.style.display = this.open && Online.current && Party.active && ch !== 'dm' ? '' : 'none'; sw.textContent = ch === 'party' ? 'Room chat' : 'Party chat'; }
     const list = this.log.filter(m => m.channel === ch || (m.sys && m.channel === 'sys')).slice(this.open ? -80 : -6);
     this.logEl.innerHTML = '';
     for (const m of list) {

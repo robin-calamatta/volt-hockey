@@ -108,7 +108,7 @@ class JoinCodeScene extends Phaser.Scene {
     this.add.text(CX, 440, 'Type the room code, or use the gamepad: ▲ ▼ change letter, ◀ ▶ move, A join, B back.   Enter joins, Esc goes back.', { ...STYLE.hint, fontSize: '20px', align: 'center', wordWrap: { width: 1000 } }).setOrigin(0.5);
     this.note = this.add.text(CX, 540, '', { ...STYLE.hint, fontSize: '26px', align: 'center', wordWrap: { width: 900 } }).setOrigin(0.5);
     this.onKey = e => {                                         // raw keyboard: letters type into the code
-      if (this.busy) return;
+      if (this.busy || Controls.isBlocked()) return;             // a pop-up or chat is in front
       if (e.target && e.target.tagName === 'INPUT') { if (e.key === 'Enter') this.submit(); else if (e.key === 'Escape') this.back(); return; }   // the phone's text box handles its own letters
       if (e.key === 'Backspace') { this.cursor = Math.max(0, this.chars[this.cursor] ? this.cursor : this.cursor - 1); this.chars[this.cursor] = ''; }
       else if (e.key === 'Enter') this.submit();
@@ -160,11 +160,12 @@ class JoinCodeScene extends Phaser.Scene {
 /* The room: shows the code and who is on which side. The host sets teams, sizes and difficulty and starts the match. */
 class RoomScene extends ListMenuScene {
   constructor() { super('Room'); }
-  init(data) { this.role = data.role; this.session = data.session || null; this.cursorAt = data.cursor || 0; this.capturing = false; }
+  init(data) { this.role = data.role; this.session = data.session || null; this.cursorAt = data.cursor || 0; this.capturing = false; this.rules = !!data.rules; this.preset = data.preset || (data.session && data.session.preset) || null; }   // preset: a party leader's match / practice / season game (partyGame)
   create() {
     const host = this.role === 'host'; this.opening = false;
     if (host && !this.session) {
       this.opening = true; this.session = new HostSession(new PeerTransport());
+      if (this.preset) { this.session.preset = this.preset; const { seasonFx, ...cfg } = this.preset; Object.assign(this.session.cfg, cfg); this.session.seasonFx = seasonFx || null; if (cfg.season) this.session.roster[0].side = cfg.season.side; }
       this.session.open().then(() => { this.opening = false; }).catch(e => this.fail(e));
     }
     const cycle = (key, d) => { const cfg = this.session.cfg, other = key === 'teamA' ? cfg.teamB : cfg.teamA; let i = cfg[key]; do { i = (i + d + TEAMS.length) % TEAMS.length; } while (i === other); this.session.setConfig({ [key]: i }); };
@@ -175,32 +176,40 @@ class RoomScene extends ListMenuScene {
     const rename = n => { if (host) this.session.setName(this.session.myId, n); else this.session.setName(n); };
     const yourName = nameItem(rename);
     const yourSide = { label: () => `Your side   ◀ ${me() && me().side ? 'Right' : 'Left'} ▶`, change: flip, select: flip };
-    const inviteRow = { label: () => 'Invite friends   (Tab or 💬 to chat)', select: () => { if (!Account.loggedIn) return Forms.account(); if (this.session && this.session.code) Forms.invite('room', this.session.code); } };
     const lockMe = () => { const on = !(me() && me().lock); if (host) this.session.setLock(this.session.myId, on); else this.session.setLock(on); };
     const yourLock = { label: () => `Your cart   ◀ ${me() && me().lock ? 'Locked: one cart all game' : 'Can switch with Y'} ▶`, change: lockMe, select: lockMe };
     // Local guests: friends on this machine, each on a controller of their own. They play in this room through your connection.
     const S = this.session, mine = S ? S.roster.filter(r => r.own === S.myId) : [], max = CONFIG.online.maxGuests;
     this.guestSig = mine.map(r => r.id + ':' + r.side).join();
     const flipGuest = g => () => { const side = 1 - g.side; if (host) this.session.setSide(g.id, side); else this.session.setSide(side, g.id); };
+    // the host can put anyone on either team (not in a season game: everyone plays for the season team)
+    const others = host ? S.roster.filter(r => r.id !== S.myId && r.own !== S.myId) : [];
+    const moveRows = host && !(S.cfg && S.cfg.season) ? others.map(r => ({ label: () => { const x = S.roster.find(q => q.id === r.id); return x ? `${x.name}${x.guest ? ' (guest)' : ''}   ◀ ${x.side ? 'Right' : 'Left'} team ▶` : ''; }, change: () => { const x = S.roster.find(q => q.id === r.id); if (x) S.setSide(x.id, 1 - x.side); }, select: () => { const x = S.roster.find(q => q.id === r.id); if (x) S.setSide(x.id, 1 - x.side); } })) : [];
+    this.rosterSig = S ? S.roster.map(r => r.id).join() : '';
     const guestRows = [...mine.map(g => ({ label: () => `Guest ${g.name}   ◀ ${g.side ? 'Right' : 'Left'} ▶   (A: remove)`, change: flipGuest(g), select: () => { this.session.removeGuest(g.id, host ? 1 : undefined); } })),
       ...(S && mine.length < max && S.roster.length < CONFIG.online.maxPlayers ? [{ label: () => 'Add a local guest...', select: () => this.beginCapture() }] : [])];
-    const items = host ? [
-      yourName, yourSide, yourLock, inviteRow, ...guestRows,
+    // the host's list is split in two pages so every row stays big enough to tap on a phone
+    const page = rules => () => this.scene.restart({ role: this.role, session: this.session, cursor: 0, rules, preset: this.preset });
+    const items = host && !this.rules ? [
+      yourName, ...(S.cfg && S.cfg.season ? [] : [yourSide]), yourLock, ...guestRows, ...moveRows,
       { label: () => `Room   ◀ ${this.session.visibility === 'public' ? 'PUBLIC (listed)' : 'Private (code only)'} ▶`, change: () => this.toggleVisibility(), select: () => this.toggleVisibility() },
+      { label: () => `Lobby name   ◀ ${this.session.lobbyName} ▶`, change: d => this.cycleName(d), select: () => this.typeName() },
+      { label: () => `Teams and rules ▸   (${TEAMS[cfg().teamA].name} v ${TEAMS[cfg().teamB].name}, ${cfg().practice ? 'practice' : cfg().difficulty})`, select: page(true) },
+      { label: () => 'START MATCH', select: () => this.startHost() },
+      { label: () => 'Close room', select: () => this.leave() }
+    ] : host ? [
       speedCapItem('Max cart speed (locked for all)'),
       toggle('Cart collisions', 'collisions'), toggle('Penalties', 'penalties'), lockCartItem(), slider('Game clock speed', 'timeSpeed', times),   // rules: only the host can change these, and they are fixed for everyone at kick-off
-      { label: () => `Lobby name   ◀ ${this.session.lobbyName} ▶`, change: d => this.cycleName(d), select: () => this.typeName() },
       { label: () => `Left team   ◀ ${teamName(cfg().teamA)} ▶`, change: d => cycle('teamA', d) },
       { label: () => `Right team   ◀ ${teamName(cfg().teamB)} ▶`, change: d => cycle('teamB', d) },
       { label: () => `Left side carts   ◀ ${cfg().sizes[0]} ▶`, change: d => size(0, d) },
       { label: () => `Right side carts   ◀ ${cfg().sizes[1]} ▶`, change: d => size(1, d) },
       { label: () => `CPU skill   ◀ ${cfg().difficulty} ▶`, change: d => this.session.setConfig({ difficulty: names[(names.indexOf(cfg().difficulty) + d + names.length) % names.length] }) },
       { label: () => `Practice (no clock)   ◀ ${cfg().practice ? 'On' : 'Off'} ▶`, change: () => this.session.setConfig({ practice: !cfg().practice }), select: () => this.session.setConfig({ practice: !cfg().practice }) },
-      { label: () => 'START MATCH', select: () => this.startHost() },
-      { label: () => 'Close room', select: () => this.leave() }
-    ] : [yourName, yourSide, yourLock, inviteRow, ...guestRows, { label: () => 'Teams, carts per side, CPU skill and the rules are set by the host' }, { label: () => 'Leave room', select: () => this.leave() }];
+      { label: () => '◂ Back to the room', select: page(false) }
+    ] : [yourName, yourSide, yourLock, ...guestRows, { label: () => 'Teams, carts per side, CPU skill and the rules are set by the host' }, { label: () => 'Leave room', select: () => this.leave() }];
     this.buildMenu('', items.map(it => ({ ...it, select: it.select && (() => !this.opening && it.select()), change: it.change && (d => !this.opening && it.change(d)) })), 120, { x: 330, size: 32 });
-    this.onBack = () => this.leave(); this.cursor = Math.min(this.cursorAt, this.items.length - 1);
+    this.onBack = host && this.rules ? page(false) : () => this.leave(); this.cursor = Math.min(this.cursorAt, this.items.length - 1);
     this.codeText = this.add.text(CX, 45, '', { ...STYLE.title, fontSize: '48px' }).setOrigin(0.5);
     this.statusText = this.add.text(330, 690, '', { ...STYLE.hint, fontSize: '20px', align: 'center', wordWrap: { width: 600 } }).setOrigin(0.5);
     this.sideTitles = [0, 1].map(s => this.add.text(1010, 130 + s * 280, '', { ...STYLE.hud, fontSize: '36px' }).setOrigin(0.5, 0));
@@ -227,12 +236,14 @@ class RoomScene extends ListMenuScene {
   beginClient(msg) {
     const s = this.session; Settings.applyRules(msg.rules || {});
     const players = msg.players.map(p => ({ id: p.id, name: p.name, side: p.side, tag: p.tag, speedLevel: Settings.speedLevel, chair: null, spinQueued: 0 }));
-    const match = new Match({ teamA: msg.cfg.teamA, teamB: msg.cfg.teamB, players, difficulty: msg.cfg.difficulty, sizes: msg.cfg.sizes, practice: msg.cfg.practice, remote: true });
+    const match = new Match({ teamA: msg.cfg.teamA, teamB: msg.cfg.teamB, players, difficulty: msg.cfg.difficulty, sizes: msg.cfg.sizes, practice: msg.cfg.practice, remote: true, periodSeconds: msg.cfg.season ? msg.cfg.season.periodSeconds : undefined });
     this.scene.start('Game', { online: { role: 'client', session: s, match, players, sim: new ClientSim(s, match, players) } });
   }
-  exit(message) {                                             // close or leave the room and go back to the Online menu
+  exit(message) {                                             // close or leave the room and go back to the Online menu (a party leader's own game: back where it was started)
     Settings.restoreRules(); Controls.claimed.clear();
-    if (this.session) { try { this.role === 'host' ? this.session.close() : this.session.leave(); } catch (x) { /* already closed */ } }
+    if (this.session) { try { this.role === 'host' ? this.session.close(this.preset ? 'party_done' : undefined) : this.session.leave(); } catch (x) { /* already closed */ } }
+    if (this.preset && this.preset.season) return this.scene.start('SeasonHub');
+    if (this.preset) return this.scene.start('Main');
     this.scene.start('OnlineMenu', { message });
   }
   fail(e) { this.exit(netErrorText(e)); }
@@ -251,7 +262,7 @@ class RoomScene extends ListMenuScene {
     const s = this.session; if (s) Controls.claim(s.claimedSources());
     if (s && this.capturing) { this.captureUpdate(); this.statusText.setText((this.flash && this.time.now < this.flashUntil ? this.flash + '\n' : '') + 'GUEST: press A on their controller (Space on keyboard 1, Right Shift on keyboard 2).  B cancels.'); return; }
     super.update(); if (!s || !this.sys.isActive() || !this.sideLists) return;
-    if (s.roster.filter(r => r.own === s.myId).map(r => r.id + ':' + r.side).join() !== this.guestSig) { this.scene.restart({ role: this.role, session: s, cursor: this.cursor }); return; }
+    if (s.roster.filter(r => r.own === s.myId).map(r => r.id + ':' + r.side).join() !== this.guestSig || (this.role === 'host' && s.roster.map(r => r.id).join() !== this.rosterSig)) { this.scene.restart({ role: this.role, session: s, cursor: this.cursor, rules: this.rules, preset: this.preset }); return; }
     if (this.role === 'client' && s.silent()) { s.finish('lost'); return; }
     if (!this.sys.isActive() || !this.codeText || !this.codeText.active) return;     // the scene is on its way out: nothing left to draw
     this.codeText.setText(this.opening || !s.code ? 'Opening room...' : 'ROOM  ' + s.code + (this.role === 'host' ? (s.visibility === 'public' ? '  · PUBLIC' : '  · PRIVATE') : ''));

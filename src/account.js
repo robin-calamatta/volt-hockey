@@ -27,7 +27,9 @@ const Account = {
     if (this.token) headers.authorization = 'Bearer ' + this.token;
     let res; try { res = await fetch(this.base() + '/api' + path + q, { method, headers, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' }); }
     catch (e) { throw Object.assign(new Error('Could not reach the server. Check your connection.'), { status: 0 }); }
-    let data = {}; try { data = await res.json(); } catch (e) { data = {}; }
+    let data = null; try { data = await res.json(); } catch (e) { data = null; }
+    if (!data && !res.ok) throw Object.assign(new Error(res.status === 404 ? "The game's online services aren't on this site yet (the Netlify Function isn't deployed). See DEPLOY.md." : 'The server had a problem (' + res.status + '). Please try again in a moment.'), { status: res.status });
+    data = data || {};
     if (!res.ok) { if (res.status === 401 && this.token && path !== '/login') this.dropLogin(); throw Object.assign(new Error(data.error || 'Server error (' + res.status + ').'), { status: res.status }); }
     return data;
   },
@@ -42,13 +44,17 @@ const Account = {
       catch (e) { this.lastError = e.message; }
     }
     this.ready = true; this.emit();
+    this.loadIce();
     if (this.loggedIn && typeof Social !== 'undefined') Social.start();
   },
   persist() { try { localStorage.setItem(this.key, JSON.stringify(this.loggedIn ? { token: this.token, user: this.user } : null)); } catch (e) { /* storage blocked */ } },
   dropLogin() { this.token = null; this.user = null; this.persist(); if (typeof Social !== 'undefined') Social.stop(); this.emit(); },
 
   /* ---- logging in and out ---- */
-  async register(username, password, age) { const r = await this.req('POST', '/register', { username, password, age }); await this.begin(r, true); return r; },
+  async register(username, password, age, email) { const r = await this.req('POST', '/register', { username, password, age, email }); await this.begin(r, true); return r; },
+  requestReset(who) { return this.req('POST', '/reset/request', { who, origin: location.origin }); },             // emails a reset link
+  async confirmReset(token, password) { const r = await this.req('POST', '/reset/confirm', { token, password }); await this.begin(r, false); return r; },
+  async setEmail(email, password) { const r = await this.req('POST', '/email', { email, password }); this.user = r.user; this.persist(); this.emit(); return r; },
   async login(username, password) { const r = await this.req('POST', '/login', { username, password }); await this.begin(r, false); return r; },
   async begin(r, fresh) {
     this.token = r.token; this.user = r.user; this.persist();
@@ -81,5 +87,7 @@ const Account = {
     if (!this.loggedIn) return; const p = this.progressNow(), json = JSON.stringify(p); if (!force && json === this.lastProgress) return;
     try { await this.req('PUT', '/progress', p); this.lastProgress = json; } catch (e) { this.lastError = e.message; }
   },
+  /* A TURN relay the site owner set up (ICE_SERVERS in Netlify): lets voice and parties connect on strict networks. */
+  async loadIce() { try { const r = await this.req('GET', '/ice'); if (Array.isArray(r.iceServers) && r.iceServers.length) CONFIG.online.iceServers = [...CONFIG.online.iceServers, ...r.iceServers]; } catch (e) { /* none */ } },
   leaderboard() { return this.req('GET', '/leaderboard'); }
 };

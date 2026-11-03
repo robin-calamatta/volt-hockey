@@ -12,8 +12,8 @@ const STYLE = {
 };
 // The controls guide (Settings > Controls and screen > Controls guide). Edit freely: one block per device.
 const CONTROLS_GUIDE = [
-  ['GAMEPAD', ['Left stick   drive  (1st / 3rd person: up = go, ◀ ▶ = turn)', 'Right stick   look around (springs back)', 'L3 (hold)   push to talk      D-pad ▲   quick chat', 'View   camera: 1st person, 3rd person, broadcast, 2D', 'RT / LT   spin clockwise / counter-clockwise', 'RB / LB   half spin (half a trigger)', 'D-pad ◀ ▶   speed down / up', 'X   full press on / off (goalie joins the attack)', 'Y   switch cart', 'Start   pause      A / B   select / back']],
-  ['KEYBOARD 1', ['WASD   drive', 'T   camera view', 'Tab   chat      1-9   quick chat      G (hold)   talk', 'E / Q   spin', 'R / Z   half spin', 'X   full press on / off', 'V / C   speed up / down', 'F   switch cart', 'Esc   pause', 'Space / Backspace   select / back']],
+  ['GAMEPAD', ['Left stick   drive  (1st / 3rd person: up = go, ◀ ▶ = turn)', 'Right stick   look around (springs back)', 'L3 (hold)   push to talk      D-pad ▲   quick chat', 'D-pad ▼   camera      Select (View)   friends and party', 'RT / LT   spin clockwise / counter-clockwise', 'RB / LB   half spin (half a trigger)', 'D-pad ◀ ▶   speed down / up', 'X   full press on / off (goalie joins the attack)', 'Y   switch cart', 'Start   pause      A / B   select / back']],
+  ['KEYBOARD 1', ['WASD   drive', 'T   camera view', 'Tab chat   1-9 quick chat   G (hold) talk   ` friends', 'E / Q   spin', 'R / Z   half spin', 'X   full press on / off', 'V / C   speed up / down', 'F   switch cart', 'Esc   pause', 'Space / Backspace   select / back']],
   ['KEYBOARD 2', ['Arrows   drive', 'P   camera view', 'L (hold)   push to talk', '. / ,   spin', '] / [   half spin', '\\   full press on / off', "' / ;   speed up / down", '/   switch cart', 'Right Shift / Right Ctrl   select / back']],
   ['TOUCH', ['Stick   drive', 'VIEW   camera view', '💬   chat      🎙   talk (hold) / mic on-off (tap)', 'Spin buttons   spin', 'Small spin buttons   half spin', 'PRESS   full press on / off', '+ / -   speed up / down', 'Cart button   switch cart', 'II   pause', 'Settings > Touch and screen   move the buttons']]
 ];
@@ -55,8 +55,8 @@ const lockCartItem = () => ({ rule: true, label: () => `Switch carts with Y   �
 /* The settings, grouped. Each page is a list of menu items; SettingsScene lists the pages with a line saying what is on each (SETTINGS_HINTS).
    'Camera and graphics' is its own scene (CameraPageScene) with a live picture of the game behind it. */
 const SETTINGS_PAGES = {
-  'Account and player': () => [
-    { label: () => !Account.available() ? 'Account: online services need the game opened from its website' : Account.loggedIn ? `Logged in as ${Account.name}   ·   A: log out` : 'Account: guest   ·   A: log in or sign up', select: () => { if (Account.loggedIn) { Account.logout(); Party.reset(); } else Forms.account(); } },
+  'Player': () => [
+    { label: () => 'Account, friends and party: the 👥 button (top left), Select on a gamepad, or the ` key' },
     nameItem(), { label: () => `Career:  ${(Settings.career || {}).games || 0} matches   ${(Settings.career || {}).wins || 0} wins   ${(Settings.career || {}).goals || 0} goals   ${(Settings.career || {}).shots || 0} shots on net` }],
   'Sound and commentary': () => [slider('Music volume', 'musicVolume', pct), slider('Effects volume', 'sfxVolume', pct), slider('Crowd volume', 'crowdVolume', pct),
     { label: () => `Commentator   ◀ ${{ full: 'Voice and captions', voice: 'Voice only', captions: 'Captions only', off: 'Off' }[Settings.commentaryMode || 'full']} ▶`, change: d => Commentator.cycleMode(d), select: () => Commentator.cycleMode(1) },
@@ -83,7 +83,7 @@ const SETTINGS_PAGES = {
     toggle('Fullscreen on first tap', 'autoFullscreen')]
 };
 const SETTINGS_HINTS = {
-  'Account and player': 'Log in or out, your name and your career totals',
+  'Player': 'Your name and your career totals',
   'Voice chat': 'Voice on or off, push to talk, microphone, mic volume, hear yourself, voice volume',
   'Sound and commentary': 'Master volume, speakers, music, effects and crowd volume, commentator voice and captions',
   'Camera and graphics': 'First / third person, broadcast, 2D view, field of view, court, crowd, graphics quality',
@@ -93,7 +93,7 @@ const SETTINGS_HINTS = {
   'Controls and screen': 'Controls guide, right-stick look, touch buttons, fullscreen'
 };
 const sampleCall = key => { const e = Commentary.pick(key, { whoT: 'Volts', whoN: 2, who: 'Robin', a: 3, o: 2, sa: 12, sb: 7, team: 'Volts', opp: 'Comets', tail: ' 3 to 2.' }); if (e) { const l = Commentary.parse(e); Commentator.speak({ ...l, mood: Math.max(l.mood, 2) }); } };
-const SETTINGS_ORDER = ['Camera and graphics', 'Sound and commentary', 'Voice chat', 'Game rules', 'Ball and carts', 'CPU opponent', 'Controls and screen', 'Account and player'];
+const SETTINGS_ORDER = ['Camera and graphics', 'Sound and commentary', 'Voice chat', 'Game rules', 'Ball and carts', 'CPU opponent', 'Controls and screen', 'Player'];
 
 class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
@@ -150,6 +150,10 @@ class TitleScene extends Phaser.Scene {
 
 /* Base class for every list menu. Items: { label(): string, select?(), change?(dir) }. */
 class ListMenuScene extends Phaser.Scene {
+  fitRow(row, want) {                                                  // a long label is shrunk so it never spills out of the panel
+    const room = this.panelBox ? this.panelBox.w - 36 : CONFIG.view.width - 40, w = row.width || 1;
+    row.setScale(Math.min(want, room / w));
+  }
   buildMenu(title, items, top = 210, opts = {}) {                    // opts: { x: row centre, size: max font size, noFooter }
     this.items = items; this.cursor = 0; menuBackdrop(this);
     const long = items.length > 8, V = CONFIG.view;                   // long menus use a smaller title and tighter rows
@@ -160,6 +164,7 @@ class ListMenuScene extends Phaser.Scene {
     }
     const gap = Math.min(58, (V.height - top - 60) / items.length), size = Math.min(opts.size || 40, Math.floor(gap * 0.7)), cx = opts.x || CX, w = opts.panelWidth || Math.min(900, Math.max(560, 40 + (opts.size ? 600 : 640)));
     panel(this, cx - w / 2, top - gap * 0.75, w, gap * items.length + gap * 0.5);
+    this.panelBox = { x: cx - w / 2, w };                              // rows are shrunk to fit inside it (fitRow)
     this.bar = new SelectionBar(this, cx, w - 24, gap - 6);
     this.rows = items.map((_, i) => this.add.text(cx, top + i * gap, '', { ...STYLE.row, fontSize: size + 'px' }).setOrigin(0.5));
     items.forEach((item, i) => {                                       // tap a row: left third = less, right third = more, middle = select
@@ -177,15 +182,16 @@ class ListMenuScene extends Phaser.Scene {
   }
   update() {
     Controls.update(this.game.loop.frame);
-    if (!this.items || (typeof Forms !== 'undefined' && Forms.isOpen)) return;      // a pop-up form has the keyboard
+    if (!this.items || (typeof PadNav !== 'undefined' && PadNav.stack.some(x => x.modal))) return;      // a pop-up (form, friends) has the controls
     const e = Controls.menu(), n = this.items.length, item = this.items[this.cursor];
+    if (Controls.escPressed) { if (this.onBack) { Sound.play('back'); this.onBack(); } return; }   // Esc on a keyboard: back (it is also Start, which would select)
     if (e.up) { this.cursor = (this.cursor + n - 1) % n; Sound.play('blip'); }
     if (e.down) { this.cursor = (this.cursor + 1) % n; Sound.play('blip'); }
     if (e.left && item.change) { item.change(-1); Sound.play('blip'); }
     if (e.right && item.change) { item.change(1); Sound.play('blip'); }
     if ((e.a || e.start) && item.select) { Sound.play('select'); item.select(); return; }
     if (e.b && this.onBack) { Sound.play('back'); this.onBack(); return; }
-    this.rows.forEach((row, i) => row.setText(this.items[i].label()).setColor(i === this.cursor ? STYLE.colorSelected : STYLE.colorIdle).setScale(i === this.cursor ? 1.04 : 1));
+    this.rows.forEach((row, i) => { row.setText(this.items[i].label()).setColor(i === this.cursor ? STYLE.colorSelected : STYLE.colorIdle); this.fitRow(row, i === this.cursor ? 1.04 : 1); });
     this.bar.moveTo(this.rows[this.cursor].y);
     if (this.hintText) this.hintText.setText(item && item.hint ? (typeof item.hint === 'function' ? item.hint() : item.hint) : '');
   }
@@ -211,6 +217,7 @@ class NameEntryScene extends Phaser.Scene {
     });
     this.add.text(CX, 650, 'Pick letters with ◀ ▲ ▼ ▶ + A    Start: done    B: cancel      On a keyboard just type, Enter = done', { fontFamily: FONT, fontSize: '20px', color: THEME.dim }).setOrigin(0.5);
     this.onKey = e => {
+      if (keyForPopup(e)) return;                                // typing in a pop-up or chat over this screen
       if (e.key === 'Enter') { this.finish(true); e.preventDefault(); }
       else if (e.key === 'Escape') { this.finish(false); e.preventDefault(); }
       else if (e.key === 'Backspace') { this.text = this.text.slice(0, -1); e.preventDefault(); }
@@ -255,12 +262,11 @@ class MainMenuScene extends ListMenuScene {
   constructor() { super('Main'); }
   create() {
     this.buildMenu('VOLT HOCKEY', [
-      { label: () => 'Play', hint: 'A match against the CPU or friends on this screen', select: () => this.scene.start('Setup', { practice: false }) },
-      { label: () => 'Season', hint: 'A full season, playoffs and the Volt Hockey World Cup', select: () => this.scene.start('SeasonMenu') },
-      { label: () => 'Practice', hint: 'Any team sizes, no clock', select: () => this.scene.start('Setup', { practice: true }) },
-      { label: () => 'Friends and party' + (Social.unreadTotal() ? `   ✉ ${Social.unreadTotal()}` : '') + (Social.data.invites.length ? '   ★ invite' : ''), hint: 'Log in, add friends, message them, party up and invite them to games', select: () => this.scene.start('Social') },
+      { label: () => 'Play' + leaderPicks(), hint: 'A match against the CPU or friends on this screen (in a party: your whole party)', select: () => memberWaits() || this.scene.start('Setup', { practice: false }) },
+      { label: () => 'Season' + leaderPicks(), hint: 'A full season, playoffs and the Volt Hockey World Cup (in a party: your party plays for your team)', select: () => memberWaits() || this.scene.start('SeasonMenu') },
+      { label: () => 'Practice' + leaderPicks(), hint: 'Any team sizes, no clock', select: () => memberWaits() || this.scene.start('Setup', { practice: true }) },
       { label: () => 'Leaderboard', hint: 'The best players everywhere: World Cups, wins, goals and win %', select: () => this.scene.start('Leaderboard') },
-      { label: () => 'Online', hint: 'Host or join a room, public or private', select: () => this.scene.start('OnlineMenu') },
+      { label: () => 'Online' + leaderPicks(), hint: 'Host or join a room, public or private', select: () => memberWaits() || this.scene.start('OnlineMenu') },
       { label: () => 'Settings', hint: 'Camera, sound, rules, CPU, controls and your name', select: () => this.scene.start('Settings') }
     ], 280);
   }
@@ -308,9 +314,8 @@ class ControlsGuideScene extends Phaser.Scene {                    // what every
       this.add.text(x + 26, y + 14, title, { ...STYLE.hint, fontSize: '26px', color: THEME.gold_css });
       this.add.text(x + 26, y + 48, lines.join('\n'), { fontFamily: FONT, fontSize: '18px', color: '#dbe7ee', lineSpacing: 1 });
     });
-    this.add.text(CX, V.height - 26, 'B  back', { fontFamily: FONT, fontSize: '19px', color: THEME.dim }).setOrigin(0.5);
     const back = () => { Sound.play('back'); if (this.page) this.scene.start('SettingsPage', { page: this.page, ctx: this.ctx }); else this.scene.start('Settings', this.ctx); };
-    const btn = this.add.zone(CX, V.height - 26, 200, 50).setInteractive({ useHandCursor: true }); btn.on('pointerdown', back);
+    tapButton(this, CX, V.height - 26, 220, 'Back  (B)', back);
     this.back = back;
   }
   update() { Controls.update(this.game.loop.frame); if (Controls.menu().b || Controls.menu().a) this.back(); }
@@ -321,7 +326,7 @@ class SetupScene extends ListMenuScene {
   init(data) { this.practice = !!(data && data.practice); }
   create() {
     const size = (name, key) => ({ label: () => `${name}   ◀ ${Settings[key]} cart${Settings[key] > 1 ? 's' : ''} ▶`, change: d => Settings.adjust(key, d) });
-    const toLobby = () => this.scene.start('Lobby', { practice: this.practice, sizes: this.practice ? [Settings.sizeA, Settings.sizeB] : [CONFIG.match.chairsPerTeam, CONFIG.match.chairsPerTeam] });
+    const toLobby = () => partyGame(this, { teamA: Settings.teamA, teamB: Settings.teamB, difficulty: Settings.difficulty, practice: this.practice, sizes: this.practice ? [Settings.sizeA, Settings.sizeB].map(n => Math.min(n, CONFIG.match.chairsPerTeam)) : [CONFIG.match.chairsPerTeam, CONFIG.match.chairsPerTeam] }) || this.scene.start('Lobby', { practice: this.practice, sizes: this.practice ? [Settings.sizeA, Settings.sizeB] : [CONFIG.match.chairsPerTeam, CONFIG.match.chairsPerTeam] });
     this.buildMenu(this.practice ? 'PRACTICE SETUP' : 'MATCH SETUP', [
       { label: () => `Left team   ◀ ${TEAMS[Settings.teamA].name} ▶`, change: d => Settings.cycleTeam('teamA', d) },
       { label: () => `Right team   ◀ ${TEAMS[Settings.teamB].name} ▶`, change: d => Settings.cycleTeam('teamB', d) },
@@ -329,7 +334,8 @@ class SetupScene extends ListMenuScene {
       { label: () => `Difficulty   ◀ ${Settings.difficulty} ▶`, change: d => Settings.cycleDifficulty(d) },
       speedCapItem('Max cart speed'), lockCartItem(),
       ...(this.practice ? [] : [{ label: () => `Game clock   ◀ ${times(Settings.timeSpeed)} ▶`, change: d => Settings.adjust('timeSpeed', d) }]),
-      { label: () => 'Choose players', select: toLobby }
+      { label: () => 'Choose players', select: toLobby },
+      { label: () => 'Back', select: () => this.scene.start('Main') }
     ], 250);
     this.onBack = () => this.scene.start('Main');
     this.logoA = this.add.image(190, 400, 'logo-' + TEAMS[Settings.teamA].id).setDisplaySize(240, 240);
@@ -349,9 +355,18 @@ class LobbyScene extends Phaser.Scene {
   create() {
     this.players = []; this.ready = 0;
     this.add.text(CX, 90, 'CHOOSE PLAYERS', { ...STYLE.title, fontSize: '72px' }).setOrigin(0.5);
-    this.add.text(CX, 640, 'A: join   ◀ ▶: team   X: lock to one cart   ▲ ▼: pick your name   Y: type a name   Start: kick off   B: leave.\nEmpty carts are played by NPCs. A locked player keeps the cart they start in all game (Y will not switch).', { ...STYLE.hint, fontSize: '24px' }).setOrigin(0.5);
+    this.add.text(CX, 596, 'A: join   ◀ ▶: team   X: lock to one cart   ▲ ▼: pick your name   Y: type a name   Start: kick off   B: leave.\nEmpty carts are played by NPCs. A locked player keeps the cart they start in all game (Y will not switch).', { ...STYLE.hint, fontSize: '22px' }).setOrigin(0.5);
+    // mouse and touch: leave, join with the on-screen controller, kick off (with whoever has joined, or CPU v CPU)
+    tapButton(this, 150, 676, 220, 'Back', () => { if (this.players.length) this.players = []; else this.scene.start(this.season ? 'SeasonHub' : 'Setup', { practice: this.practice }); });
+    if (Settings.touch || navigator.maxTouchPoints > 0) tapButton(this, CX, 676, 360, 'Join (touch controls)', () => {
+      if (!Settings.touch) TouchPad.toggle();
+      if (!Controls.sources.touch) Controls.sources.touch = new Source('touch', 'Touch controls');
+      const src = Controls.sources.touch; if (!src || this.playerOf(src) || this.openSide() === null) return;
+      this.players.push({ src, side: this.openSide(), chair: null, spinQueued: 0, speedLevel: Settings.speedLevel, name: this.firstName() });
+    });
+    tapButton(this, 1130, 676, 260, 'Kick off', () => { Controls.owner = null; this.scene.start('Game', { players: this.players, sizes: this.sizes, practice: this.practice, season: this.season }); });
     this.colA = this.add.text(300, 270, '', STYLE.row).setOrigin(0.5, 0); this.colB = this.add.text(980, 270, '', STYLE.row).setOrigin(0.5, 0);
-    this.idle = this.add.text(CX, 220, '', { ...STYLE.row, fontSize: '28px' }).setOrigin(0.5, 0);
+    this.idle = this.add.text(CX, 220, '', { ...STYLE.row, fontSize: '28px', align: 'center', wordWrap: { width: 1180 } }).setOrigin(0.5, 0);
     this.add.image(300, 160, 'logo-' + TEAMS[this.teams[0]].id).setDisplaySize(90, 90);
     this.add.image(980, 160, 'logo-' + TEAMS[this.teams[1]].id).setDisplaySize(90, 90);
     this.add.text(300, 222, TEAMS[this.teams[0]].name.toUpperCase(), { ...STYLE.hud, color: teamColorHex(this.teams[0]) }).setOrigin(0.5);
@@ -430,6 +445,11 @@ class GameScene extends Phaser.Scene {
     this.pingText = this.add.text(V.width - 10, V.height - 22, '', { ...STYLE.hint, fontSize: '14px', color: '#9fb2bf' }).setOrigin(1, 0);   // online: ping and players
     this.noticeText = this.add.text(this.courtCX, this.viewTop + 14, '', { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: '#ffe27a', align: 'center' }).setOrigin(0.5, 0).setStroke('#0d151b', 6).setAlpha(0.92).setDepth(30);   // fouls and other events: over the top of the court, smallish so play stays visible
     this.setup3d();                                          // first / third person and broadcast cameras (scenes_3d.js)
+    if (!this.demo) {                                          // a pause button for the mouse (the touch controller has its own)
+      this.pauseBtn = tapButton(this, 58, 86, 92, 'II', () => this.pauseFromTap());
+      for (const o of [this.pauseBtn.bg, this.pauseBtn.t, this.pauseBtn.hit]) o.setDepth(60).setScrollFactor(0);
+      this.pauseBtn.bg.setAlpha(0.8);
+    }
     if (!this.demo) Sound.playMusic('match');
     if (this.online) {                                         // leave cleanly if the host goes away or the room returns to its lobby
       const o = this.online;
@@ -437,13 +457,18 @@ class GameScene extends Phaser.Scene {
       else { o.idle = { ax: 0, ay: 0, pressed: {} }; o.session.onError = () => {}; }
     }
   }
+  pauseFromTap() {
+    if (!this.match || this.match.state === 'over' || this.scene.isActive('Pause') || this.scene.isActive('JoinMenu')) return;
+    Controls.owner = null; this.scene.launch('Pause', { game: this, online: !!this.online }); if (!this.online) this.scene.pause();
+  }
+  showPauseBtn() { const b = this.pauseBtn; if (!b) return; const v = !Settings.touch && this.match.state !== 'over'; if (b.t.visible !== v) { b.bg.setVisible(v); b.t.setVisible(v); b.hit.input.enabled = v; } }
   leaveOnline(message) {
     Controls.owner = null; Controls.claimed.clear();
     const o = this.online; if (o.role === 'host') o.session.close(); else o.session.leave();
     Settings.restoreRules(); Sound.playMusic('menu'); this.scene.stop('Pause'); this.scene.start('OnlineMenu', { message: message || '' });
   }
   updateOnline(delta) {                                        // an online match: the host simulates, clients predict their own cart and draw host snapshots
-    const o = this.online, m = this.match, dt = Math.min(delta / 1000, 0.05), pad = Controls.combined, menuOpen = this.scene.isActive('Pause');
+    const o = this.online, m = this.match, dt = Math.min(delta / 1000, 0.05), pad = Controls.combined, menuOpen = this.scene.isActive('Pause') || FriendsBar.open || Forms.isOpen;   // (the friends window or a form is open: your cart coasts)
     const idle = { ax: 0, ay: 0, pressed: {}, held: {} };                                    // while the menu is open your carts get no input
     if (pad.pressed.start && m.state !== 'over' && !menuOpen) { Sound.play('select'); Controls.owner = Controls.list().find(src => src.pressed.start) || null; this.scene.launch('Pause', { game: this, online: true }); }
     Controls.claim(o.session.claimedSources());
@@ -461,7 +486,10 @@ class GameScene extends Phaser.Scene {
       }
       this.pre3d(dt); m.update(dt); o.session.tick(dt);
       this.pingText.setText(`${o.session.roster.length} player${o.session.roster.length > 1 ? 's' : ''} online   room ${o.session.code}`);
-      if (m.state === 'over' && this.resultReady() && Controls.menu().a && !menuOpen) { o.session.backToLobby(); this.scene.start('Room', { role: 'host', session: o.session }); return; }
+      if (m.state === 'over' && o.session.seasonFx && !this.filed) { this.filed = true; Season.record(Season.cur, o.session.seasonFx, m.score[0], m.score[1], m.overtime); Season.save(Season.cur); }   // a party season game counts in the leader's season
+      const tapA = this.resultTap === 'a' && this.resultReady(); if (this.resultTap && this.resultReady()) this.resultTap = null;
+      if (m.state === 'over' && o.session.seasonFx && this.resultReady() && (Controls.menu().a || tapA) && !menuOpen) { Controls.owner = null; Controls.claimed.clear(); o.session.close('party_done'); Sound.playMusic('menu'); this.scene.start('SeasonHub'); return; }
+      if (m.state === 'over' && this.resultReady() && (Controls.menu().a || tapA) && !menuOpen) { o.session.backToLobby(); this.scene.start('Room', { role: 'host', session: o.session }); return; }
     } else {
       this.pre3d(dt); o.sim.frame(dt, [{ id: o.session.myId, input: menuOpen ? idle : Controls.mine }, ...guests.map(([id, src]) => ({ id, input: menuOpen ? idle : src }))]);
       if (o.session.silent()) o.session.finish('lost');
@@ -522,7 +550,12 @@ class GameScene extends Phaser.Scene {
     if (m.scorers && Object.keys(m.scorers).length) rows.push(['Top scorer', best(0), best(1)]);
     rows.forEach((r, i) => { const y = cy + 62 + i * 31; T(cx, y, r[0], { fontSize: '20px', color: THEME.dim }); T(cx - 230, y, String(r[1]), { fontSize: '24px', fontStyle: 'bold', color: '#ffffff' }); T(cx + 230, y, String(r[2]), { fontSize: '24px', fontStyle: 'bold', color: '#ffffff' }); });
     const hint = o ? (o.role === 'host' ? 'A: back to the room' : 'Waiting for the host...') : se ? 'A: continue the season' : 'A: rematch      B: main menu';
-    const hintT = T(cx, cy + h / 2 - 28, hint, { fontSize: '28px', fontStyle: 'bold', color: '#ffffff' });     items.forEach(x => { x.setAlpha(0); if (x !== hintT) this.tweens.add({ targets: x, alpha: x.fillAlpha !== undefined && x.type === 'Rectangle' ? 0.55 : 1, duration: 350 }); });
+    const hintT = T(cx, cy + h / 2 - 28, hint, { fontSize: '28px', fontStyle: 'bold', color: '#ffffff' });
+    // the same choices as buttons for a mouse or a finger (they act like A / B once the result can be dismissed)
+    const btns = o ? (o.role === 'host' ? [['Back to the room', 'a']] : []) : se ? [['Continue the season', 'a']] : [['Rematch', 'a'], ['Main menu', 'b']];
+    if (btns.length) { hintT.setY(cy + h / 2 - 100).setFontSize(20).setColor(THEME.dim); hintT.setText(hint.replace(/ {2,}/g, '   ')); }
+    btns.forEach(([label, b], i) => { const x = cx + (i - (btns.length - 1) / 2) * 280, t = tapButton(this, x, cy + h / 2 - 44, 250, label, () => { this.resultTap = b; }); for (const o2 of [t.bg, t.t, t.hit]) { o2.setDepth(42); add(o2); } });
+    items.forEach(x => { x.setAlpha(0); if (x !== hintT) this.tweens.add({ targets: x, alpha: x.fillAlpha !== undefined && x.type === 'Rectangle' ? 0.55 : 1, duration: 350 }); });
     this.resultHint = hintT;
     if (win >= 0) confettiBurst(this, cx, cy - 150, Phaser.Display.Color.HexStringToColor(col(win)).color);
     this.result = items; this.events.once('shutdown', () => { this.result = null; this.resultHint = null; this.overAt = undefined; });
@@ -685,7 +718,7 @@ class GameScene extends Phaser.Scene {
   }
   update(time, delta) {
     if (!this.clockText || !this.clockText.active || !this.world || !this.world.scene) return;      // the scene is being torn down (backing out to the menu): nothing left to draw
-    Controls.update(this.game.loop.frame);
+    Controls.update(this.game.loop.frame); this.showPauseBtn();
     if (this.demo) { this.match.update(Math.min(delta / 1000, 0.05)); this.pre3d(Math.min(delta / 1000, 0.05)); this.render(); return; }          // the camera-settings preview: the CPU plays itself, nobody can pause it
     if (this.online) return this.updateOnline(delta);
     const m = this.match;
@@ -706,7 +739,8 @@ class GameScene extends Phaser.Scene {
     this.render();
     if (m.state === 'over') {
       if (!this.recorded) { this.recorded = true; const sides = [...new Set(this.setup.players.map(p => p.side))]; if (sides.length) Settings.record(m, sides); }
-      const e = this.resultReady() ? Controls.menu() : {}, se = this.setup.season;
+      const e = this.resultReady() ? { ...Controls.menu() } : {}, se = this.setup.season;
+      if (this.resultTap) { if (this.resultReady()) e[this.resultTap] = true; this.resultTap = null; }
       if (se) {                                                                                      // Season: file the result and go back to the season screen
         if (!this.filed) { this.filed = true; Season.record(Season.cur, se.fx, m.score[0], m.score[1], m.overtime); Season.save(Season.cur); }
         if (e.a || e.b || e.start) { Sound.playMusic('menu'); Controls.owner = null; this.scene.start('SeasonHub'); }
@@ -917,11 +951,11 @@ class CameraPageScene extends ListMenuScene {
       { label: () => `3D graphics   ◀ ${gfxLabel()} ▶`, change: d => { cycleGfx(d); apply(); }, select: () => { cycleGfx(1); apply(); } },
       { label: () => 'Back', select: back }];
     this.cursor = 0; this.onBack = back;
-    const w = 900, cx = V.width / 2, gap = 30, top = 720 - 24 - gap * this.items.length + gap / 2 - 36, y0 = top - 34;
+    const w = 900, cx = V.width / 2, gap = Settings.touch ? 44 : 30, top = 720 - 24 - gap * this.items.length + gap / 2 - 36, y0 = top - 34;
     panel(this, cx - w / 2, y0 - 30, w, gap * this.items.length + 64, { alpha: 0.78 });
     this.add.text(cx, y0 - 12, 'CAMERA   -   this is what you will see in the game', { fontFamily: FONT, fontSize: '18px', color: THEME.dim }).setOrigin(0.5);
-    this.bar = new SelectionBar(this, cx, w - 24, gap - 6);
-    this.rows = this.items.map((_, i) => this.add.text(cx, top + i * gap, '', { ...STYLE.row, fontSize: '23px' }).setOrigin(0.5));
+    this.bar = new SelectionBar(this, cx, w - 24, gap - 6); this.panelBox = { x: cx - w / 2, w };
+    this.rows = this.items.map((_, i) => this.add.text(cx, top + i * gap, '', { ...STYLE.row, fontSize: Settings.touch ? '28px' : '23px' }).setOrigin(0.5));
     this.items.forEach((item, i) => {
       const zone = this.add.zone(cx, top + i * gap, w, gap).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', p => {
@@ -966,7 +1000,8 @@ class PauseScene extends ListMenuScene {
     const m = this.gameScene.match, online = this.gameScene.online, resume = online ? () => { Controls.owner = null; try { this.gameScene.applyCamera(); } catch (e) {} this.scene.stop(); } : () => { Controls.owner = null; this.scene.resume('Game'); this.scene.stop(); };   // online: the match keeps running behind the menu
     const toSettings = { label: () => 'Settings', select: () => this.scene.start('Settings', { from: 'Pause', game: this.gameScene }) };
     const camItem = { label: () => `Camera   ◀ ${CONFIG.view3d.names[Settings.camMode] || ''} ▶`, change: d => { cycleCamMode(d); this.gameScene.apply3d(); }, select: () => { cycleCamMode(1); this.gameScene.apply3d(); } };
-    const onlineItems = [{ label: () => 'Resume', select: resume }, camItem, toSettings, { label: () => 'Leave room', select: () => { Controls.owner = null; this.gameScene.leaveOnline(''); } }];
+    const social = { label: () => 'Friends and party', select: () => FriendsBar.toggle(true) };
+    const onlineItems = [{ label: () => 'Resume', select: resume }, camItem, toSettings, social, { label: () => 'Leave room', select: () => { Controls.owner = null; this.gameScene.leaveOnline(''); } }];
     const switchTeam = p => () => { if (m.switchSide(p)) Sound.play('select'); else Sound.play('back'); };
     this.buildMenu('PAUSED', online ? onlineItems : [
       { label: () => 'Resume', select: resume },
@@ -975,7 +1010,7 @@ class PauseScene extends ListMenuScene {
         label: () => `${p.name || p.tag}  ${p.src.label}:   ◀ ${TEAMS[m.teams[p.side]].name} ▶`, change: switchTeam(p), select: switchTeam(p) })),
       ...(m.practice ? [{ label: () => 'Reset score and kickoff', select: () => { m.score = [0, 0]; m.kickoff(); resume(); } }] : []),
       ...(Sound.playlist ? [{ label: () => 'Next song', select: () => Sound.nextTrack() }] : []),
-      toSettings,
+      toSettings, social,
       ...(this.gameScene.setup.players.some(p => p.src === Controls.owner) ? [{ label: () => 'Leave the match (a CPU takes your cart)', select: () => { const me = this.gameScene.setup.players.find(p => p.src === Controls.owner); m.removePlayer(me); this.gameScene.setup.players = this.gameScene.setup.players.filter(p => p !== me); resume(); } }] : []),
       { label: () => this.gameScene.setup.season ? 'Leave the game (it is not counted)' : 'Quit to main menu', select: () => { Controls.owner = null; this.scene.stop('Game'); Sound.playMusic('menu'); this.scene.start(this.gameScene.setup.season ? 'SeasonHub' : 'Main'); } }
     ], 180);

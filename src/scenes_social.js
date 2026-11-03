@@ -1,58 +1,139 @@
 /* Screens for the online services: log in / sign up, Friends and party, one friend's options, the global leaderboard,
    plus the Sound and Voice chat settings pages. Forms (typing a username or password) are small HTML pop-ups over the game. */
 
-/* ---------------- pop-up forms ---------------- */
+/* ---------------- pop-up forms ----------------
+   Work with a mouse, a keyboard, touch or a gamepad alone (PadNav and the on-screen keyboard, ui_overlay.js). While one is open the game behind
+   it does not react to clicks or buttons. Password boxes have a 👁 button to peek. */
 const Forms = {
   isOpen: false, el: null,
   css() {
     if (this.styled) return; this.styled = true; const css = document.createElement('style');
-    css.textContent = `#form{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(5,10,14,.6);font-family:"Barlow Condensed",Arial,sans-serif}
-      #form .box{width:min(440px,92vw);background:#0f1a22;border:1px solid #2f4a5c;border-radius:14px;padding:18px 20px;color:#e8eef2;box-shadow:0 10px 40px #000a}
-      #form h2{margin:0 0 10px;font-size:30px;color:#fff;letter-spacing:.03em}#form .tabs{display:flex;gap:6px;margin-bottom:12px}
-      #form .tabs button.on{background:#19c3ff;color:#06222f;border-color:#19c3ff}#form label{display:block;font-size:17px;color:#9fb2bf;margin:8px 0 3px}
+    css.textContent = `#form{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(5,10,14,.66);font-family:"Barlow Condensed",Arial,sans-serif}
+      #form .box{width:min(460px,92vw);max-height:94vh;overflow:auto;box-sizing:border-box;background:#0f1a22;border:1px solid #2f4a5c;border-radius:14px;padding:16px 20px;color:#e8eef2;box-shadow:0 10px 40px #000a}
+      #form h2{margin:0 0 8px;font-size:30px;color:#fff;letter-spacing:.03em}#form .tabs{display:flex;gap:6px;margin-bottom:8px}
+      #form .tabs button.on{background:#19c3ff;color:#06222f;border-color:#19c3ff}#form label{display:block;font-size:17px;color:#9fb2bf;margin:7px 0 3px}
+      #form .pw{display:flex;gap:6px}#form .pw input{flex:1;min-width:0}#form .pw button{padding:4px 10px}
       #form input{width:100%;box-sizing:border-box;font:inherit;font-size:20px;background:#0a1116;color:#fff;border:1px solid #3c5566;border-radius:8px;padding:6px 10px}
       #form button{font:inherit;font-size:18px;background:#1b2a35;color:#fff;border:1px solid #3c5566;border-radius:8px;padding:6px 14px;cursor:pointer}
-      #form .go{background:#19c3ff;color:#06222f;border-color:#19c3ff;font-weight:700}#form .row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
-      #form .err{color:#ff7a59;min-height:22px;margin-top:8px;font-size:17px}#form .note{color:#9fb2bf;font-size:15px;margin-top:8px;line-height:1.3}
-      #form .list{max-height:46vh;overflow:auto;display:flex;flex-direction:column;gap:6px}#form .list div{display:flex;align-items:center;gap:8px}#form .list span{flex:1}`;
+      #form .go{background:#19c3ff;color:#06222f;border-color:#19c3ff;font-weight:700}#form .row{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+      #form .link{background:none;border:0;color:#7fd3ff;padding:2px 0;font-size:17px;text-decoration:underline}
+      #form .err{color:#ff7a59;min-height:22px;margin-top:8px;font-size:17px}#form .ok{color:#3dff9a}#form .note{color:#9fb2bf;font-size:15px;margin-top:6px;line-height:1.3}
+      #form .list{max-height:46vh;overflow:auto;display:flex;flex-direction:column;gap:6px}#form .list div{display:flex;align-items:center;gap:8px}#form .list span{flex:1}
+      #form .pads{color:#9fb2bf;font-size:14px;text-align:center;margin-top:8px}`;
     document.head.append(css);
   },
   show(html, wire) {
-    this.close(); this.css(); this.isOpen = true; Controls.keys = {};
-    const el = this.el = document.createElement('div'); el.id = 'form'; el.innerHTML = `<div class="box">${html}</div>`; document.body.append(el);
+    this.close(true); this.css(); this.isOpen = true; Controls.keys = {};
+    const el = this.el = document.createElement('div'); el.id = 'form';
+    el.innerHTML = `<div class="box">${html}<div class="pads">Gamepad: move with the D-pad, A selects (and opens the keyboard), B goes back</div></div>`; document.body.append(el);
     el.addEventListener('pointerdown', e => { if (e.target === el) this.close(); });
     el.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') this.close(); });
-    wire(el); const first = el.querySelector('input'); if (first) setTimeout(() => first.focus(), 0);
+    for (const b of el.querySelectorAll('[data-peek]')) b.onclick = () => { const inp = el.querySelector(`[name=${b.dataset.peek}]`); const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; inp.dataset.peek = show ? '1' : ''; b.textContent = show ? '🙈' : '👁'; };
+    wire(el);
+    PadNav.open(el, { onBack: () => this.close(), modal: true, focusFirst: true });
+    const first = el.querySelector('input'); if (first && !PadNav.padRecently()) setTimeout(() => first.focus(), 0);
   },
-  close() { if (this.el) this.el.remove(); this.el = null; setTimeout(() => { this.isOpen = false; }, 120); Controls.keys = {}; },
-  /* Log in or sign up. done() runs once you are logged in. */
+  close(quiet) {
+    if (this.el) { PadNav.close(this.el); this.el.remove(); } this.el = null; if (typeof OSK !== 'undefined') OSK.close(false);
+    setTimeout(() => { this.isOpen = !!this.el; }, 150); Controls.keys = {};
+  },
+  pw(name, label, auto, ph = '') { return `<label>${label}</label><div class="pw"><input name="${name}" type="password" maxlength="100" autocomplete="${auto}" placeholder="${ph}" aria-label="${label}"><button type="button" data-peek="${name}" title="Show / hide">👁</button></div>`; },
+  field(name, label, type = 'text', extra = '') { return `<label>${label}</label><input name="${name}" type="${type}" aria-label="${label}" ${extra}>`; },
+  /* Log in, sign up, or "forgot password". done() runs once you are logged in. */
   account(done, mode = 'login') {
     if (!Account.available()) return Toasts.show('Online services need the game to be opened from its website.', [], 5000);
+    if (mode === 'forgot') return this.forgot(done);
     const signup = mode === 'signup';
     this.show(`<h2>${signup ? 'Create an account' : 'Log in'}</h2>
       <div class="tabs"><button data-m="login" class="${signup ? '' : 'on'}">Log in</button><button data-m="signup" class="${signup ? 'on' : ''}">Sign up</button></div>
-      <label>Username</label><input name="u" maxlength="16" autocomplete="username" placeholder="3-16 letters, numbers or _">
-      <label>Password</label><input name="p" type="password" maxlength="100" autocomplete="${signup ? 'new-password' : 'current-password'}" placeholder="${signup ? 'at least 6 characters' : ''}">
-      ${signup ? '<label>Your age</label><input name="a" type="number" min="5" max="120" inputmode="numeric" placeholder="e.g. 16">' : ''}
+      ${this.field('u', signup ? 'Username' : 'Username or email', 'text', `maxlength="${signup ? 16 : 120}" autocomplete="username" ${signup ? 'placeholder="3-16 letters, numbers or _"' : ''}`)}
+      ${signup ? this.field('e', 'Email (only for resetting your password)', 'email', 'maxlength="120" autocomplete="email"') : ''}
+      ${this.pw('p', 'Password', signup ? 'new-password' : 'current-password', signup ? 'at least 6 characters' : '')}
+      ${signup ? this.pw('p2', 'Confirm password', 'new-password') + this.field('a', 'Your age', 'number', 'min="5" max="120" inputmode="numeric" maxlength="3"') : '<button class="link" data-a="forgot">Forgot your password?</button>'}
       <div class="err"></div>
-      ${signup ? '<div class="note">Your age is used for chat safety: players under 18 can only text and voice chat with friends they have accepted. Only "under 18" or "18 and over" is kept, not your age.</div>' : ''}
+      ${signup ? '<div class="note">Your age is used for chat safety: players under 18 can only text and voice chat with friends they have accepted. Only "under 18" or "18 and over" is kept. Your email is never shown to anyone.</div>' : ''}
       <div class="row"><button data-a="guest">Play as guest</button><button class="go" data-a="go">${signup ? 'Create account' : 'Log in'}</button></div>`, el => {
       const err = el.querySelector('.err'), val = n => (el.querySelector(`[name=${n}]`) || {}).value || '';
       el.querySelectorAll('[data-m]').forEach(b => b.onclick = () => this.account(done, b.dataset.m));
       el.querySelector('[data-a=guest]').onclick = () => this.close();
+      const f = el.querySelector('[data-a=forgot]'); if (f) f.onclick = () => this.forgot(done);
       const go = async () => {
+        if (signup && val('p') !== val('p2')) { err.textContent = "The passwords don't match."; return; }
         err.textContent = 'One moment...';
-        try { if (signup) await Account.register(val('u').trim(), val('p'), val('a')); else await Account.login(val('u').trim(), val('p')); this.close(); Toasts.show(`Welcome, <b>${esc(Account.name)}</b>! Your progress is now saved online.`, [], 4500); done && done(); }
+        try {
+          if (signup) await Account.register(val('u').trim(), val('p'), val('a'), val('e').trim());
+          else { let who = val('u').trim(); await Account.login(who, val('p')); }
+          this.close(); Toasts.show(`Welcome, <b>${esc(Account.name)}</b>! Your progress is now saved online.`, [], 4500); done && done();
+        } catch (e) { err.textContent = e.message; }
+      };
+      el.querySelector('[data-a=go]').onclick = go; el.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') go(); });
+      for (const i of el.querySelectorAll('input')) i.dataset.enter = '';
+    });
+  },
+  forgot(done) {
+    this.show(`<h2>Forgot your password?</h2>${this.field('w', 'Your username or email', 'text', 'maxlength="120" autocomplete="username"')}
+      <div class="note">We'll email you a link to choose a new password. It works for 30 minutes.</div><div class="err"></div>
+      <div class="row"><button data-a="back">Back</button><button class="go" data-a="go">Send the link</button></div>`, el => {
+      const err = el.querySelector('.err');
+      el.querySelector('[data-a=back]').onclick = () => this.account(done, 'login');
+      const go = async () => {
+        const who = el.querySelector('[name=w]').value.trim(); if (!who) return; err.textContent = 'Sending...';
+        try { await Account.requestReset(who); err.className = 'err ok'; err.textContent = 'If that account has an email, a link is on its way. Check your inbox (and spam).'; }
+        catch (e) { err.className = 'err'; err.textContent = e.message; }
+      };
+      el.querySelector('[data-a=go]').onclick = go; el.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') go(); });
+    });
+  },
+  /* opened by the link in the reset email (?reset=...) */
+  reset(token) {
+    this.show(`<h2>Choose a new password</h2>${this.pw('p', 'New password', 'new-password', 'at least 6 characters')}${this.pw('p2', 'Confirm new password', 'new-password')}
+      <div class="err"></div><div class="row"><button data-a="x">Cancel</button><button class="go" data-a="go">Save and log in</button></div>`, el => {
+      const err = el.querySelector('.err'), val = n => el.querySelector(`[name=${n}]`).value;
+      el.querySelector('[data-a=x]').onclick = () => this.close();
+      const go = async () => {
+        if (val('p') !== val('p2')) { err.textContent = "The passwords don't match."; return; }
+        err.textContent = 'Saving...';
+        try { await Account.confirmReset(token, val('p')); this.close(); Toasts.show(`Password changed. Welcome back, <b>${esc(Account.name)}</b>!`, [], 5000); }
         catch (e) { err.textContent = e.message; }
       };
-      el.querySelector('[data-a=go]').onclick = go; el.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+      el.querySelector('[data-a=go]').onclick = go; el.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') go(); });
+    });
+  },
+  /* add or change the email on your account */
+  email() {
+    if (!Account.loggedIn) return this.account();
+    this.show(`<h2>${Account.user.email ? 'Change your email' : 'Add an email'}</h2>
+      <div class="note">${Account.user.email ? 'Now: ' + esc(Account.user.email) : 'Add one so you can reset your password if you forget it.'}</div>
+      ${this.field('e', 'Email', 'email', 'maxlength="120" autocomplete="email"')}${this.pw('p', 'Your password (to confirm it is you)', 'current-password')}
+      <div class="err"></div><div class="row"><button data-a="x">Cancel</button><button class="go" data-a="go">Save</button></div>`, el => {
+      const err = el.querySelector('.err'), val = n => el.querySelector(`[name=${n}]`).value;
+      el.querySelector('[data-a=x]').onclick = () => this.close();
+      el.querySelector('[data-a=go]').onclick = async () => { err.textContent = 'Saving...'; try { await Account.setEmail(val('e').trim(), val('p')); this.close(); Toasts.show('Email saved.', [], 3000); } catch (e) { err.textContent = e.message; } };
+    });
+  },
+  /* Add a friend: matching usernames drop down as you type (mouse, keyboard or gamepad + on-screen keyboard). */
+  findFriend() {
+    if (!Account.loggedIn) return this.account();
+    this.show(`<h2>Add a friend</h2><input name="q" maxlength="16" placeholder="Start typing their username" aria-label="Their username" autocomplete="off"><div class="list" data-res></div><div class="err"></div><div class="row"><button data-a="x">Done</button></div>`, el => {
+      const input = el.querySelector('input'), res = el.querySelector('[data-res]'), err = el.querySelector('.err'); let timer = null, seq = 0;
+      const label = f => f === 'friends' ? 'Friends' : f === 'out' ? 'Request sent' : f === 'in' ? 'Accept' : 'Add';
+      const draw = users => {
+        res.innerHTML = users.map((u, i) => `<div><span>${esc(u.name)}</span><button data-i="${i}" ${u.friend === 'friends' || u.friend === 'out' ? 'disabled' : ''}>${label(u.friend)}</button></div>`).join('') || (input.value.trim() ? '<div class="note">No players found. An under-18 player only shows up when you type their exact username.</div>' : '');
+        res.querySelectorAll('[data-i]').forEach(b => b.onclick = async () => { const u = users[+b.dataset.i]; b.disabled = true; b.textContent = '...'; const ok = await (u.friend === 'in' ? Social.accept(u.name) : Social.request(u.name)); b.textContent = ok ? (u.friend === 'in' ? 'Friends' : 'Request sent') : label(u.friend); });
+      };
+      const search = () => { clearTimeout(timer); timer = setTimeout(async () => {
+        const q = input.value.trim(), my = ++seq; if (!q) return draw([]);
+        try { const r = await Account.req('GET', '/search', null, { q }); if (my === seq) { err.textContent = ''; draw(r.users); } } catch (e) { err.textContent = e.message; }
+      }, 180); };
+      input.addEventListener('input', search); input.addEventListener('keydown', e => { if (e.key === 'Enter') { const b = res.querySelector('[data-i]:not([disabled])'); if (b) b.click(); } });
+      el.querySelector('[data-a=x]').onclick = () => this.close();
     });
   },
   /* One line of text (e.g. a friend's username). */
   ask(title, placeholder, done) {
-    this.show(`<h2>${esc(title)}</h2><input maxlength="40" placeholder="${esc(placeholder)}"><div class="err"></div><div class="row"><button data-a="x">Cancel</button><button class="go" data-a="go">OK</button></div>`, el => {
+    this.show(`<h2>${esc(title)}</h2><input name="q" maxlength="40" placeholder="${esc(placeholder)}" aria-label="${esc(title)}"><div class="err"></div><div class="row"><button data-a="x">Cancel</button><button class="go" data-a="go">OK</button></div>`, el => {
       const input = el.querySelector('input'), go = async () => { const v = input.value.trim(); if (!v) return; this.close(); await done(v); };
-      el.querySelector('[data-a=x]').onclick = () => this.close(); el.querySelector('[data-a=go]').onclick = go; input.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+      input.dataset.enter = ''; el.querySelector('[data-a=x]').onclick = () => this.close(); el.querySelector('[data-a=go]').onclick = go; input.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
     });
   },
   /* Pick friends to invite (to your party or your room). */
@@ -67,61 +148,6 @@ const Forms = {
 
 /* ---------------- Friends and party ---------------- */
 const statusText = f => !f.online ? 'offline' : !f.status ? 'online' : f.status.where === 'game' ? 'in a match' : f.status.where === 'room' ? 'in room ' + f.status.room : f.status.where === 'party' ? 'in a party' : 'in the menus';
-class SocialScene extends ListMenuScene {
-  constructor() { super('Social'); }
-  init(data) { this.cursorAt = (data && data.cursor) || 0; }
-  create() {
-    const items = [], S = Social.data, restart = () => this.scene.restart({ cursor: this.cursor });
-    if (!Account.available()) items.push({ label: () => 'Online services need the game opened from its website' });
-    else if (!Account.loggedIn) items.push({ label: () => 'Log in or sign up   (guests can still play everything)', hint: 'Save your progress online, add friends, party up and chat', select: () => Forms.account(restart) });
-    else items.push({ label: () => `Logged in as ${Account.name}${Account.adult ? '' : '   (under 18: chat with friends only)'}   ·   A: log out`, select: async () => { await Account.logout(); Party.reset(); restart(); } });
-    if (Account.loggedIn) {
-      if (!Party.active) items.push({ label: () => 'Start a party', hint: 'Friends in your party follow you into your online rooms, each with their own local players', select: async () => { try { await Party.create(); Forms.invite('party', Party.id); } catch (e) { /* shown */ } restart(); } });
-      else {
-        items.push({ label: () => `Party (${Party.members.length}/${Party.max}):  ${Party.members.map(m => m.name + (m.leader ? ' ★' : '')).join(', ')}`, hint: Party.role === 'leader' ? 'Create a room under Online and everyone in the party joins it' : 'You will join the rooms your party leader opens' });
-        if (Party.role === 'leader') items.push({ label: () => 'Invite friends to the party', select: () => Forms.invite('party', Party.id) });
-        items.push({ label: () => Party.role === 'leader' ? 'End the party' : 'Leave the party', select: () => { Party.leave(); restart(); } });
-      }
-      items.push({ label: () => 'Add a friend by username', select: () => Forms.ask('Add a friend', 'Their username', async n => { await Social.request(n); restart(); }) });
-      for (const inv of S.invites) items.push({ label: () => `${inv.from} invited you to ${inv.kind === 'party' ? 'their party' : 'room ' + inv.code}   ·   A: join`, select: () => Social.acceptInvite(inv) });
-      for (const n of S.incoming) items.push({ label: () => `Friend request from ${n}   ·   A: accept   ◀ decline`, select: async () => { await Social.accept(n); restart(); }, change: async d => { if (d < 0) { await Social.remove(n); restart(); } } });
-      const shown = S.friends.slice(0, 10);
-      for (const f of shown) items.push({ label: () => `${f.online ? '●' : '○'} ${f.name}   ${statusText(f)}${S.unread[f.name.toLowerCase()] ? `   ✉ ${S.unread[f.name.toLowerCase()]}` : ''}`, hint: 'A: message, invite, join, remove or block', select: () => this.scene.start('Friend', { name: f.name, cursor: this.cursor }) });
-      if (S.friends.length > shown.length) items.push({ label: () => `+ ${S.friends.length - shown.length} more friends (message them from the chat button)` });
-      for (const n of S.outgoing) items.push({ label: () => `Request sent to ${n}   ·   A: cancel`, select: async () => { await Social.remove(n); restart(); } });
-      if (!S.friends.length && !S.incoming.length) items.push({ label: () => 'No friends yet: add one by their username' });
-    }
-    items.push({ label: () => 'Back', select: () => this.scene.start('Main') });
-    this.buildMenu('FRIENDS AND PARTY', items, 200);
-    this.onBack = () => this.scene.start('Main'); this.cursor = Math.min(this.cursorAt, this.items.length - 1);
-    this.sig = this.signature(); this.offs = [Social.on(() => this.changed()), Party.on(() => this.changed()), Account.on(() => this.changed())];
-    this.events.once('shutdown', () => this.offs.forEach(f => f()));
-    if (Account.loggedIn) Social.tick();
-  }
-  signature() { const S = Social.data; return JSON.stringify([Account.name, Party.members.map(m => m.name), S.invites.map(i => i.id), S.incoming, S.outgoing, S.friends.map(f => [f.name, f.online, f.status && f.status.where, f.status && f.status.room]), S.unread]); }
-  changed() { if (!this.sys.isActive() || Forms.isOpen) return; const sig = this.signature(); if (sig !== this.sig) { this.sig = sig; this.scene.restart({ cursor: this.cursor }); } }
-}
-
-class FriendScene extends ListMenuScene {
-  constructor() { super('Friend'); }
-  init(data) { this.name = data.name; this.back = data.cursor || 0; }
-  create() {
-    const f = Social.data.friends.find(x => x.name === this.name) || { name: this.name, online: false }, back = () => this.scene.start('Social', { cursor: this.back }), items = [];
-    items.push({ label: () => 'Message', select: () => Chat.openDm(f.name) });
-    if (Party.role === 'leader') items.push({ label: () => 'Invite to my party', select: () => Social.invite(f.name, 'party', Party.id) });
-    else if (!Party.active) items.push({ label: () => 'Start a party and invite them', select: async () => { try { await Party.create(); Social.invite(f.name, 'party', Party.id); } catch (e) { /* shown */ } } });
-    if (Online.current && Online.current.code) items.push({ label: () => `Invite to my room (${Online.current.code})`, select: () => Social.invite(f.name, 'room', Online.current.code) });
-    if (f.online && f.status && f.status.open && f.status.room) items.push({ label: () => `Join their room (${f.status.room})`, select: () => joinRoomFromAnywhere(f.status.room) });
-    if (f.online && f.status && f.status.party) items.push({ label: () => 'Join their party', select: () => { Party.join(f.status.party); back(); } });
-    items.push({ label: () => this.stats ? `Career: ${this.stats.career.games} games, ${this.stats.career.wins} wins, ${this.stats.career.goals} goals, ${this.stats.career.cups} World Cups` : 'Career: loading...' });
-    items.push({ label: () => 'Remove friend', select: async () => { await Social.remove(f.name); back(); } });
-    items.push({ label: () => 'Block', select: async () => { await Social.block(f.name); back(); } });
-    items.push({ label: () => 'Back', select: back });
-    this.buildMenu(f.name.toUpperCase() + (f.online ? '' : '  (offline)'), items, 210); this.onBack = back;
-    Account.req('GET', '/profile', null, { name: f.name }).then(r => { this.stats = r; }).catch(() => {});
-  }
-}
-
 /* ---------------- global leaderboard ---------------- */
 class LeaderboardScene extends Phaser.Scene {
   constructor() { super('Leaderboard'); }
@@ -133,9 +159,10 @@ class LeaderboardScene extends Phaser.Scene {
     panel(this, 190, 145, 900, 515, { depth: -40 });
     this.rows = Array.from({ length: 15 }, (_, i) => this.add.text(230, 162 + i * 32, '', { ...MONO_LB, color: '#e8eef2' }));
     this.note = this.add.text(CX, 400, '', { ...STYLE.hint, fontSize: '24px', color: '#9fb2bf', align: 'center', wordWrap: { width: 820 } }).setOrigin(0.5);
-    this.add.text(CX, 696, '◀ ▶  category        B  back' + (Account.loggedIn ? '' : '        log in from Friends and party to get on the board'), { ...STYLE.hint, fontSize: '19px', color: '#9fb2bf' }).setOrigin(0.5);
+    this.add.text(CX - 60, 696, '◀ ▶  category        B  back' + (Account.loggedIn ? '' : '        log in from Friends and party to get on the board'), { ...STYLE.hint, fontSize: '19px', color: '#9fb2bf' }).setOrigin(0.5);
     const z = this.add.zone(CX, 118, 700, 50).setInteractive({ useHandCursor: true }); z.on('pointerdown', p => { this.tab = (this.tab + (p.x < CX ? 3 : 1)) % 4; this.draw(); });
-    const b = this.add.zone(CX, 696, 400, 40).setInteractive({ useHandCursor: true }); b.on('pointerdown', () => this.scene.start('Main'));
+    tapButton(this, 150, 118, 120, '◀', () => { this.tab = (this.tab + 3) % 4; this.draw(); }); tapButton(this, 1130, 118, 120, '▶', () => { this.tab = (this.tab + 1) % 4; this.draw(); });
+    tapButton(this, 1170, 690, 160, 'Back', () => this.scene.start('Main'));
     if (!Account.available()) this.error = 'The leaderboard needs the game opened from its website.';
     else Account.leaderboard().then(d => { this.data = d; this.draw(); }).catch(e => { this.error = e.message; this.draw(); });
     this.draw();
@@ -176,6 +203,7 @@ Object.assign(SETTINGS_PAGES, {
     { label: () => `Mic test   ${Voice.testing ? meter(Voice.micLevel()) + '   A: stop' : (Voice.lastError ? Voice.lastError : 'A: start')}`, select: () => Voice.test(!Voice.testing) },
     { label: () => `Voice chat volume   ◀ ${pct(Settings.voiceVolume === undefined ? 1 : Settings.voiceVolume)} ▶`, change: d => { Settings.adjust('voiceVolume', d); Voice.applyVolumes(); } },
     { label: () => 'Push to talk:  hold L3 (gamepad), G (keyboard 1), L (keyboard 2) or the 🎙 button' },
+    { label: () => { const c = [...Voice.calls.values()], ok = c.filter(e => e.state === 'connected').length, bad = c.filter(e => e.state === 'failed').length; return !c.length ? 'Voice links: nobody to talk to right now' : `Voice links: ${ok} connected${bad ? `, ${bad} can't connect (their network needs a TURN relay: see DEPLOY.md)` : ''}`; } },
     { label: () => Account.loggedIn ? (Account.adult ? 'You can talk with anyone in your room or party (mute anyone from the chat)' : 'Under 18: you only hear and talk with friends') : 'Guests do not have voice chat: log in under Friends and party' }]
 });
 // Sound: master volume and the speakers go at the top of the existing page; nothing is removed
@@ -185,4 +213,19 @@ Object.assign(SETTINGS_PAGES, {
     slider('Master volume', 'masterVolume', pct),
     Sound.canPickSpeaker() ? deviceItem('Speakers / headphones', 'audiooutput', 'speakerId', () => Sound.applySpeaker()) : { label: () => 'Speakers / headphones   (this browser always uses your system output)' },
     ...base(sc)];
+}
+
+/* ---------------- party-led games ----------------
+   In a party the leader picks every game. Starting a match, practice or a season game as leader opens a room set up the same way and
+   brings the whole party in (each member can still add local players). Members' Play / Season / Practice / Online wait for the leader. */
+function partyGame(scene, preset) {
+  if (Party.role !== 'leader' || !Party.others().length) return false;
+  Sound.play('select'); scene.scene.start('Room', { role: 'host', preset });
+  return true;
+}
+const leaderPicks = () => Party.role === 'member' ? '   (your party leader picks)' : '';
+function memberWaits() {
+  if (Party.role !== 'member') return false;
+  Toasts.show('Your party leader picks the game and will bring you in. Leave the party to play on your own.', [{ label: 'Leave party', fn: () => Party.leave() }, { label: 'OK' }], 6000);
+  return true;
 }

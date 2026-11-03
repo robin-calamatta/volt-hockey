@@ -32,7 +32,7 @@ Object.assign(GameScene.prototype, {
   localControls() {
     const o = this.online;
     if (!o) return this.demo ? [] : this.setup.players.filter(p => p.src).map(p => [p, p.src]);
-    const menuOpen = this.scene.isActive('Pause'), idle = { ax: 0, ay: 0, pressed: {}, held: {} }, out = [];
+    const menuOpen = this.scene.isActive('Pause') || FriendsBar.open || Forms.isOpen, idle = { ax: 0, ay: 0, pressed: {}, held: {} }, out = [];
     const me = o.role === 'host' ? o.me : o.players.find(p => p.id === o.session.myId);
     if (me) out.push([me, menuOpen ? idle : Controls.mine]);
     for (const [id, src] of o.session.guestSrc || []) { const p = o.players.find(q => q.id === id); if (p) out.push([p, menuOpen ? idle : src]); }

@@ -104,7 +104,8 @@ class SeasonHubScene extends ListMenuScene {
     if (this.flash) { const t = this.add.text(CX, 690, this.flash, { ...STYLE.hint, fontSize: '28px', color: '#ffe27a' }).setOrigin(0.5).setDepth(5); this.tweens.add({ targets: t, alpha: 0, delay: 2500, duration: 600 }); }
   }
   play(fx) {
-    const s = this.s; Season.fx = fx;
+    const s = this.s; Season.fx = fx; const side = fx.h === s.team ? 0 : 1, levels = [Season.levelFor(s, fx.h), Season.levelFor(s, fx.a)];
+    if (partyGame(this, { teamA: fx.h, teamB: fx.a, difficulty: s.difficulty, practice: false, sizes: [CONFIG.match.chairsPerTeam, CONFIG.match.chairsPerTeam], season: { side, periodSeconds: s.periodSeconds, levels }, seasonFx: fx })) return;   // in a party: everyone plays for your team
     this.scene.start('Lobby', { sizes: [CONFIG.match.chairsPerTeam, CONFIG.match.chairsPerTeam], season: { teams: [fx.h, fx.a], side: fx.h === s.team ? 0 : 1, periodSeconds: s.periodSeconds, difficulty: s.difficulty, levels: [Season.levelFor(s, fx.h), Season.levelFor(s, fx.a)], fx } });
   }
   info(s, mine, played, done, today) {                                  // the right-hand card: your team, your standing, today's game, the latest results
@@ -158,7 +159,8 @@ class StandingsScene extends Phaser.Scene {
       this.add.text(x0, y, line([r.rank, TEAMS[r.t].name, r.gp, r.w, r.l, r.otl, r.pts, r.gf, r.ga, r.gd > 0 ? '+' + r.gd : r.gd, f]), { ...MONO, fontSize: '20px', color: r.t === s.team ? '#ffe27a' : i < Q ? '#e8eef2' : '#8fa8b8' });
       if (i === Q - 1) this.add.rectangle(x0 + 370, y + h - 3, 780, 2, THEME.gold, 0.8);
     });
-    this.add.text(CX, 700, `Top ${Q} make the playoffs.   W = ${CONFIG.season.winPoints} pts, overtime loss (O) = ${CONFIG.season.otLossPoints}.   A / B: back`, { ...STYLE.hint, fontSize: '20px', color: '#9fb2bf' }).setOrigin(0.5);
+    tapButton(this, 1170, 690, 160, 'Back', () => this.scene.start('SeasonHub'));
+    this.add.text(CX - 60, 700, `Top ${Q} make the playoffs.   W = ${CONFIG.season.winPoints} pts, overtime loss (O) = ${CONFIG.season.otLossPoints}.   A / B: back`, { ...STYLE.hint, fontSize: '20px', color: '#9fb2bf' }).setOrigin(0.5);
   }
   update() { Controls.update(this.game.loop.frame); const e = Controls.menu(); if (e.a || e.b || e.start) { Sound.play('back'); this.scene.start('SeasonHub'); } }
 }
@@ -173,6 +175,10 @@ class GamesScene extends Phaser.Scene {
     this.add.text(CX, 44, 'YOUR GAMES', { ...STYLE.title, fontSize: '52px' }).setOrigin(0.5); this.add.rectangle(CX, 82, 130, 4, THEME.gold, 0.95);
     panel(this, 330, 108, 620, 560, { depth: -40 });
     this.rows = Array.from({ length: 15 }, (_, i) => this.add.text(350, 122 + i * 36, '', { ...MONO, fontSize: '22px' }));
+    const scroll = d => { this.top = Math.max(0, Math.min(Math.max(0, this.list.length - 15), this.top + d)); this.paint(); };
+    tapButton(this, 1040, 300, 120, '▲', () => scroll(-5)); tapButton(this, 1040, 380, 120, '▼', () => scroll(5));
+    this.input.on('wheel', (p, o, dx, dy) => scroll(dy > 0 ? 1 : -1));
+    tapButton(this, 1170, 690, 160, 'Back', () => this.scene.start('SeasonHub'));
     this.foot = this.add.text(CX, 696, '▲ ▼ scroll    A / B: back', { ...STYLE.hint, fontSize: '20px', color: '#9fb2bf' }).setOrigin(0.5);
     this.top = Math.max(0, Math.min(this.list.length - 15, this.list.findIndex(x => !x.f.done) - 4)); this.paint();
   }
@@ -213,8 +219,9 @@ class BracketScene extends Phaser.Scene {
         this.box(x, y - H / 2, W, H, ser, s);
       }
     }
-    if (s.stage === 'done') this.add.text(CX, 700, `${TEAMS[s.champion].name.toUpperCase()} ARE THE ${CONFIG.season.cupName.toUpperCase()} CHAMPIONS`, { ...STYLE.hud, fontSize: '28px', color: '#f2c200' }).setOrigin(0.5);
-    else this.add.text(CX, 700, (this.intro ? 'THE REGULAR SEASON IS OVER.   ' : '') + 'A / B: continue', { ...STYLE.hint, fontSize: '22px', color: this.intro ? '#ffe27a' : '#9fb2bf' }).setOrigin(0.5);
+    if (s.stage === 'done') this.add.text(CX - 70, 700, `${TEAMS[s.champion].name.toUpperCase()} ARE THE ${CONFIG.season.cupName.toUpperCase()} CHAMPIONS`, { ...STYLE.hud, fontSize: '28px', color: '#f2c200' }).setOrigin(0.5);
+    tapButton(this, 1170, 690, 160, 'Continue', () => this.scene.start(Season.cur.stage === 'done' && this.intro ? 'Trophy' : 'SeasonHub'));
+    if (s.stage !== 'done') this.add.text(CX - 60, 700, (this.intro ? 'THE REGULAR SEASON IS OVER.   ' : '') + 'A / B: continue', { ...STYLE.hint, fontSize: '22px', color: this.intro ? '#ffe27a' : '#9fb2bf' }).setOrigin(0.5);
   }
   box(x, y, w, h, ser, s) {                                        // one series: two team lines with the series score
     panel(this, x, y, w, h, { depth: -20, radius: 10, alpha: 0.9 });
@@ -248,6 +255,7 @@ class TrophyScene extends Phaser.Scene {
     const cups = (Settings.career || {}).cups || 0;
     this.add.text(CX, 616, `${cups} World Cup${cups === 1 ? '' : 's'} won`, { ...STYLE.hint, fontSize: '24px', color: '#f2c200' }).setOrigin(0.5);
     this.add.text(CX, 690, 'A: continue', { ...STYLE.hint, fontSize: '24px', color: '#9fb2bf' }).setOrigin(0.5);
+    tapButton(this, 1170, 690, 160, 'Continue', () => this.scene.start('SeasonHub'));
     const burst = () => confettiBurst(this, Phaser.Math.Between(300, 980), Phaser.Math.Between(260, 460), TEAMS[champ].color);
     burst(); this.time.addEvent({ delay: 700, repeat: win ? 14 : 3, callback: burst }); if (win) Sound.play('goal');
   }
@@ -270,6 +278,7 @@ class HistoryScene extends Phaser.Scene {
       badge(this, 1040, y + 12, r.champion, 28);
     });
     this.add.text(CX, 696, 'A / B: back', { ...STYLE.hint, fontSize: '20px', color: '#9fb2bf' }).setOrigin(0.5);
+    tapButton(this, 1170, 690, 160, 'Back', () => this.scene.start(this.from));
   }
   update() { Controls.update(this.game.loop.frame); const e = Controls.menu(); if (e.a || e.b || e.start) { Sound.play('back'); this.scene.start(this.from); } }
 }

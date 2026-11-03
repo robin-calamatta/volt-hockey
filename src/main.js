@@ -5,10 +5,16 @@ Settings.load(); Learn.load();
 })();
 Account.on(() => { Voice.refresh(); Chat.refresh(); });
 Account.init();                                             // log back in if you were (works offline too)
+FriendsBar.build();
+(function resetLink() {                                   // opened from a password-reset email: ?reset=<code>
+  let t = ''; try { t = new URLSearchParams(location.search).get('reset') || ''; } catch (e) { /* no location */ }
+  if (!t) return; try { const u = new URL(location.href); u.searchParams.delete('reset'); history.replaceState(null, '', u); } catch (e) { /* keep it */ }
+  setTimeout(() => Forms.reset(t), 1200);
+})();
 Controls.init(); TouchPad.init();
 MUSIC_READY = scanMusic();                                  // looks for your music files in the background, never blocks start-up
 
-const SCENES = [BootScene, TitleScene, MainMenuScene, SettingsScene, SettingsPageScene, ControlsGuideScene, SetupScene, LobbyScene, GameScene, PreviewScene, CameraPageScene, PauseScene, OnlineMenuScene, BrowseScene, JoinCodeScene, RoomScene, NameEntryScene, JoinMenuScene, SeasonMenuScene, SeasonSetupScene, SeasonHubScene, StandingsScene, GamesScene, BracketScene, TrophyScene, HistoryScene, SocialScene, FriendScene, LeaderboardScene];
+const SCENES = [BootScene, TitleScene, MainMenuScene, SettingsScene, SettingsPageScene, ControlsGuideScene, SetupScene, LobbyScene, GameScene, PreviewScene, CameraPageScene, PauseScene, OnlineMenuScene, BrowseScene, JoinCodeScene, RoomScene, NameEntryScene, JoinMenuScene, SeasonMenuScene, SeasonSetupScene, SeasonHubScene, StandingsScene, GamesScene, BracketScene, TrophyScene, HistoryScene, LeaderboardScene];
 
 /* Phaser stops its whole loop if a scene throws, which looks like a freeze. Catch it, keep running, and tell the player with a small toast that can be dismissed
    (the full error is always in the browser console, F12). "Details" shows it on screen so it can be copied and sent to whoever looks after the game. */

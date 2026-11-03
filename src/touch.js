@@ -24,7 +24,7 @@ const TOUCH = {
 };
 
 const TouchPad = {
-  state: { held: {}, ax: 0, ay: 0 }, els: {}, root: null, bar: null, hint: null, editing: false, selected: null, built: false,
+  state: { held: {}, tapped: {}, ax: 0, ay: 0 }, els: {}, root: null, bar: null, hint: null, editing: false, selected: null, built: false,
   detect() { return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0 && !!window.matchMedia && matchMedia('(pointer: coarse)').matches); },
   init() {
     if (Settings.touch === undefined) Settings.touch = this.detect();                      // phones and tablets start with it on
@@ -71,12 +71,14 @@ const TouchPad = {
   },
   sync() {                                                                       // called every frame: show or hide with the setting
     if (!this.built) return;
+    if (this.editing && Controls.list().some(x => x.raw && (x.raw.pressed.b || x.raw.pressed.start))) this.action('lock');   // B / Start / Esc: done adjusting
     const show = !!Settings.touch; if (show !== this.shown) { this.shown = show; this.root.style.display = show ? 'block' : 'none'; if (show) this.place(); else this.clear(); }
-    const inGame = !!(window.voltGame && voltGame.scene && voltGame.scene.isActive('Game'));
+    const sc = window.voltGame && voltGame.scene, inGame = !!(sc && sc.isActive('Game') && !sc.isActive('Pause') && !sc.isActive('JoinMenu') && !sc.isActive('Settings') && !sc.isActive('SettingsPage') && !sc.isActive('CameraPage'));   // the online pause menu sits over a running match
     if (inGame !== this.inGame || this.editing !== this.wasEditing) {
       this.inGame = inGame; this.wasEditing = this.editing;
-      for (const id of TOUCH.gameOnly) this.els[id].style.display = (inGame || this.editing) ? 'flex' : 'none';
-      if (!inGame && !this.editing) for (const id of TOUCH.gameOnly) this.state.held[TOUCH.controls[id].button] = false;
+      // only in a match (or while adjusting them): every menu can be tapped, and the buttons would cover its rows
+      for (const id of Object.keys(TOUCH.controls)) this.els[id].style.display = (inGame || this.editing) ? (TOUCH.gameOnly.includes(id) ? 'flex' : '') : 'none';
+      if (!inGame && !this.editing) this.clear();
     }
   },
   clear() { this.state.held = {}; this.state.ax = this.state.ay = 0; for (const el of Object.values(this.els)) el.classList.remove('down'); const k = this.els.stick.querySelector('.knob'); k.style.transform = ''; },
@@ -92,7 +94,7 @@ const TouchPad = {
       e.preventDefault(); if (typeof Sound !== 'undefined') Sound.resume();
       if (this.editing) { drag = { dx: e.clientX - parseFloat(el.style.left), dy: e.clientY - parseFloat(el.style.top) }; this.selected = id; el.setPointerCapture(e.pointerId); this.place(); return; }
       if (pointer !== null) return; pointer = e.pointerId; el.setPointerCapture(e.pointerId); el.classList.add('down');
-      if (d.kind === 'stick') stickMove(e); else this.state.held[d.button] = true;
+      if (d.kind === 'stick') stickMove(e); else { this.state.held[d.button] = true; this.state.tapped[d.button] = true; }   // tapped: a quick tap between two frames still counts
     });
     el.addEventListener('pointermove', e => {
       if (this.editing && drag) { const m = TOUCH.edgeMargin; this.setLayout(id, { x: Math.min(1 - m, Math.max(m, (e.clientX - drag.dx) / innerWidth)), y: Math.min(1 - m, Math.max(m, (e.clientY - drag.dy) / innerHeight)) }); this.place(); return; }

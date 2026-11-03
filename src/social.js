@@ -58,11 +58,11 @@ const Social = {
     clearTimeout(this.timer); if (!this.started || !Account.loggedIn) return;
     if (!this.busy) {
       this.busy = true;
-      try { const d = await Account.req('POST', '/sync', { status: this.status() }); this.data = d; this.notice(d); this.emit(); }
-      catch (e) { /* offline for a moment: try again next time */ }
+      try { const d = await Account.req('POST', '/sync', { status: this.status() }); this.data = d; this.notice(d); this.emit(); this.fails = 0; }
+      catch (e) { this.fails = (this.fails || 0) + 1; }                       // offline or a server problem: try again, more slowly each time
       this.busy = false;
     }
-    const idle = document.hidden, C = CONFIG.server; this.timer = setTimeout(() => this.tick(), (idle ? C.idleSyncSeconds : C.syncSeconds) * 1000);
+    const idle = document.hidden, C = CONFIG.server; this.timer = setTimeout(() => this.tick(), Math.min(120, (idle ? C.idleSyncSeconds : C.syncSeconds) * (1 + Math.min(5, this.fails || 0))) * 1000);
   },
   notice(d) {                                                  // pop a notice for anything new
     for (const name of d.incoming) if (!this.seen.has('req:' + name)) { this.seen.add('req:' + name); Toasts.show(`<b>${esc(name)}</b> wants to be your friend.`, [{ label: 'Accept', go: true, fn: () => this.accept(name) }, { label: 'Later' }]); }

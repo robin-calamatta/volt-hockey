@@ -3,6 +3,37 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v8.1: friends window, party leader, controller everywhere, password reset, admin page
+- **Friends and party window**: the 👥 button in the top-left corner of every screen (or **Select / View** on a gamepad, or the **`** key)
+  opens one window with your account, Add a friend, Leaderboard, your party, room, invites and friends list. An offline match pauses while
+  it is open. Nothing social is in the menus any more.
+- **Camera button moved to D-pad down** on a gamepad (keyboard T / P unchanged), so Select is free for the friends window.
+- **Add a friend**: matching usernames drop down as you type; under-18 players only appear on an exact username.
+- **Party leader is the boss**: the leader picks Play, Season, Practice or Online and the whole party comes along (members can put local
+  players on either team in rooms; in a season the party plays on the leader's team). Members see "waiting for the leader". The leader can
+  remove anyone; anyone can leave. Party voice is open mic for the whole time you are in a party, and the window shows who is connected.
+- **Accounts**: email at sign-up, confirm password, 👁 to peek, **Forgot password** emails a reset link (DEPLOY.md). Older accounts can add
+  an email from the friends window.
+- **Mouse, keyboard or controller alone**: pop-ups no longer let clicks through to the menu behind; a gamepad moves around every form with
+  the D-pad and types on an **on-screen keyboard** (A types, B deletes, X shift, Y space, Start done).
+- **Nothing behind a pop-up reacts**: while the friends window, a form, chat, the on-screen keyboard or the touch-button editor is open,
+  every screen behind it gets no keys, controller presses, stick, mouse or taps (`Controls.isBlocked`, `src/input.js`). The key or button
+  that closes a pop-up (Esc, B, A) stays dead until it is let go, so it cannot fall through to the menu behind. Fixed: after a pop-up opened by a tap, the next tap on the game was ignored.
+- **Esc goes back** in every list menu (it used to act as Start and select the highlighted row). Quick key or touch-button taps
+  between two frames are no longer lost.
+- **Mouse and touch everywhere**: Back rows on match / practice setup; Back / Continue buttons on standings, your games (with ▲ ▼ and the
+  mouse wheel), bracket, trophy, hall of fame, leaderboard (◀ ▶ categories) and the controls guide; the lobby has Back, Join (touch
+  controls) and Kick off; a match has a II pause button for the mouse; the end of a match has Rematch / Main menu (or Continue / Back to
+  the room) buttons.
+- **Phones**: the touch controller only shows during a match (it used to cover the bottom menu rows), taller rows on the camera page,
+  the online room's host settings moved to a second page (**Teams and rules ▸**) so rows stay big enough to tap, and a "turn your phone
+  sideways" screen when a phone is held upright. During a match on a touch screen the 👥 button steps aside (it covered the speed +
+  button); the pause menu has **Friends and party** on every device.
+- **Log in with your username or your email.**
+- **Long menu text** shrinks to fit its box.
+- **Server errors fixed** (the Netlify Function now opens its storage fresh on each call), quieter background traffic.
+- **Admin page** at `/admin.html` (DEPLOY.md): players, reports, and every stored item.
+
 ## Accounts, leaderboard, friends, parties, chat and voice (v8)
 - **Optional login** (Friends and party, or Settings > Account and player). Guests still play everything; their saves stay in that browser.
   Logged-in players have their preferences, career, current season and hall of fame saved online and restored on any device or after
@@ -30,7 +61,7 @@ The match is now drawn in 3D: a real arena with a hardwood (or tile, concrete, i
 - **One cart all game**: Match setup, Season setup, the online room and Settings > Game rules have **Switch carts with Y: On / Off**. Off locks everyone to the cart they start in (online it is the host's rule).
 - **Settings, regrouped** (nothing removed): Camera and graphics, Sound and commentary, Game rules, Ball and carts, CPU opponent, Controls and screen (controls guide, right-stick look, touch buttons, fullscreen), Player. A line under the menu says what is on the highlighted page. The pause menu has Camera right under Resume.
 - **Commentator**: Voice and captions, **Voice only**, Captions only, or Off.
-- **Camera button**: View on a gamepad, **T** on keyboard 1, **P** on keyboard 2, **◉ VIEW** on the touch pad. It steps through **First person -> Third person -> Broadcast -> Classic 2D**. Also in the pause menu and Settings > Camera.
+- **Camera button**: D-pad down on a gamepad (View until v8.1), **T** on keyboard 1, **P** on keyboard 2, **◉ VIEW** on the touch pad. It steps through **First person -> Third person -> Broadcast -> Classic 2D**. Also in the pause menu and Settings > Camera.
 - **Steering in first and third person is cart-relative**: push forward to drive, left / right to turn. How far you push sideways sets how fast you turn; sideways alone turns on the spot; pull back to reverse. Spin shots work as before (the camera eases round so a 90 degree spin does not whip the view).
 - **Broadcast** is a TV camera high on the near side that slides along with the ball; the stick follows the screen like the 2D game.
 - **Classic 2D** is the original flat view, unchanged (zoom, tilt, NHL/sideways/whole rink).

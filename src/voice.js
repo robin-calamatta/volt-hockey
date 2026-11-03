@@ -1,4 +1,4 @@
-/* Voice chat. In an online room you talk with the other players in it; otherwise with your party.
+/* Voice chat: with your party the whole time you are in one, and with everyone in your online room.
    Rules: logged-in players only (guests have no voice). If either player is under 18 you only hear each other if you are friends.
    Muted or blocked players are never connected. Audio goes player-to-player over WebRTC (PeerJS media calls): no server in between.
    Settings (Settings > Voice chat): mode (open mic / push to talk / muted mic / off), microphone, mic volume, hear yourself (monitoring),
@@ -12,9 +12,10 @@ const Voice = {
 
   /* Who should I be connected to right now? (room players, else party members) */
   channel() {
-    if (Online.current) return Online.roster().filter(r => r.id !== Online.myId() && r.acct).map(r => ({ vid: r.vid, name: r.name, acct: r.acct, adult: r.adult }));
-    if (Party.active) return Party.others().filter(m => m.acct).map(m => ({ vid: m.vid, name: m.name, acct: m.acct, adult: m.adult }));
-    return [];
+    const out = new Map(), add = p => { if (!p.acct || p.acct === Account.name) return; const k = p.acct.toLowerCase(), was = out.get(k); out.set(k, { ...was, ...p, vid: p.vid || (was && was.vid) || '', party: (was && was.party) || p.party }); };
+    if (Party.active) for (const m of Party.others()) add({ vid: m.vid, name: m.name, acct: m.acct, adult: m.adult, party: true });   // your party: the whole time you are in it
+    if (Online.current) for (const r of Online.roster()) if (r.id !== Online.myId()) add({ vid: r.vid, name: r.name, acct: r.acct, adult: r.adult });   // plus everyone in your room
+    return [...out.values()];
   },
   allowed(p) {
     if (!Account.loggedIn || !p || !p.acct || Social.isMuted(p.acct)) return false;
@@ -60,7 +61,7 @@ const Voice = {
   },
   track(vid, call) {
     const old = this.calls.get(vid); if (old && old.call !== call) { try { old.call.close(); } catch (e) { /* gone */ } }
-    const entry = { call, el: null, an: null }; this.calls.set(vid, entry);
+    const entry = { call, el: null, an: null, state: 'connecting', at: performance.now() }; this.calls.set(vid, entry);
     call.on('stream', s => this.play(vid, s));
     call.on('close', () => this.drop(vid, call)); call.on('error', () => this.drop(vid, call));
   },
@@ -112,9 +113,19 @@ const Voice = {
   micLevel() { return this.nodes ? this.level(this.nodes.an) : 0; },
   /* every frame (from Chat's overlay loop): push to talk and who is speaking */
   frame() {
-    const held = Controls.list().some(s => s.held && s.held.talk) || this.touchTalk;
+    const held = Controls.list().some(s => s.raw && s.raw.held.talk) || this.touchTalk;
     if (held !== this.pttHeld) { this.pttHeld = held; this.updateGate(); }
-    for (const [vid, e] of this.calls) this.levels.set(vid, this.level(e.an));
+    for (const [vid, e] of this.calls) {
+      this.levels.set(vid, this.level(e.an));
+      const pc = e.call.peerConnection, ice = pc ? pc.iceConnectionState : '';                     // how each voice link is doing (shown in the friends panel)
+      e.state = ice === 'connected' || ice === 'completed' ? 'connected' : ice === 'failed' || (ice !== 'connected' && performance.now() - e.at > 15000 && !e.el) ? 'failed' : 'connecting';
+    }
+  },
+  /* 'connected' | 'connecting' | 'failed' | 'blocked' (age / mute rules) | 'off' for a person in your party or room */
+  statusOf(acct, vid) {
+    if (this.mode() === 'off' || !Account.loggedIn) return 'off';
+    const p = this.channel().find(x => x.acct === acct); if (p && !this.allowed(p)) return 'blocked';
+    const e = vid && this.calls.get(vid); return e ? e.state : 'connecting';
   },
   speakers() {                                                  // [{ name, level, me }] for the on-screen list
     const out = []; if (!this.calls.size) return out;

@@ -140,7 +140,7 @@ function netErrorText(e) {
     'socket-error': 'Lost the matchmaking server. Try again.', 'socket-closed': 'Lost the matchmaking server. Try again.', 'unavailable-id': 'Could not create a room. Try again.',
     'browser-incompatible': 'This browser does not support online play.', full: 'That room is full.', started: 'That match has already started. Ask the host to return to the lobby.',
     version: 'Different game versions. Everyone should reload the page.', unsupported: 'Online play is unavailable (the PeerJS library did not load).',
-    host_left: 'The host left the room.', lost: 'Lost connection to the host.', kicked: 'You were removed from the room.'
+    host_left: 'The host left the room.', party_done: 'Your party leader finished that game. They will bring you into the next one.', lost: 'Lost connection to the host.', kicked: 'You were removed from the room.'
   })[t] || 'Connection problem (' + t + ').';
 }
 
@@ -184,7 +184,7 @@ class HostSession {
   setName(id, name) { const p = this.roster.find(r => r.id === id), clean = Settings.cleanName(name); if (!p || !clean) return; p.name = this.uniqueName(clean, id); this.sendRoster(); }
   count(side) { return this.roster.filter(p => p.side === side).length; }
   guestName(taken) { return CONFIG.playerNames.find(n => !taken.includes(n)) || 'Guest'; }
-  openSide() { return [0, 1].filter(s => this.count(s) < this.cfg.sizes[s]).sort((a, b) => this.count(a) - this.count(b))[0]; }
+  openSide() { if (this.cfg.season) return this.count(this.cfg.season.side) < this.cfg.sizes[this.cfg.season.side] ? this.cfg.season.side : undefined; return [0, 1].filter(s => this.count(s) < this.cfg.sizes[s]).sort((a, b) => this.count(a) - this.count(b))[0]; }   // a season game: everyone plays for the leader's team
   claimedSources() { return [...this.guestSrc.values()]; }
   guestsOf(owner) { return this.roster.filter(r => r.own === owner); }
   /* A local guest: another person on the same machine as a player, with a controller of their own. They get a cart and a roster entry, but share the owner's connection. */
@@ -251,7 +251,7 @@ class HostSession {
   setVid(vid) { const me = this.roster.find(r => r.id === this.myId); if (me) { me.vid = vid; this.sendRoster(); } }
   setSide(id, side) {
     const p = this.roster.find(r => r.id === id);
-    if (!p || (side !== 0 && side !== 1) || p.side === side || this.count(side) >= this.cfg.sizes[side]) return false;
+    if (!p || (side !== 0 && side !== 1) || p.side === side || this.count(side) >= this.cfg.sizes[side] || (this.cfg.season && side !== this.cfg.season.side)) return false;
     p.side = side; this.sendRoster(); return true;
   }
   setConfig(patch) {                                              // host menu: teams, sizes, difficulty...
@@ -280,7 +280,8 @@ class HostSession {
     const players = this.roster.map((r, i) => ({ id: r.id, name: r.name, side: r.side, locked: !!r.lock, tag: 'P' + (i + 1), speedLevel: Settings.speedLevel, chair: null, spinQueued: 0,
       remote: !(r.host || r.own === 1), src: r.host ? localSource : r.own === 1 ? this.guestSrc.get(r.id) : { ax: 0, ay: 0, pressed: {} } }));
     for (const e of this.entries.values()) e.players = new Map(players.filter(p => p.id === e.id || (this.roster.find(r => r.id === p.id) || {}).own === e.id).map(p => [p.id, p]));
-    this.match = new Match({ teamA: this.cfg.teamA, teamB: this.cfg.teamB, players, difficulty: this.cfg.difficulty, sizes: this.cfg.sizes, practice: this.cfg.practice });
+    const se = this.cfg.season;                                    // a party season game: the season's length and each team's own skill
+    this.match = new Match({ teamA: this.cfg.teamA, teamB: this.cfg.teamB, players, difficulty: this.cfg.difficulty, sizes: this.cfg.sizes, practice: this.cfg.practice, periodSeconds: se ? se.periodSeconds : undefined, diffBySide: se ? se.levels : undefined });
     this.match.sfxQueue = []; this.match.callQueue = []; this.state = 'playing'; this.snapAcc = 0; this.relist();
     this.broadcast({ t: 'start', cfg: this.cfg, rules: Settings.rules(), players: players.map(p => ({ id: p.id, name: p.name, side: p.side, tag: p.tag })) });
     return this.match;

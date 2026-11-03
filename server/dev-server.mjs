@@ -18,7 +18,9 @@ const store = {
   del: async k => { try { fs.unlinkSync(file(k)); } catch (e) { /* gone */ } },
   list: async prefix => fs.readdirSync(dataDir).map(f => decodeURIComponent(f.replace(/\.json$/, ''))).filter(k => k.startsWith(prefix))
 };
-const api = createApi(store);
+// Locally, "emails" are written to server/.data/outbox.txt (and the console) instead of being sent.
+const api = createApi(store, { admin: { user: process.env.ADMIN_USER || 'admin', pass: process.env.ADMIN_PASSWORD || 'admin' },   // local only: admin / admin unless you set them
+  siteUrl: () => `http://localhost:${PORT}`, sendEmail: async m => { const line = `\n--- ${new Date().toISOString()}  to: ${m.to}\n${m.subject}\n${m.text}\n`; fs.appendFileSync(path.join(dataDir, 'outbox.txt'), line); console.log(line); } });
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.webmanifest': 'application/manifest+json', '.css': 'text/css' };
 
 const server = http.createServer(async (req, res) => {

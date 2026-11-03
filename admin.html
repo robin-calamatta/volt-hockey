@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
+<title>Volt Hockey Admin</title>
+<style>
+  :root { --bg:#0d151b; --panel:#13212b; --line:#2a4252; --text:#e8eef2; --dim:#9fb2bf; --accent:#19c3ff; --warn:#ff7a59; --ok:#3dff9a; }
+  * { box-sizing: border-box; } body { margin:0; background:var(--bg); color:var(--text); font:15px system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  header { display:flex; align-items:center; gap:16px; padding:12px 20px; border-bottom:1px solid var(--line); background:#0f1a22; position:sticky; top:0; }
+  header h1 { margin:0; font-size:20px; flex:1; } nav button.on { background:var(--accent); color:#06222f; border-color:var(--accent); }
+  main { padding:16px 20px; max-width:1200px; margin:0 auto; } .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:14px; }
+  button { font:inherit; background:#1b2a35; color:#fff; border:1px solid #3c5566; border-radius:7px; padding:5px 12px; cursor:pointer; } button.go { background:var(--accent); color:#06222f; border-color:var(--accent); font-weight:600; }
+  button.warn { border-color:var(--warn); color:#ffb39f; } input, textarea, select { font:inherit; background:#0a1116; color:#fff; border:1px solid #3c5566; border-radius:7px; padding:6px 9px; }
+  textarea { width:100%; min-height:340px; font:13px ui-monospace, Menlo, Consolas, monospace; } table { width:100%; border-collapse:collapse; } th, td { text-align:left; padding:6px 8px; border-bottom:1px solid #1d3241; } th { color:var(--dim); font-weight:500; font-size:13px; }
+  tr.click:hover { background:#18303f; cursor:pointer; } .dim { color:var(--dim); } .err { color:var(--warn); } .okm { color:var(--ok); } .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:6px 0; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; } .stat b { font-size:26px; display:block; } .tag { font-size:12px; padding:1px 7px; border-radius:9px; background:#22384a; } .tag.ban { background:#5a2a22; } .tag.kid { background:#3b3a1f; }
+  #login { max-width:360px; margin:12vh auto; } #login input { width:100%; margin:4px 0 10px; } .keys { max-height:420px; overflow:auto; font:13px ui-monospace, Menlo, Consolas, monospace; } .keys div { padding:3px 6px; cursor:pointer; border-radius:5px; } .keys div:hover { background:#18303f; }
+  @media (max-width: 700px) { .hide-sm { display:none; } }
+</style></head>
+<body>
+<div id="login" class="card">
+  <h2 style="margin-top:0">Volt Hockey admin</h2>
+  <label class="dim">Admin username</label><input id="lu" autocomplete="username">
+  <label class="dim">Admin password</label><input id="lp" type="password" autocomplete="current-password">
+  <div class="row"><button class="go" id="lgo">Log in</button><span class="err" id="lerr"></span></div>
+  <p class="dim" style="font-size:13px">The admin username and password are the ADMIN_USER and ADMIN_PASSWORD environment variables in your Netlify site settings.</p>
+</div>
+<div id="app" hidden>
+  <header><h1>Volt Hockey admin</h1><nav><button data-tab="players" class="on">Players</button> <button data-tab="reports">Reports</button> <button data-tab="data">All data</button></nav><button id="out">Log out</button></header>
+  <main>
+    <section data-panel="players">
+      <div class="grid card" id="stats"></div>
+      <div class="card"><div class="row"><input id="q" placeholder="Search by username or email" style="flex:1"><button class="go" id="qgo">Search</button></div>
+        <table><thead><tr><th>Player</th><th class="hide-sm">Email</th><th>Games</th><th>Wins</th><th>Cups</th><th class="hide-sm">Last seen</th></tr></thead><tbody id="ulist"></tbody></table><div class="dim" id="utotal"></div></div>
+      <div class="card" id="detail" hidden></div>
+    </section>
+    <section data-panel="reports" hidden><div class="card"><table><thead><tr><th>When</th><th>By</th><th>About</th><th>Where</th><th>Message</th><th></th></tr></thead><tbody id="rlist"></tbody></table></div></section>
+    <section data-panel="data" hidden>
+      <div class="card"><div class="row"><select id="pfx"><option value="">everything</option><option value="u/">players (u/)</option><option value="r/">reports (r/)</option><option value="dm/">messages (dm/)</option><option value="lb">leaderboard (lb)</option><option value="names">username index</option><option value="s/">logins (s/)</option><option value="e/">emails (e/)</option><option value="pr/">reset links (pr/)</option></select><button id="kgo">List</button><span class="dim" id="kcount"></span></div>
+        <div class="keys" id="klist"></div></div>
+      <div class="card"><div class="row"><input id="rkey" placeholder="key" style="flex:1"><button id="rload">Load</button><button class="go" id="rsave">Save</button><button class="warn" id="rdel">Delete</button><span id="rmsg"></span></div><textarea id="rval" spellcheck="false"></textarea>
+        <p class="dim" style="font-size:13px">Careful: this edits the stored JSON directly. Player records are under u/&lt;name&gt;; use the Players tab for everyday changes.</p></div>
+    </section>
+  </main>
+</div>
+<script>
+/* Talks to the same API as the game (/api/admin/...). The admin pass is kept for this browser tab only. */
+const $ = s => document.querySelector(s), esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let token = sessionStorage.getItem('voltAdmin') || '';
+const when = t => t ? new Date(t).toLocaleString() : '-';
+async function api(method, path, body, query) {
+  const res = await fetch('/api' + path + (query ? '?' + new URLSearchParams(query) : ''), { method, headers: { 'content-type': 'application/json', 'x-admin-token': token }, body: body ? JSON.stringify(body) : undefined });
+  let data = {}; try { data = await res.json(); } catch (e) { data = { error: 'The server did not answer (' + res.status + '). Is the Netlify Function deployed?' }; }
+  if (res.status === 401 && path !== '/admin/login') { logout(); throw new Error(data.error); }
+  if (!res.ok) throw new Error(data.error || 'Error ' + res.status); return data;
+}
+function logout() { token = ''; sessionStorage.removeItem('voltAdmin'); $('#app').hidden = true; $('#login').hidden = false; }
+async function login() { $('#lerr').textContent = ''; try { const r = await api('POST', '/admin/login', { user: $('#lu').value, pass: $('#lp').value }); token = r.token; sessionStorage.setItem('voltAdmin', token); start(); } catch (e) { $('#lerr').textContent = e.message; } }
+$('#lgo').onclick = login; $('#lp').onkeydown = e => { if (e.key === 'Enter') login(); }; $('#out').onclick = logout;
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => { document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('[data-panel]').forEach(p => p.hidden = p.dataset.panel !== b.dataset.tab); if (b.dataset.tab === 'reports') reports(); if (b.dataset.tab === 'data') keys(); });
+async function start() { $('#login').hidden = true; $('#app').hidden = false; try { const s = await api('GET', '/admin/stats'); $('#stats').innerHTML = `<div class="stat"><b>${s.players}</b>players</div><div class="stat"><b>${s.leaderboard}</b>on the leaderboard</div><div class="stat"><b>${s.reports}</b>reports</div>`; } catch (e) { $('#stats').textContent = e.message; } search(); }
+async function search() {
+  try {
+    const r = await api('GET', '/admin/users', null, { q: $('#q').value.trim() });
+    $('#ulist').innerHTML = r.users.map(u => `<tr class="click" data-n="${esc(u.name)}"><td>${esc(u.name)} ${u.adult ? '' : '<span class="tag kid">under 18</span>'} ${u.banned ? '<span class="tag ban">suspended</span>' : ''}</td><td class="hide-sm">${esc(u.email)}</td><td>${u.games}</td><td>${u.wins}</td><td>${u.cups}</td><td class="hide-sm dim">${when(u.lastSeen)}</td></tr>`).join('') || '<tr><td colspan="6" class="dim">No players found.</td></tr>';
+    $('#utotal').textContent = `${r.users.length} shown of ${r.total}`;
+    document.querySelectorAll('#ulist tr[data-n]').forEach(tr => tr.onclick = () => detail(tr.dataset.n));
+  } catch (e) { $('#ulist').innerHTML = `<tr><td colspan="6" class="err">${esc(e.message)}</td></tr>`; }
+}
+$('#qgo').onclick = search; $('#q').onkeydown = e => { if (e.key === 'Enter') search(); };
+async function detail(name) {
+  const d = $('#detail'); d.hidden = false; d.innerHTML = 'Loading...';
+  const { user: u } = await api('GET', '/admin/user', null, { name }), c = (u.progress && u.progress.career) || {};
+  const friends = Object.entries(u.friends || {}).map(([k, v]) => `${esc(k)}${v === 'friends' ? '' : ' (' + v + ')'}`).join(', ') || 'none';
+  d.innerHTML = `<h3 style="margin-top:0">${esc(u.name)}</h3>
+    <div class="row dim">Joined ${when(u.created)} · last seen ${when(u.lastSeen)} · ${u.adult ? '18 or over' : 'under 18'} ${u.banned ? '· <span class="err">suspended</span>' : ''}</div>
+    <div class="row"><label>Email <input id="de" value="${esc(u.email || '')}" size="30"></label><button id="dsave-e">Save email</button></div>
+    <div class="row"><label><input type="checkbox" id="dadult" ${u.adult ? 'checked' : ''}> 18 or over</label><label><input type="checkbox" id="dban" ${u.banned ? 'checked' : ''}> Suspended (cannot log in)</label><button id="dsave-f">Save</button></div>
+    <div class="row">Career: ${['games', 'wins', 'goals', 'shots', 'cups'].map(k => `<label>${k} <input data-c="${k}" type="number" min="0" value="${c[k] || 0}" style="width:80px"></label>`).join(' ')}<button id="dsave-c">Save career</button></div>
+    <div class="row"><input id="dpw" type="password" placeholder="New password for them"><button id="dsave-p">Set password</button><span class="dim">(logs them out everywhere)</span></div>
+    <div class="row dim">Friends: ${friends}</div><div class="row dim">Blocked: ${esc((u.blocked || []).join(', ') || 'nobody')}</div>
+    <div class="row"><button class="warn" id="ddel">Delete this player</button><span id="dmsg"></span></div>`;
+  const msg = (t, ok) => { $('#dmsg').innerHTML = `<span class="${ok ? 'okm' : 'err'}">${esc(t)}</span>`; };
+  const save = async patch => { try { await api('POST', '/admin/user', { name: u.name, patch }); msg('Saved.', true); search(); } catch (e) { msg(e.message); } };
+  $('#dsave-e').onclick = () => save({ email: $('#de').value.trim() });
+  $('#dsave-f').onclick = () => save({ adult: $('#dadult').checked, banned: $('#dban').checked });
+  $('#dsave-c').onclick = () => save({ career: Object.fromEntries([...document.querySelectorAll('[data-c]')].map(i => [i.dataset.c, +i.value])) });
+  $('#dsave-p').onclick = async () => { try { await api('POST', '/admin/user/password', { name: u.name, password: $('#dpw').value }); msg('Password set.', true); } catch (e) { msg(e.message); } };
+  $('#ddel').onclick = async () => { if (!confirm(`Delete ${u.name} for good? Their progress, email and friendships go too.`)) return; try { await api('POST', '/admin/user/delete', { name: u.name }); d.hidden = true; search(); } catch (e) { msg(e.message); } };
+}
+async function reports() {
+  try {
+    const r = await api('GET', '/admin/reports');
+    $('#rlist').innerHTML = r.reports.map(x => `<tr><td class="dim">${when(x.at)}</td><td>${esc(x.by)}</td><td><a href="#" data-n="${esc(x.about)}">${esc(x.about)}</a></td><td>${esc(x.where)}</td><td>${esc(x.text)}</td><td><button class="warn" data-k="${esc(x.key)}">Done</button></td></tr>`).join('') || '<tr><td colspan="6" class="dim">No reports.</td></tr>';
+    document.querySelectorAll('#rlist [data-k]').forEach(b => b.onclick = async () => { await api('POST', '/admin/raw/delete', { key: b.dataset.k }); reports(); });
+    document.querySelectorAll('#rlist [data-n]').forEach(a => a.onclick = e => { e.preventDefault(); document.querySelector('nav [data-tab=players]').click(); detail(a.dataset.n); });
+  } catch (e) { $('#rlist').innerHTML = `<tr><td colspan="6" class="err">${esc(e.message)}</td></tr>`; }
+}
+async function keys() {
+  try { const r = await api('GET', '/admin/keys', null, { prefix: $('#pfx').value }); $('#kcount').textContent = r.keys.length + ' items'; $('#klist').innerHTML = r.keys.map(k => `<div data-k="${esc(k)}">${esc(k)}</div>`).join(''); document.querySelectorAll('#klist [data-k]').forEach(x => x.onclick = () => { $('#rkey').value = x.dataset.k; load(); }); }
+  catch (e) { $('#klist').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+$('#kgo').onclick = keys; $('#pfx').onchange = keys;
+async function load() { $('#rmsg').textContent = ''; try { const r = await api('GET', '/admin/raw', null, { key: $('#rkey').value.trim() }); $('#rval').value = JSON.stringify(r.value, null, 2); } catch (e) { $('#rmsg').innerHTML = `<span class="err">${esc(e.message)}</span>`; } }
+$('#rload').onclick = load;
+$('#rsave').onclick = async () => { let v; try { v = JSON.parse($('#rval').value); } catch (e) { $('#rmsg').innerHTML = '<span class="err">That is not valid JSON.</span>'; return; } try { await api('PUT', '/admin/raw', { key: $('#rkey').value.trim(), value: v }); $('#rmsg').innerHTML = '<span class="okm">Saved.</span>'; } catch (e) { $('#rmsg').innerHTML = `<span class="err">${esc(e.message)}</span>`; } };
+$('#rdel').onclick = async () => { const k = $('#rkey').value.trim(); if (!k || !confirm('Delete ' + k + '?')) return; await api('POST', '/admin/raw/delete', { key: k }); $('#rval').value = ''; keys(); };
+if (token) start();
+</script>
+</body></html>
