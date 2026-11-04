@@ -129,11 +129,12 @@ MODES.br = {
   init(m) {
     const g = m.gs, M = this.map(m), sq = m.mini.squad || 1; g.map = m.mini.map; g.t = 0; g.L = []; g.lid = 0; g.dead = [];
     const order = m.chairs.slice().sort((a, b) => (b.player ? 1 : 0) - (a.player ? 1 : 0));   // people first, so friends on one screen share a team
-    order.forEach((c, i) => { c.gs = { team: Math.floor(i / sq), lv: 0, z: 0, ramp: -1, hp: BR.hp, sh: 0, inv: [{ k: 'pistol', a: 12 }], sel: 0, cd: 0, boost: 0, kills: 0, dmg: 0 }; });
+    order.forEach((c, i) => { c.gs = { team: Math.floor(i / sq), lv: 0, z: 0, ramp: -1, hp: BR.hp, sh: 0, inv: [], sel: 0, cd: 0, boost: 0, kills: 0, dmg: 0 }; });
     g.teams = Math.ceil(m.chairs.length / sq);
     const R = Math.hypot(m.width, m.height) / 2 + 4; g.st = { x: m.width / 2, y: m.height / 2, r: R, fx: m.width / 2, fy: m.height / 2, fr: R, ph: 0, wait: 45, shrink: 0, sx: 0, sy: 0, sr: R };
-    for (const [x, y, lv] of M.loot) this.drop(m, x, y, lv);
-    for (let i = 0; i < 40; i++) { const p = this.freeGround(m); if (p) this.drop(m, p.x, p.y, 0); }
+    for (const [x, y, lv] of M.loot) this.drop(m, x, y, lv, Math.random() < 0.72 ? 'chest' : 'ammo');      // chests (guns) and ammo crates where the map puts loot
+    for (let i = 0; i < 12; i++) { const p = this.freeGround(m); if (p) this.drop(m, p.x, p.y, 0, Math.random() < 0.6 ? 'chest' : 'ammo'); }
+    for (let i = 0; i < 34; i++) { const p = this.freeGround(m); if (p) this.drop(m, p.x, p.y, 0, ['med', 'med', 'med', 'pot', 'pot', 'boost', 'wall'][Math.floor(Math.random() * 7)]); }   // health and items lying in the open
   },
   pickLoot() { let tot = 0; for (const [, w] of BR_LOOT) tot += w; let r = Math.random() * tot; for (const [k, w] of BR_LOOT) { if ((r -= w) <= 0) return k; } return 'pistol'; },
   drop(m, x, y, lv, k, a) { k = k || (lv > 0 && Math.random() < 0.6 ? ['rifle', 'sniper', 'rocket', 'pot', 'shotgun', 'wall'][Math.floor(Math.random() * 6)] : this.pickLoot());   // the high ground has the better loot
@@ -193,7 +194,13 @@ MODES.br = {
   },
   take(m, c, L) {
     const G = c.gs, [, k, , , , a] = L, inv = G.inv;
-    if (k === 'ammo') { let any = false; for (const it of inv) if (BR_GUNS[it.k]) { it.a = Math.min(BR_GUNS[it.k].ammo * 2, it.a + Math.ceil(BR_GUNS[it.k].ammo * 0.6)); any = true; } if (any && c.player) this.say(m, c, 'AMMO'); return any; }
+    if (k === 'chest') {                                                  // a chest: it bursts open with a gun (and its ammo), and often something else
+      const gun = (L[4] > 0 && Math.random() < 0.6 ? ['rifle', 'sniper', 'rocket', 'shotgun'] : ['pistol', 'pistol', 'smg', 'smg', 'shotgun', 'rifle', 'rifle', 'sniper', 'rocket'])[Math.floor(Math.random() * (L[4] > 0 ? 4 : 9))], g2 = BR_GUNS[gun];
+      const a0 = c.heading + Math.PI, out = (k2, a2, n) => this.drop(m, L[2] + Math.cos(a0 + n) * 1.1, L[3] + Math.sin(a0 + n) * 1.1, L[4], k2, a2);
+      out(gun, Math.ceil(g2.ammo * 0.75), -0.5); if (Math.random() < 0.7) out(['med', 'pot', 'boost', 'wall', 'pot'][Math.floor(Math.random() * 5)], 1, 0.5);
+      m.sfx('select'); MG.add(m, { t: 'boom', x: L[2], y: L[3], z: L[4] * BR.H, life: 0.5, wave: 1 }); if (c.player) this.say(m, c, 'CHEST OPENED'); return true;
+    }
+    if (k === 'ammo') { let any = false; for (const it of inv) if (BR_GUNS[it.k] && it.a < BR_GUNS[it.k].ammo * 2) { it.a = Math.min(BR_GUNS[it.k].ammo * 2, it.a + Math.ceil(BR_GUNS[it.k].ammo * 0.8)); any = true; } if (any && c.player) this.say(m, c, 'AMMO CRATE: AMMO FOR YOUR GUNS'); else if (!any && c.player && !inv.some(it => BR_GUNS[it.k]) && !(G.ammoMsg > m.simTime)) { G.ammoMsg = m.simTime + 3; this.say(m, c, 'NO GUN YET: OPEN A CHEST'); } return any; }   // ammo crates refill the guns you have
     const same = inv.find(it => it.k === k);
     if (BR_GUNS[k] && same) { if (same.a >= BR_GUNS[k].ammo * 2) return false; same.a = Math.min(BR_GUNS[k].ammo * 2, same.a + a); if (c.player) this.say(m, c, '+' + BR_GUNS[k].name + ' AMMO'); return true; }
     if (BR_ITEMS[k] && same && same.a < BR_ITEMS[k].stack) { same.a++; if (c.player) this.say(m, c, BR_ITEMS[k].name); return true; }
@@ -321,7 +328,7 @@ MODES.br = {
     let goal = null, gl = 0; const inStorm = Math.hypot(c.x - S.x, c.y - S.y) > S.r - 3, safe = { x: S.fx || S.x, y: S.fy || S.y };
     const armed = G.inv.some(it => BR_GUNS[it.k] && it.a > 0 && it.k !== 'pistol');
     if (inStorm || (Math.hypot(c.x - S.x, c.y - S.y) > S.r * 0.85 && S.shrink > 0) || (S.shrink > 0 && Math.hypot(c.x - S.fx, c.y - S.fy) > S.fr * 0.9)) { goal = safe; gl = 0; }   // head for the next circle while the storm moves
-    if (!goal || !inStorm) { let best = null, bd = armed ? 24 : 60; for (const L of g.L) { if (Math.hypot(L[2] - S.x, L[3] - S.y) > S.r - 2) continue; const want = L[1] === 'ammo' ? 0.5 : BR_GUNS[L[1]] ? (G.inv.some(i => i.k === L[1]) ? 0.3 : G.inv.length < BR.slots ? 2 : 0) : (G.inv.length < BR.slots || G.inv.some(i => i.k === L[1] && i.a < BR_ITEMS[L[1]].stack)) ? 1 : 0; if (!want) continue; const d = Math.hypot(L[2] - c.x, L[3] - c.y) + Math.abs(L[4] - G.lv) * 2 - want * 3 - (L[4] > 0 ? 5 : 0); if (d < bd) { bd = d; best = L; } } if (best) { goal = { x: best[2], y: best[3] }; gl = best[4]; } }
+    if (!goal || !inStorm) { let best = null, bd = armed ? 24 : 60; for (const L of g.L) { if (Math.hypot(L[2] - S.x, L[3] - S.y) > S.r - 2) continue; const anyGun = G.inv.some(i => BR_GUNS[i.k]), lowAmmo = G.inv.some(i => BR_GUNS[i.k] && i.a < BR_GUNS[i.k].ammo * 0.4); const want = L[1] === 'chest' ? (anyGun ? (G.inv.length < BR.slots ? 1.2 : 0) : 5) : L[1] === 'ammo' ? (lowAmmo ? 3 : 0) : L[1] === 'med' && G.hp < 70 ? 3 : BR_GUNS[L[1]] ? (G.inv.some(i => i.k === L[1]) ? 0.3 : G.inv.length < BR.slots ? 2 : 0) : (G.inv.length < BR.slots || G.inv.some(i => i.k === L[1] && i.a < BR_ITEMS[L[1]].stack)) ? 1 : 0; if (!want) continue; const d = Math.hypot(L[2] - c.x, L[3] - c.y) + Math.abs(L[4] - G.lv) * 2 - want * 3 - (L[4] > 0 ? 5 : 0); if (d < bd) { bd = d; best = L; } } if (best) { goal = { x: best[2], y: best[3] }; gl = best[4]; } }
     if (!goal) { const t = MG.live(m).filter(o => o.gs.team !== G.team).sort((a, b) => MH.dist(c, a) - MH.dist(c, b))[0]; if (t && armed && (S.ph >= 1 || G.inv.length >= 3)) { goal = t; gl = t.gs.lv; } else if (!G.camp || m.simTime > G.camp.until) { const f = this.map(m).floors.filter(f => Math.hypot((f.x0 + f.x1) / 2 - S.x, (f.y0 + f.y1) / 2 - S.y) < S.r * 0.8); const h = f[Math.floor(Math.random() * f.length)]; G.camp = h && Math.random() < 0.6 ? { x: (h.x0 + h.x1) / 2, y: (h.y0 + h.y1) / 2, lv: h.lv, until: m.simTime + 20 } : { x: safe.x, y: safe.y, lv: 0, until: m.simTime + 10 }; } if (!goal) { goal = G.camp; gl = G.camp.lv; } }   // early on: loot, or take the high ground
     if (c.goTo) { goal = c.goTo; gl = c.goTo.lv; }                       // (a fixed destination: tests and demos)
     if (G.boost <= 0 && Math.hypot(goal.x - c.x, goal.y - c.y) > 18 && G.inv.some(x => x.k === 'boost') && G.cd <= 0 && G.ramp < 0) { const prev = G.sel; G.sel = G.inv.findIndex(x => x.k === 'boost'); c.wantUse = true; G.selBack = prev; }
@@ -363,7 +370,7 @@ MODES.br = {
 GAME_INFO.br = { name: 'Battle Royale', cat: 'sneaky', noCarts: true, blurb: 'Loot guns and items, stay in the circle, be the last team standing. Five big maps with buildings, garages and ramps.', noItems: true, noClockOpt: true,
   court: mini => (BR_MAPS[mini && mini.map] || BR_MAPS.downtown).size, label: cfg => `${(BR_MAPS[cfg.map] || BR_MAPS.downtown).name}, ${['solo', 'duos', 'trios'][(cfg.squad || 1) - 1]}`,
   goal: 'Be the last cart (or team) left alive.',
-  rules: ['Everyone starts with a pistol. Drive over loot to pick it up: SMG, shotgun, rifle, sniper, rockets, medkits, shield potions, boosts and shield walls.', 'You carry up to 5 things. Y switches between them; A uses the one you hold (hold A for automatic guns).',
+  rules: ['You start with nothing. Drive into a CHEST to burst it open: it holds a gun (pistol, SMG, shotgun, rifle, sniper or rockets) and often an item. AMMO CRATES refill the guns you have. Medkits, shield potions, boosts and shield walls lie around the map.', 'You carry up to 5 things. Y switches between them; A uses the one you hold (hold A for automatic guns).',
     'You have 100 health and up to 100 shield (shield takes damage first). Medkits heal, shield potions top up your shield.', 'BOOST: a few seconds of extra speed. SHIELD WALL: drops a wall in front of you that stops bullets (and carts).',
     'Buildings have doors; ramps lead up into garages, onto roofs and up the jungle tree. You only hit carts on your own level.', 'The STORM closes in: outside the circle you lose health, faster and faster. Last cart or team standing wins.'],
   controls: [CTRL.drive, 'Use / fire: A or X  /  Space or X  /  Right Shift or \\  /  touch A  (hold for automatic guns)', 'Switch item: Y  /  F  /  /  /  touch Y', CTRL.spin, CTRL.pause],

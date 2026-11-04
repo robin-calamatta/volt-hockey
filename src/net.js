@@ -287,6 +287,7 @@ class HostSession {
     const players = this.roster.map((r, i) => ({ id: r.id, name: r.name, side: r.side, locked: !!r.lock, tag: 'P' + (i + 1), speedLevel: Settings.speedLevel, chair: null, spinQueued: 0,
       remote: !(r.host || r.own === 1), src: r.host ? localSource : r.own === 1 ? this.guestSrc.get(r.id) : { ax: 0, ay: 0, pressed: {} } }));
     for (const e of this.entries.values()) e.players = new Map(players.filter(p => p.id === e.id || (this.roster.find(r => r.id === p.id) || {}).own === e.id).map(p => [p.id, p]));
+    if (this.cfg.mini) { this.cfg.sizesRoom = this.cfg.sizesRoom || this.cfg.sizes; this.cfg.sizes = fitSizes(this.cfg.mini, players, this.cfg.sizesRoom); }   // no CPU carts: just the people in the room
     const se = this.cfg.season;                                    // a party season game: the season's length and each team's own skill
     this.match = makeMatch({ mini: this.cfg.mini || null, teamA: this.cfg.teamA, teamB: this.cfg.teamB, players, difficulty: this.cfg.difficulty, sizes: this.cfg.sizes, practice: this.cfg.practice, periodSeconds: se ? se.periodSeconds : undefined, diffBySide: se ? se.levels : undefined });
     this.match.sfxQueue = []; this.match.callQueue = []; this.state = 'playing'; this.snapAcc = 0; this.relist();

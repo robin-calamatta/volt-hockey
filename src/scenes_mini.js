@@ -115,6 +115,8 @@ class MiniSetupScene extends ListMenuScene {
     if (!IK.noCarts) items.push({ label: () => `Carts   ◀ ${o().carts} ▶`, change: d => step('carts', d, 2, CONFIG.match.chairsPerTeam * 2), hint: 'Carts nobody drives are played by the CPU.' });
     const itemsOn = () => miniCfg(k).items, flipItems = () => miniSave({ items: { ...o().items, [k]: !itemsOn() } });
     if (!IK.noItems) items.push({ label: () => `Power-ups   ◀ ${itemsOn() ? 'On' : 'Off'} ▶`, change: flipItems, select: flipItems, hint: () => '? boxes: ' + ((MODES[k] && MODES[k].items) || ['boost', 'zap', 'oil']).map(i => MINI.items[i].label).join(', ') + '. Use with A or X.' });
+    const flipCpu = () => miniSave({ nocpu: { ...(o().nocpu || {}), [k]: !(o().nocpu || {})[k] } });
+    items.push({ label: () => `CPU carts   ◀ ${(o().nocpu || {})[k] ? 'Off (players only)' : 'On'} ▶`, change: flipCpu, select: flipCpu, hint: 'Off: no computer players, just the people who join (on this screen or online).' });
     items.push({ label: () => `CPU skill   ◀ ${Settings.difficulty} ▶`, change: d => Settings.cycleDifficulty(d) });
     items.push({ label: () => `Colours   ◀ ${TEAMS[Settings.teamA].name} v ${TEAMS[Settings.teamB].name} ▶`, change: d => Settings.cycleTeam('teamA', d), hint: k === 'hunt' ? 'The runners wear the first colours, IT the second.' : k === 'balloons' ? 'The two teams\' colours (in free for all, every cart has its own balloon colour).' : 'Cart colours.' });
     items.push({ label: () => 'How to play (full screen, controls)', hint: 'The goal, the rules and every control, over a bigger demo', select: () => this.scene.start('HowTo', { kind: k, back: { scene: 'MiniSetup', data: { kind: k } } }) });
@@ -259,7 +261,8 @@ Object.assign(View3D.prototype, {
     if (this.arena) this.scene.remove(this.arena);
     const g = this.arena = new THREE.Group(), glow = !!T.glow;
     this.scene.background = new THREE.Color(T.sky); this.scene.fog = new THREE.Fog(T.sky, 45, Math.max(W, H) > 150 ? 190 : 130);
-    const ground = new THREE.Mesh(G3.layFlat(new THREE.PlaneGeometry(W + 160, H + 160)), new THREE.MeshStandardMaterial({ color: T.ground, roughness: map.theme === 'ice' ? 0.35 : 0.95 }));
+    const gk = { grass: 'grass', sand: 'sand', canyon: 'dirt', forest: 'jungle' }[map.theme], gt = gk ? Look.tex(gk).clone() : null; if (gt) { gt.needsUpdate = true; gt.repeat.set((W + 160) / 7, (H + 160) / 7); }
+    const ground = new THREE.Mesh(G3.layFlat(new THREE.PlaneGeometry(W + 160, H + 160)), new THREE.MeshStandardMaterial(gt ? { map: gt, roughness: 0.95 } : { color: T.ground, roughness: map.theme === 'ice' ? 0.35 : 0.95 }));
     ground.position.set(W / 2, -0.01, H / 2); ground.receiveShadow = true; g.add(ground);
     const strip = (offA, offB, y, color, opts = {}, test) => {             // a flat band along the track between two offsets from the centre line
       const pos = [], idx = []; let n = 0;

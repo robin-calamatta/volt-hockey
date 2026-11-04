@@ -50,6 +50,12 @@ const modeOf = m => m && MODES[m.kind];
 function modeOpts(kind) { const I = GAME_INFO[kind] || {}, saved = (Settings.mg && Settings.mg[kind]) || {}, out = {}; for (const o of I.opts || []) out[o.key] = saved[o.key] !== undefined ? saved[o.key] : o.def; return out; }
 function modeSave(kind, patch) { Settings.mg = { ...miniOpts(), [kind]: { ...modeOpts(kind), ...patch } }; Settings.save(); }
 { const base = miniCfg; miniCfg = kind => MODES[kind] ? { kind, mode: GAME_INFO[kind].teams ? 'teams' : 'ffa', items: miniOpts().items[kind] !== undefined ? !!miniOpts().items[kind] : !!GAME_INFO[kind].itemsOn, minutes: modeOpts(kind).minutes || GAME_INFO[kind].minutes || 3, ...modeOpts(kind) } : base(kind); }
+{ const base2 = miniCfg; miniCfg = kind => ({ ...base2(kind), noCpu: !!((miniOpts().nocpu || {})[kind]) }); }   // every minigame: CPU carts on or off
+/* No CPU carts: only the people who joined get a cart (a demo with nobody in it keeps its CPUs). */
+function fitSizes(mini, players, sizes) {
+  if (!mini || !mini.noCpu || !players || !players.length) return sizes;
+  const n = [0, 1].map(s => players.filter(p => p.side === s).length); return n;
+}
 { const base = miniLabel; miniLabel = cfg => { if (!cfg || !MODES[cfg.kind]) return base(cfg); const I = GAME_INFO[cfg.kind]; return I.name + (I.label ? ' (' + I.label(cfg) + ')' : '') + (cfg.items ? ', power-ups' : ''); }; }
 
 /* ----- the framework: MiniMatch hands the new kinds over to their mode ----- */

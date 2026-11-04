@@ -533,3 +533,4 @@ class View3D {
     if (this.sun.shadow.map) this.sun.shadow.map.dispose(); this.cams.clear();
   }
 }
+

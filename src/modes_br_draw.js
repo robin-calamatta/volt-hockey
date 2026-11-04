@@ -9,7 +9,8 @@ Object.assign(View3D.prototype, {
     if (this.arena) this.scene.remove(this.arena);
     const g = this.arena = new THREE.Group(), byCol = new Map(), put = (col, geo) => { if (!byCol.has(col)) byCol.set(col, []); byCol.get(col).push(geo); };
     this.scene.background = new THREE.Color(T.sky); this.scene.fog = new THREE.Fog(T.sky, 45, 150);
-    const ground = new THREE.Mesh(G3.layFlat(new THREE.PlaneGeometry(W + 160, D + 160)), new THREE.MeshStandardMaterial({ color: T.ground, roughness: 0.95 })); ground.position.set(W / 2, -0.01, D / 2); ground.receiveShadow = true; g.add(ground);
+    const gt = Look.tex({ downtown: 'asphalt', jungle: 'jungle', port: 'concrete', suburbs: 'grass', canyon: 'dirt' }[m.mini.map] || 'grass').clone(); gt.needsUpdate = true; gt.repeat.set((W + 160) / 7, (D + 160) / 7);
+    const ground = new THREE.Mesh(G3.layFlat(new THREE.PlaneGeometry(W + 160, D + 160)), new THREE.MeshStandardMaterial({ map: gt, roughness: 0.95 })); ground.position.set(W / 2, -0.01, D / 2); ground.receiveShadow = true; g.add(ground);
     for (const [x0, y0, x1, y1] of [[-0.4, -0.4, W + 0.4, 0], [-0.4, D, W + 0.4, D + 0.4], [-0.4, 0, 0, D], [W, 0, W + 0.4, D]]) put(0x5a5f66, new THREE.BoxGeometry(x1 - x0, 1.2, y1 - y0).translate((x0 + x1) / 2, 0.6, (y0 + y1) / 2));   // the fence round the map
     for (const w of M.walls) { const h = w.h || BR_WALLH[w.kind] || H; put(BR_COLS[w.kind] || 0xb8b2a6, new THREE.BoxGeometry(w.x1 - w.x0, h, w.y1 - w.y0).translate((w.x0 + w.x1) / 2, w.lv * H + h / 2, (w.y0 + w.y1) / 2)); }
     for (const f of M.floors) { put(BR_FLOORS[f.kind] || 0x8e949b, new THREE.BoxGeometry(f.x1 - f.x0, 0.22, f.y1 - f.y0).translate((f.x0 + f.x1) / 2, f.lv * H - 0.11, (f.y0 + f.y1) / 2));
@@ -37,6 +38,15 @@ Object.assign(View3D.prototype, {
   },
   brLootMesh(L) {
     const k = L[1], gun = BR_GUNS[k], item = BR_ITEMS[k], col = gun ? gun.col : item ? item.col : 0x2e7d32, grp = new THREE.Group();
+    if (k === 'chest') {                                                     // a chest: dark wood with gold bands and a glow
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.6), this.mat(0x5a3a1e, { rough: 0.8 })), lid = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.9, 16, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2), this.mat(0x6b4a2b, { rough: 0.7 }));
+      lid.rotation.set(0, 0, 0); lid.position.y = 0.25; body.position.y = 0;
+      for (const x of [-0.32, 0, 0.32]) { const band = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.52, 0.62), this.mat(0xd4a017, { metal: 0.8, rough: 0.3 })); band.position.set(x, 0, 0); grp.add(band); }
+      const lock = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.05), this.mat(0xd4a017, { metal: 0.8, rough: 0.3 })); lock.position.set(0, 0.12, 0.32); grp.add(body, lid, lock);
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.6, 6), new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.3, depthWrite: false })); beam.position.y = 1.3; grp.add(beam);
+      grp.traverse(x => { if (x.isMesh && x !== beam) x.castShadow = true; }); grp.userData.still = true; return grp;
+    }
+    if (k === 'ammo') { const b = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.4, 0.45), this.mat(0x3f4f2f, { rough: 0.85 })), lid = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.06, 0.47), this.mat(0x2f3a22)), stripe = new THREE.Mesh(new THREE.BoxGeometry(0.71, 0.08, 0.46), this.mat(0xd4a017)); lid.position.y = 0.22; stripe.position.y = 0.05; grp.add(b, lid, stripe); grp.traverse(x => { if (x.isMesh) x.castShadow = true; }); grp.userData.still = true; return grp; }
     if (gun) { const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.16, 0.14), this.mat(0x2a2e33, { metal: 0.5, rough: 0.4 })), grip = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.22, 0.12), this.mat(col, { emissive: 0.3 })); grip.position.set(-0.15, -0.15, 0); grp.add(body, grip); if (k === 'rocket') body.scale.set(1.2, 1.8, 1.8); }
     else if (item) { const b = new THREE.Mesh(k === 'pot' ? new THREE.SphereGeometry(0.2, 14, 10) : new THREE.BoxGeometry(0.4, 0.3, 0.4), this.mat(col, { emissive: 0.4, rough: 0.4 })); grp.add(b); }
     else { const b = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.4), this.mat(0x2e7d32)); const lid = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.06, 0.42), this.mat(0xffd23f)); lid.position.y = 0.2; grp.add(b, lid); }
@@ -48,7 +58,7 @@ Object.assign(View3D.prototype, {
     const f = m.ball; this.sun.position.set(f.x - 9, 30, f.y - 11); this.sun.target.position.set(f.x, 0, f.y); this.sun.target.updateMatrixWorld();   // shadows follow the action
     if (!this.brLoot) { this.brLoot = new Map(); this.brG = new THREE.Group(); this.scene.add(this.brG); }
     const seen = new Set();
-    for (const L of g.L || []) { let mesh = this.brLoot.get(L[0]); if (!mesh) { mesh = this.brLootMesh(L); this.brG.add(mesh); this.brLoot.set(L[0], mesh); } mesh.position.set(L[2], L[4] * BR.H + 0.45 + Math.sin(t * 2 + L[0]) * 0.08, L[3]); mesh.rotation.y = t * 1.2 + L[0]; seen.add(L[0]); }
+    for (const L of g.L || []) { let mesh = this.brLoot.get(L[0]); if (!mesh) { mesh = this.brLootMesh(L); this.brG.add(mesh); this.brLoot.set(L[0], mesh); } if (mesh.userData.still) { mesh.position.set(L[2], L[4] * BR.H + 0.25, L[3]); mesh.rotation.y = L[0]; } else { mesh.position.set(L[2], L[4] * BR.H + 0.45 + Math.sin(t * 2 + L[0]) * 0.08, L[3]); mesh.rotation.y = t * 1.2 + L[0]; } seen.add(L[0]); }
     for (const [id, mesh] of this.brLoot) if (!seen.has(id)) { this.brG.remove(mesh); this.brLoot.delete(id); }
     if (!this.storm) { this.storm = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 40, 64, 1, true), new THREE.MeshBasicMaterial({ color: 0x9b4dff, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false })); this.scene.add(this.storm); }
     const S = g.st; if (S) { this.storm.position.set(S.x, 20, S.y); this.storm.scale.set(Math.max(0.5, S.r), 1, Math.max(0.5, S.r)); this.storm.material.opacity = 0.18 + 0.06 * Math.sin(t * 3); }
@@ -111,3 +121,53 @@ Object.assign(View3D.prototype, {
     const S = s.st; if (S) g.lineStyle(0.25, 0x9b4dff, 0.8 + 0.2 * Math.sin(t * 4)).strokeCircle(S.x, S.y, S.r);
   };
 }
+
+/* ----- the Battle Royale hotbar: five slots with a picture of each gun or item, its ammo, and health and shield bars ----- */
+function brDrawIcon(c, k) {
+  const W = 128, H = 72, metal = '#2b2f35', dark = '#15181c', acc = '#' + ((BR_GUNS[k] || BR_ITEMS[k] || { col: 0x2e7d32 }).col).toString(16).padStart(6, '0');
+  c.clearRect(0, 0, W, H); c.lineJoin = 'round';
+  const R = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); }, P = (pts, col) => { c.fillStyle = col; c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); c.fill(); };
+  const shine = (x, y, w) => { c.fillStyle = 'rgba(255,255,255,0.18)'; c.fillRect(x, y, w, 2); };
+  if (k === 'pistol') { R(34, 24, 56, 13, metal); R(84, 27, 12, 6, dark); P([[40, 37], [56, 37], [52, 60], [36, 60]], dark); c.strokeStyle = dark; c.lineWidth = 3; c.beginPath(); c.arc(58, 40, 6, 0, Math.PI); c.stroke(); R(36, 26, 10, 3, acc); shine(34, 25, 50); }
+  else if (k === 'smg') { R(26, 24, 66, 14, metal); R(92, 28, 16, 5, dark); R(56, 38, 9, 22, dark); P([[30, 38], [44, 38], [40, 56], [28, 56]], dark); R(8, 28, 20, 6, dark); R(14, 34, 5, 12, dark); R(30, 26, 12, 3, acc); shine(26, 25, 66); }
+  else if (k === 'shotgun') { R(14, 26, 98, 7, metal); R(40, 33, 52, 6, '#6b4a2b'); R(10, 30, 28, 10, '#6b4a2b'); P([[2, 30], [14, 30], [14, 46], [4, 44]], '#5a3a20'); R(60, 39, 8, 12, dark); R(96, 25, 4, 3, acc); shine(14, 27, 98); }
+  else if (k === 'rifle') { R(22, 26, 76, 12, metal); R(98, 29, 24, 4, dark); P([[54, 38], [64, 38], [68, 58], [58, 60]], dark); P([[30, 38], [42, 38], [38, 54], [28, 54]], dark); P([[2, 28], [22, 26], [22, 40], [4, 44]], dark); R(44, 18, 22, 7, dark); R(46, 20, 18, 3, acc); shine(22, 27, 76); }
+  else if (k === 'sniper') { R(16, 30, 64, 10, metal); R(80, 32, 46, 4, dark); P([[0, 30], [16, 30], [16, 44], [2, 48]], '#4a5a3a'); R(30, 18, 40, 9, dark); c.fillStyle = acc; c.beginPath(); c.arc(30, 22, 5, 0, 7); c.fill(); c.beginPath(); c.arc(70, 22, 4, 0, 7); c.fill(); R(40, 40, 7, 14, dark); c.strokeStyle = dark; c.lineWidth = 3; c.beginPath(); c.moveTo(100, 36); c.lineTo(94, 56); c.moveTo(100, 36); c.lineTo(108, 56); c.stroke(); shine(16, 31, 64); }
+  else if (k === 'rocket') { R(10, 22, 96, 20, '#4a5a3a'); P([[106, 22], [122, 32], [106, 42]], acc); R(4, 20, 8, 24, dark); R(50, 42, 9, 16, dark); R(36, 14, 14, 8, dark); R(80, 22, 4, 20, '#3a4a2a'); shine(10, 23, 96); }
+  else if (k === 'med') { R(36, 14, 56, 46, '#f4f4f2'); R(36, 14, 56, 8, '#d0d0d0'); R(58, 24, 12, 30, '#e0283a'); R(49, 33, 30, 12, '#e0283a'); }
+  else if (k === 'pot') { c.fillStyle = '#3d8bff'; c.beginPath(); c.arc(64, 44, 20, 0, 7); c.fill(); R(56, 10, 16, 18, '#3d8bff'); R(54, 6, 20, 6, '#8a6a3a'); c.fillStyle = 'rgba(255,255,255,0.5)'; c.beginPath(); c.arc(56, 38, 6, 0, 7); c.fill(); }
+  else if (k === 'boost') { P([[30, 36], [86, 26], [104, 36], [86, 46]], '#d0d4da'); P([[86, 26], [104, 36], [86, 46]], '#e0283a'); P([[30, 36], [14, 26], [6, 36], [14, 46]], '#ff9f1c'); P([[24, 36], [14, 30], [12, 36], [14, 42]], '#ffe27a'); }
+  else if (k === 'wall') { c.fillStyle = 'rgba(127,246,255,0.55)'; c.fillRect(30, 8, 68, 56); c.strokeStyle = '#3dd6ff'; c.lineWidth = 3; c.strokeRect(30, 8, 68, 56); c.beginPath(); c.moveTo(64, 8); c.lineTo(64, 64); c.moveTo(30, 36); c.lineTo(98, 36); c.stroke(); }
+}
+Object.assign(GameScene.prototype, {
+  brIcon(k) { const key = 'bricon-' + k; if (!this.textures.exists(key)) { const cv = document.createElement('canvas'); cv.width = 128; cv.height = 72; brDrawIcon(cv.getContext('2d'), k); this.textures.addCanvas(key, cv); } return key; },
+  brHud(m) {
+    const mine = (this.setup.players || []).filter(p => !p.remote && p.chair), one = !this.vps || this.vps.length < 2, c = mine[0] && mine[0].chair;
+    const show = one && c && !c.out && m.state !== 'over';
+    if (!this.brH || !this.brH.g.scene) {
+      const V = CONFIG.view, g = this.add.graphics().setDepth(30), slots = [];
+      for (let i = 0; i < BR.slots; i++) slots.push({ img: this.add.image(0, 0, this.brIcon('pistol')).setDepth(31).setDisplaySize(84, 47), txt: this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(1, 1).setDepth(32), key: this.add.text(0, 0, String(i + 1), { fontFamily: FONT, fontSize: '13px', color: '#9fb2bf' }).setDepth(32) });
+      this.brH = { g, slots, hp: this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '15px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0, 0.5).setDepth(32), name: this.add.text(V.width / 2, V.height - 118, '', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#ffe27a' }).setOrigin(0.5).setDepth(32).setShadow(0, 2, '#000', 4, true, true) };
+    }
+    const H = this.brH, all = [H.g, H.hp, H.name, ...H.slots.flatMap(s => [s.img, s.txt, s.key])];
+    if (!show) { all.forEach(o => o.setVisible(false)); return false; }
+    all.forEach(o => o.setVisible(true));
+    const V = CONFIG.view, G = c.gs, sw = 96, sh = 62, gap = 8, x0 = V.width / 2 - (BR.slots * sw + (BR.slots - 1) * gap) / 2, y0 = V.height - 74, g = H.g; g.clear();
+    const bw = 300, bx = V.width / 2 - bw / 2, by = y0 - 26;                 // health (green to red) and shield (blue) bars
+    g.fillStyle(0x0d151b, 0.75).fillRoundedRect(bx - 6, by - 20, bw + 12, 34, 6);
+    g.fillStyle(0x223040, 1).fillRect(bx, by - 14, bw, 9).fillStyle(0x3d8bff, 1).fillRect(bx, by - 14, bw * Math.max(0, G.sh) / BR.maxShield, 9);
+    const hpk = Math.max(0, G.hp) / BR.hp; g.fillStyle(0x3a2025, 1).fillRect(bx, by - 2, bw, 11).fillStyle(hpk > 0.5 ? 0x5ad45a : hpk > 0.25 ? 0xffc23d : 0xff4d4d, 1).fillRect(bx, by - 2, bw * hpk, 11);
+    H.hp.setText(`${Math.ceil(G.hp)}  |  ${Math.ceil(G.sh)}${G.boost > 0 ? '   🚀' : ''}`).setPosition(bx + bw + 14, by - 4);
+    for (let i = 0; i < BR.slots; i++) {
+      const s = H.slots[i], it = G.inv[i], x = x0 + i * (sw + gap), sel = i === G.sel && it;
+      g.fillStyle(sel ? 0x2a3a48 : 0x0d151b, sel ? 0.92 : 0.7).fillRoundedRect(x, y0, sw, sh, 8).lineStyle(sel ? 3 : 1.5, sel ? 0xffd23f : 0x3a4a58, 1).strokeRoundedRect(x, y0, sw, sh, 8);
+      s.key.setPosition(x + 6, y0 + 3);
+      if (!it) { s.img.setVisible(false); s.txt.setText(''); continue; }
+      s.img.setTexture(this.brIcon(it.k)).setDisplaySize(84, 47).setPosition(x + sw / 2, y0 + sh / 2 - 3).setAlpha(BR_GUNS[it.k] && it.a <= 0 ? 0.35 : 1);
+      s.txt.setText(BR_GUNS[it.k] ? String(it.a) : 'x' + it.a).setColor(BR_GUNS[it.k] && it.a <= 0 ? '#ff6b6b' : '#ffffff').setPosition(x + sw - 6, y0 + sh - 3);
+    }
+    const it = G.inv[G.sel]; H.name.setText(it ? `${(BR_GUNS[it.k] || BR_ITEMS[it.k]).name}      Y: switch   A: ${BR_GUNS[it.k] ? 'fire' : 'use'}` : 'Empty-handed: drive into a CHEST for a gun').setPosition(V.width / 2, by - 34);
+    return true;
+  }
+});
+{ const P = GameScene.prototype, hud = P.updateMiniHud; P.updateMiniHud = function (m) { hud.call(this, m); if (m.kind === 'br' && this.brHud(m) && this.itemText) this.itemText.setVisible(false); }; }

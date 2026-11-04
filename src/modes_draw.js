@@ -112,7 +112,7 @@ Object.assign(View3D.prototype, {
     if (k === 'night') this.nightLights();
     if (k === 'paintball') {
       const P = MODES.paintball, H = PB.wallH, cols = { wall: 0x8b939c, bags: 0xb59a6a, crate: 0x9a6b3a };
-      flat(new THREE.PlaneGeometry(m.width, m.height), this.mat(0x4f7a3a, { rough: 0.95 }), m.width / 2, m.centerY, 0.006);   // turf
+      { const tt = Look.tex('grass').clone(); tt.needsUpdate = true; tt.repeat.set(m.width / 6, m.height / 6); flat(new THREE.PlaneGeometry(m.width, m.height), new THREE.MeshStandardMaterial({ map: tt, roughness: 0.95 }), m.width / 2, m.centerY, 0.006); }   // turf
       for (const b of P.walls(m)) { const h = b.kind === 'bags' ? 1.0 : b.kind === 'crate' ? 1.2 : H, box = add(new THREE.Mesh(new THREE.BoxGeometry(b.x1 - b.x0, h, b.y1 - b.y0), this.mat(cols[b.kind] || 0x8b939c, { rough: 0.85 }))); box.position.set((b.x0 + b.x1) / 2, h / 2, (b.y0 + b.y1) / 2); box.castShadow = box.receiveShadow = true;
         if (b.kind === 'wall') { const cap = add(new THREE.Mesh(new THREE.BoxGeometry(b.x1 - b.x0 + 0.04, 0.08, b.y1 - b.y0 + 0.04), this.mat(0xff7a1c, { rough: 0.5 }))); cap.position.set((b.x0 + b.x1) / 2, H + 0.04, (b.y0 + b.y1) / 2); } }
       P.map(m).spawn.forEach((list, sd) => list.forEach(([x, y]) => flat(new THREE.RingGeometry(0.55, 0.7, 24), this.modeMat(m.mini.mode === 'teams' ? TEAMS[m.teams[sd]].color : 0xffffff, { basic: true, op: 0.6 }), x, y, 0.014)));

@@ -431,6 +431,7 @@ class GameScene extends Phaser.Scene {
     if (this.online) { this.match = this.online.match; this.setup = { players: this.online.players }; }
     else {
       const se = this.setup.season || null;                                                   // Season mode: these two teams, each at its own skill, with the season's game length
+      if (this.setup.mini) this.setup.sizes = fitSizes(this.setup.mini, this.setup.players, this.setup.sizesAsked || (this.setup.sizesAsked = this.setup.sizes));
       this.match = makeMatch({ mini: this.setup.mini || null, teamA: se ? se.teams[0] : Settings.teamA, teamB: se ? se.teams[1] : Settings.teamB, players: this.setup.players, difficulty: se ? se.difficulty : Settings.difficulty, sizes: this.setup.sizes, practice: this.setup.practice,
         periodSeconds: se ? se.periodSeconds : undefined, diffBySide: se ? se.levels : undefined }, !this.setup.demo);
       this.setup.players.forEach((p, i) => { p.tag = 'P' + (i + 1); });
@@ -900,7 +901,7 @@ class GameScene extends Phaser.Scene {
     const m = this.match, q = m.heard; this.capLeft -= dt;
     if (q && q.length) {
       const t = Commentary.parse(q.splice(0).pop()), mode = Settings.commentaryMode || 'full';
-      if (mode === 'full' || mode === 'captions') { this.cap.setText(t.text).setColor(t.mood >= 3 ? '#ffe45c' : '#ffffff').setFontSize(t.mood >= 3 ? 30 : 24).setVisible(true); this.capLeft = 3 + t.text.length * 0.05; }
+      if (mode === 'full' || mode === 'captions') { this.cap.setText(t.text || '').setColor(t.mood >= 3 ? '#ffe45c' : '#ffffff').setFontSize(t.mood >= 3 ? 30 : 24).setVisible(!!(t.text && t.text.trim())).setY(this.match && this.match.kind === 'br' ? CONFIG.view.height - 190 : CONFIG.view.height - 40); this.capLeft = 3 + t.text.length * 0.05; }
       if (mode === 'full' || mode === 'voice') Commentator.speak(t);
     }
     if (this.capLeft <= 0 && this.cap.visible) this.cap.setVisible(false);

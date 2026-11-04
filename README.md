@@ -3,6 +3,14 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v11.1: Battle Royale loot and HUD, players-only games, a more realistic look
+- **Battle Royale**: you start with nothing. Search CHESTS (a gun with its ammo, often an item too) and AMMO CRATES; medkits, shield
+  potions and other items lie out in the open. A new inventory bar shows a picture of every gun and item you carry (the one in your hands
+  is highlighted), with health and shield bars. No top-down (classic 2D) view in Battle Royale.
+- **CPU carts: On / Off** on every minigame's setup page. Off: only the people who join get a cart (on this screen or online).
+- **A more realistic look** for every game (`src/look.js`): lighting and reflections from a generated sky outdoors or the arena's lights
+  indoors, fine surface grain on every material, softer fill light, and real ground textures (asphalt, concrete, grass, dirt).
+
 ## v11: Battle Royale
 **Battle Royale** (Minigames > Battles and sneaky): solo, duos (teams of 2) or trios (teams of 3), 6 to 12 carts.
 - Everyone starts with a pistol. Loot lies around the maps (with a light beam above it): PISTOL, SMG, SHOTGUN, RIFLE, SNIPER, ROCKETS,

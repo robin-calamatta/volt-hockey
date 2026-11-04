@@ -27,7 +27,7 @@ Object.assign(GameScene.prototype, {
     this.sharedFlat = Settings.camMode === '2d'; this.shownFlat = null;
     if (this.v3) this.v3.applyQuality();
   },
-  modeOf(p) { const m = (p && p.camMode) || Settings.camMode || 'first'; return Settings.camAllowed(m) ? m : 'first'; },   // third person and broadcast only when turned on
+  modeOf(p) { const m = (p && p.camMode) || Settings.camMode || 'first'; return !Settings.camAllowed(m) || (m === '2d' && this.match && this.match.kind === 'br') ? 'first' : m; },   // (no top-down view in Battle Royale)   // third person and broadcast only when turned on
   /* Who is playing on this screen, and which device each of them is using right now. */
   localControls() {
     const o = this.online;
@@ -39,7 +39,7 @@ Object.assign(GameScene.prototype, {
     return out;
   },
   cycleCamera(p, LP) {
-    const lone = LP.length <= 1, cyc = Settings.camCycle().filter(m => m !== '2d' || lone), N = CONFIG.view3d.names;
+    const lone = LP.length <= 1, cyc = Settings.camCycle().filter(m => m !== '2d' || (lone && this.match.kind !== 'br')), N = CONFIG.view3d.names;
     if (!lone && this.sharedFlat) { this.sharedFlat = false; for (const q of LP) if (this.modeOf(q) === '2d') q.camMode = 'first'; }
     else {
       const next = cyc[(cyc.indexOf(this.modeOf(p)) + 1) % cyc.length];
@@ -48,6 +48,7 @@ Object.assign(GameScene.prototype, {
     Sound.play('blip'); this.toasts.set(p, { text: N[this.modeOf(p)] || '', until: this.time.now + 1400 });
   },
   wantFlat(LP) {
+    if (this.match && this.match.kind === 'br') return false;
     if (this.demo) return Settings.camMode === '2d';
     if (LP.length <= 1) return this.modeOf(LP[0]) === '2d';
     return this.sharedFlat;
