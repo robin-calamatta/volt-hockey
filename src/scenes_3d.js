@@ -116,7 +116,7 @@ Object.assign(GameScene.prototype, {
       for (const c of m.chairs) {
         if (c.benched || (c === vp.chair && vp.mode !== 'broadcast')) continue;
         const mine = vp.p && c.side === vp.p.side, label = m.mini ? this.miniTag(c, vp) : c.player ? (c.player.name || c.player.tag) : (mine && vp.mode !== 'broadcast' ? '▼' : '');
-        if (!label) continue; const q = this.v3.project(vp, c.x, T.height, c.y);
+        if (!label) continue; const q = this.v3.project(vp, c.x, T.height + ((c.gs && c.gs.z) || 0), c.y);
         if (q.behind || q.x < R.x + 10 || q.x > R.x + R.w - 10 || q.y < R.y + top || q.y > R.y + R.h - 10) continue;
         const k = Math.max(T.minScale, Math.min(T.maxScale, T.near / Math.max(0.5, q.dist)));
         const tag = this.pooled(this.tagPool, nt++, tagStyle).setText(label).setColor(teamColorHex(m.teams[c.side])).setScale(k).setPosition(q.x, q.y).setVisible(true);

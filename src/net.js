@@ -429,7 +429,7 @@ class ClientSim {
       const found = inputs.find(x => x.id === L.id), input = found ? found.input : { ax: 0, ay: 0, pressed: {} }, p = input.pressed || {}; let spin = 0;
       if (p.halfCW) { L.pending.push('hcw'); spin = 0.5; } if (p.halfCCW) { L.pending.push('hccw'); spin = -0.5; }
       if (p.spinCW) { L.pending.push('cw'); spin = 1; } if (p.spinCCW) { L.pending.push('ccw'); spin = -1; }
-      if (this.m.mini) { if (p.a || p.x) L.pending.push('use'); } else if (p.x) L.pending.push('x');
+      if (this.m.mini) { const M = modeOf(this.m), hold = M && M.holdFire && input.held && (input.held.a || input.held.x) && this.clock - (L.holdAt || 0) > 0.08; if (p.a || p.x || hold) { L.pending.push('use'); L.holdAt = this.clock; } } else if (p.x) L.pending.push('x');
       if (spin) { Sound.play('screech'); L.spins.push({ t: this.clock, dir: Math.sign(spin), amt: Math.abs(spin) }); if (L.spins.length > 8) L.spins.shift(); }
       if (p.speedUp && L.me.speedLevel < Settings.speedCap) { L.me.speedLevel++; L.pending.push('up'); }
       if (p.speedDown && L.me.speedLevel > 1) { L.me.speedLevel--; L.pending.push('down'); }

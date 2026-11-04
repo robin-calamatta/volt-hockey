@@ -6,6 +6,7 @@
 const DEMO_WIN = { x: 462, y: 64, w: 796, h: 448 };
 const HOWTO_WIN = { x: 596, y: 96, w: 664, h: 374 };                    // How to play: the video beside the rules panel (16:9)
 const MENU_SIDE = { x: 232, panelWidth: 430, size: 28, noBackdrop: true, noFooter: true, hintX: 232, hintY: 692, hintWidth: 410, hintSize: '17px', hintBg: '#0d151bd0' };
+const cartsFor = kind => (kind && MODES[kind] && modeOpts(kind).carts) || miniOpts().carts;   // a game can have its own number of carts (Battle Royale)
 function sideTitle(sc, name) {                                          // the page title, clear of the Log in button at the top left
   const t = sc.add.text(124, 40, name.toUpperCase(), { ...STYLE.title, fontSize: '40px' }).setOrigin(0, 0.5);
   if (t.width > 330) t.setScale(330 / t.width); return t;
@@ -23,7 +24,7 @@ class DemoWindow {
     const mini = kind === 'hockey' ? null : miniCfg(kind), key = kind + JSON.stringify(mini);
     if (key === this.key && DemoWindow.owner === this) return; this.key = key; this.kind = kind;
     if (DemoWindow.cam === undefined) DemoWindow.cam = Settings.camMode; Settings.camMode = 'broadcast'; DemoWindow.owner = this;   // one demo at a time; the player's own camera is remembered once
-    setWorld(mini); this.setup = { players: [], sizes: mini ? miniSizes(Math.max(4, miniOpts().carts)) : [3, 3], practice: !!mini, mini, demo: true, win: DEMO_WIN };
+    setWorld(mini); this.setup = { players: [], sizes: mini ? miniSizes(Math.max(4, cartsFor(mini && mini.kind))) : [3, 3], practice: !!mini, mini, demo: true, win: DEMO_WIN };
     const d = this.sc.scene.get('Demo'); if (d && d.sys.isActive()) d.scene.restart(this.setup); else this.sc.scene.launch('Demo', this.setup);
     this.sc.scene.bringToTop(); this.capI = 0; this.capAt = 0; this.writeInfo();
   }
@@ -130,12 +131,12 @@ class MiniSetupScene extends ListMenuScene {
   online() {
     if (memberWaits()) return;
     if (!PeerTransport.available()) { Toasts.show(esc(netErrorText({ type: 'unsupported' })), [], 4000); return; }
-    const mini = miniCfg(this.kind), sizes = miniSizes(miniOpts().carts);
+    const mini = miniCfg(this.kind), sizes = miniSizes(cartsFor(this.kind));
     Sound.play('select'); this.scene.start('Room', { role: 'host', preset: { mini, sizes, teamA: Settings.teamA, teamB: Settings.teamB, difficulty: Settings.difficulty, practice: true } });
   }
   start() {
     if (memberWaits()) return;
-    const mini = miniCfg(this.kind), sizes = miniSizes(miniOpts().carts);
+    const mini = miniCfg(this.kind), sizes = miniSizes(cartsFor(this.kind));
     if (partyGame(this, { mini, sizes, teamA: Settings.teamA, teamB: Settings.teamB, difficulty: Settings.difficulty, practice: true })) return;
     this.scene.start('Lobby', { practice: true, sizes, mini });
   }
@@ -370,7 +371,7 @@ class HowToScene extends Phaser.Scene {
     const I = GAME_INFO[this.kind], V = CONFIG.view, mini = this.kind === 'hockey' ? null : miniCfg(this.kind);
     if (DemoWindow.cam === undefined) DemoWindow.cam = Settings.camMode; Settings.camMode = 'broadcast'; DemoWindow.owner = this;                     // the demo is filmed from the TV camera (not saved)
     setWorld(mini);
-    this.setup = { players: [], sizes: mini ? miniSizes(Math.max(4, miniOpts().carts)) : [3, 3], practice: !!mini, mini, demo: true, win: HOWTO_WIN };
+    this.setup = { players: [], sizes: mini ? miniSizes(Math.max(4, cartsFor(mini && mini.kind))) : [3, 3], practice: !!mini, mini, demo: true, win: HOWTO_WIN };
     this.scene.launch('Demo', this.setup); this.scene.bringToTop(); this.overFor = 0; this.capI = 0; this.capAt = 0;
     const W = HOWTO_WIN; this.add.graphics().fillStyle(0x0d151b, 0.6).fillRoundedRect(W.x - 10, W.y + W.h + 12, W.w + 20, 100, 12).lineStyle(3, 0x2f4a5c, 1).strokeRoundedRect(W.x - 2, W.y - 2, W.w + 4, W.h + 4, 8);
     const px = 28, pw = 540; panel(this, px - 10, 14, pw + 20, V.height - 28, { alpha: 0.86, radius: 16 });

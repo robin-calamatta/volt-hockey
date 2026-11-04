@@ -3,6 +3,22 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v11: Battle Royale
+**Battle Royale** (Minigames > Battles and sneaky): solo, duos (teams of 2) or trios (teams of 3), 6 to 12 carts.
+- Everyone starts with a pistol. Loot lies around the maps (with a light beam above it): PISTOL, SMG, SHOTGUN, RIFLE, SNIPER, ROCKETS,
+  MEDKIT (+50 health), SHIELD POTION (+50 shield), BOOST (3 s of speed) and SHIELD WALL (a wall in front of you that stops bullets and carts),
+  plus ammo crates. The high ground has the better loot.
+- Carry up to 5 things: **Y** switches, **A / X** fires or uses (hold it for the SMG and rifle). 100 health and up to 100 shield (shield first).
+- The storm closes in over six phases; outside the circle you lose health, faster and faster. Last cart / team standing wins.
+- **Levels**: buildings you drive into through their doors, parking garages with switchback ramps, roofs reached by ramps, skybridges,
+  a giant jungle tree with a square spiral ramp up the trunk to a flat canopy with logs and loot, stepped temples, mesas and container towers.
+  Carts on different levels cannot touch or shoot each other; your camera rides up with you.
+- **Five maps** (`BR_MAPS` in `src/modes_br.js`, built from `building`, `garage`, `spiralTree`, `mesa`, `ramp`, `floor`, `wall`, `tree`, `loot`):
+  Downtown, The Jungle, The Port, The Suburbs, The Canyon.
+- The CPU loots, takes the high ground, picks the right gun for the range, heals, drops shield walls, boosts across the map and plans routes over
+  every level (A* on a grid per level, linked by the ramps).
+- Code: rules, maps and CPU in `src/modes_br.js`; the 3D world, loot, bullets, storm and the 2D view in `src/modes_br_draw.js`.
+
 ## v10.1: Paintball, and fixes from play-testing
 - **Paintball** (Battles and sneaky): every cart has a paintball gun (A fires). Three big maps (`PB_MAPS` in `src/modes_games.js`):
   Bunker Hill (sandbag bunker, fort, centre maze, sliding gates and a spinning bar), The Maze (corners and corridors, sliding blocks, gates)

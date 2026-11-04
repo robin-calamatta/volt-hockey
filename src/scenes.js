@@ -440,7 +440,7 @@ class GameScene extends Phaser.Scene {
     this.demo = !!this.setup.demo; if (this.demo) this.match.call = () => {}; this.flipped = false; if (!this.demo) viewFlip = false; this.readView(); this.focus = { x: C.width / 2, y: C.height / 2 }; this.camSeen = false;
     this.world = this.add.container(0, 0);
     const layer = () => { const g = this.add.graphics(); this.world.add(g); return g; };    // drawn in metres
-    this.crowd = Settings.crowd !== false && !this.match.map ? new Crowd(this) : null;     // (a race map is outdoors: no stands)
+    this.crowd = Settings.crowd !== false && !this.match.map && !(modeOf(this.match) || {}).outdoor ? new Crowd(this) : null;     // (a race map is outdoors: no stands)
     if (this.crowd) { this.standG = layer(); this.fansG = layer(); this.crowd.drawStands(this.standG); this.crowd.initTexts(this.world); if (!this.demo && Sound.crowd) Sound.crowd.start(); }
     if (!this.demo) Commentator.warm(this.match);
     this.layers = [layer(), layer(), layer()]; this.drawFloor(...this.layers); this.arenaKey = this.arenaId();
@@ -750,7 +750,7 @@ class GameScene extends Phaser.Scene {
     for (const p of this.setup.players) {
       if (p.src.pressed.halfCW) p.spinQueued = 0.5; if (p.src.pressed.halfCCW) p.spinQueued = -0.5;
       if (p.src.pressed.spinCW) p.spinQueued = 1; if (p.src.pressed.spinCCW) p.spinQueued = -1;
-      if (m.mini && (p.src.pressed.a || p.src.pressed.x)) m.useBy(p); else if (p.src.pressed.x) m.togglePress(p.side);
+      if (m.mini && (p.src.pressed.a || p.src.pressed.x || (modeOf(m) && modeOf(m).holdFire && p.src.held && (p.src.held.a || p.src.held.x)))) m.useBy(p); else if (p.src.pressed.x) m.togglePress(p.side);   // (some games: hold to keep firing)
       if (p.src.pressed.y) m.switchChair(p);
       if (p.src.pressed.speedUp && p.speedLevel < Settings.speedCap) { p.speedLevel++; Sound.play('blip'); }   // RB
       if (p.src.pressed.speedDown && p.speedLevel > 1) { p.speedLevel--; Sound.play('blip'); }                      // LB

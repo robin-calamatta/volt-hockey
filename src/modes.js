@@ -74,7 +74,7 @@ function modeSave(kind, patch) { Settings.mg = { ...miniOpts(), [kind]: { ...mod
   P.simulate = function (h) { o.simulate.call(this, h); const M = modeOf(this); if (M && M.step && this.state === 'play') M.step(this, h); if (M) this.focusOn(); };
   P.chairHit = function (a, b) {
     const M = modeOf(this); if (!M) return o.chairHit.call(this, a, b);
-    const R = CONFIG.chair.radius, d = Math.hypot(b.x - a.x, b.y - a.y); if ((a.gs && a.gs.ghost) || (b.gs && b.gs.ghost)) return;
+    const R = CONFIG.chair.radius, d = Math.hypot(b.x - a.x, b.y - a.y); if ((a.gs && a.gs.ghost) || (b.gs && b.gs.ghost) || (M.noCollide && M.noCollide(a, b))) return;
     if (d < 2 * R + 0.12 && M.contact) M.contact(this, a, b, d);
     if (d >= 2 * R || d === 0) return;
     const K = CONFIG.chair, closing = Physics.circles(a, R, K.mass * (a.massMul || 1), b, R, K.mass * (b.massMul || 1), K.chairBounce); crashSlow(a, b, closing);
@@ -85,8 +85,9 @@ function modeSave(kind, patch) { Settings.mg = { ...miniOpts(), [kind]: { ...mod
   P.focusOn = function () { o.focusOn.call(this); const M = modeOf(this), f = M && M.focus && this.gs && M.focus(this); if (f) Object.assign(this.ball, { x: f.x, y: f.y, vx: 0, vy: 0 }); };   // what the TV camera follows
   P.miniCmd = function (c, cmd) { cmd = o.miniCmd.call(this, c, cmd); const M = modeOf(this); return M && M.cmd ? M.cmd(c, cmd, this) : cmd; };
   P.hud = function () { const M = modeOf(this); if (!M || !M.hud) return o.hud.call(this); const t = Math.max(0, Math.ceil(this.clock)); return { clock: `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, a: '', b: '', sa: '', sb: '', left: '', mid: '', right: '', ...M.hud(this) }; };
-  P.miniSnap = function () { const s = o.miniSnap.call(this); if (modeOf(this)) { s.gs = this.gs; s.cs = this.chairs.map(c => c.gs || 0); s.mm = this.chairs.map(c => [Math.round((c.massMul || 1) * 10), c.out ? 1 : 0]); } return s; };
-  P.miniApply = function (s) { o.miniApply.call(this, s); if (s && s.gs) { this.gs = s.gs; (s.cs || []).forEach((g, i) => { if (this.chairs[i]) this.chairs[i].gs = g || {}; }); (s.mm || []).forEach(([mm, out], i) => { const c = this.chairs[i]; if (c) { c.massMul = mm / 10; c.out = !!out; } }); } };
+  P.miniSnap = function () { const s = o.miniSnap.call(this), M = modeOf(this); if (M) { s.gs = this.gs; if (M.slowKeys && (this.snapN = (this.snapN || 0) + 1) % 8) { s.gs = { ...this.gs }; for (const k of M.slowKeys) delete s.gs[k]; }   // big, slow-changing state (the loot) only every 8th snapshot
+    s.cs = this.chairs.map(c => c.gs || 0); s.mm = this.chairs.map(c => [Math.round((c.massMul || 1) * 10), c.out ? 1 : 0]); } return s; };
+  P.miniApply = function (s) { o.miniApply.call(this, s); if (s && s.gs) { this.gs = modeOf(this) && modeOf(this).slowKeys ? { ...this.gs, ...s.gs } : s.gs; (s.cs || []).forEach((g, i) => { if (this.chairs[i]) this.chairs[i].gs = g || {}; }); (s.mm || []).forEach(([mm, out], i) => { const c = this.chairs[i]; if (c) { c.massMul = mm / 10; c.out = !!out; } }); } };
 }
 { const base = miniAI; miniAI = function (c, m, h) { const M = modeOf(m); if (!M || !M.ai) return base(c, m, h); c.aiNext = (c.aiNext || 0) - h; if (c.aiNext > 0 && c.aiCmd) return { ...c.aiCmd, spin: 0 }; c.aiNext = 0.05 + ((m.difficulty || {}).reaction || 0.15) * 0.5; let cmd = M.ai(c, m, h) || { x: 0, y: 0 };
   const want = Math.hypot(cmd.x || 0, cmd.y || 0) * (cmd.speed === undefined ? 1 : cmd.speed), moving = Math.hypot(c.vx, c.vy);     // stuck in a scrum (wants to go, is not moving): back off sideways for a moment
