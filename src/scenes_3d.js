@@ -151,12 +151,18 @@ Object.assign(GameScene.prototype, {
     this.drawMinimap();
   },
   drawMinimap() {
-    const g = this.mapG, M = CONFIG.view3d.minimap, C = CONFIG.court, m = this.match, s = M.scale, ox = M.x, oy = M.y, P = (x, y) => [ox + x * s, oy + y * s]; g.clear();
+    const g = this.mapG, M = CONFIG.view3d.minimap, C = CONFIG.court, m = this.match, B = CONFIG.courtBase || C, fit = Math.min(1, B.width / C.width, B.height / C.height), s = M.scale * fit, ox = M.x + (B.width - C.width * fit) * M.scale, oy = M.y, P = (x, y) => [ox + x * s, oy + y * s]; g.clear();
+    if (m.map) {                                                       // a race map: the whole track, shrunk to fit
+      const T = RACE_THEMES[m.map.theme] || RACE_THEMES.grass; g.fillStyle(0x0d151b, M.alpha).fillRoundedRect(ox - 5, oy - 5, C.width * s + 10, C.height * s + 10, 9).fillStyle(T.ground, 0.9).fillRect(ox, oy, C.width * s, C.height * s);
+      g.lineStyle(Math.max(2.5, m.hw * 2 * s), T.track, 1).beginPath(); m.rline.forEach((p, i) => { if (i % 3) return; const [x, y] = P(p.x, p.y); if (i) g.lineTo(x, y); else g.moveTo(x, y); }); g.closePath().strokePath();
+      const [sx, sy] = P(m.rline[0].x, m.rline[0].y); g.fillStyle(0xffffff, 1).fillRect(sx - 2, sy - 2, 4, 4);
+    } else {
     g.fillStyle(0x0d151b, M.alpha).fillRoundedRect(ox - 5, oy - 5, C.width * s + 10, C.height * s + 10, 9);
     g.fillStyle(0x2a3a46, 0.9).fillRoundedRect(ox, oy, C.width * s, C.height * s, C.cornerRadius * s);
     g.lineStyle(1.5, 0x9fb2bf, 0.9).strokeRoundedRect(ox, oy, C.width * s, C.height * s, C.cornerRadius * s);
     g.lineStyle(1, 0x9fb2bf, 0.45).lineBetween(...P(C.width / 2, 0), ...P(C.width / 2, C.height)).strokeCircle(...P(C.width / 2, C.height / 2), C.centerCircleRadius * s);
     for (const n of m.nets) { const [x, y] = P(Math.min(n.backX, n.mouthX), n.y1); g.fillStyle(0xd8392b, 1).fillRect(x, y, CONFIG.net.depth * s, (n.y2 - n.y1) * s); }
+    }
     const mine = new Set((this.vps || []).map(v => v.chair).filter(Boolean));
     for (const c of m.chairs) {
       if (c.benched) continue; const [x, y] = P(c.x, c.y), col = TEAMS[m.teams[c.side]].color, hx = Math.cos(c.heading), hy = Math.sin(c.heading);

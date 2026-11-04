@@ -17,16 +17,16 @@ const MINI = {
   race: { island: { x0: 6.5, y0: 4.75, x1: 21.5, y1: 10.25 }, lineOffset: 2.4, finishGrace: 20, points: 160 },
   hunt: { catchGap: 0.05, hunterSpeed: 0.88, safeSeconds: 1.5, freezeSeconds: 2, hunterPause: 0.8 },
   palette: [0xff4d4d, 0xffd23f, 0x3dd6ff, 0x7dff6a, 0xff7ad9, 0xffffff, 0xff9f1c, 0xb28dff],     // balloon colours, one per cart
-  defaults: { balloonMode: 'ffa', balloons: 3, balloonMinutes: 3, carts: 6, laps: 5, huntMinutes: 3, items: { balloons: true, race: true, hunt: false } }
+  defaults: { balloonMode: 'ffa', balloons: 3, balloonMinutes: 3, carts: 6, laps: 5, track: 'rink', huntMinutes: 3, items: { balloons: true, race: true, hunt: false } }
 };
 const miniOpts = () => { const d = MINI.defaults, s = Settings.mg || {}; return { ...d, ...s, items: { ...d.items, ...(s.items || {}) } }; };
 const miniSave = patch => { Settings.mg = { ...miniOpts(), ...patch }; Settings.save(); };
-const miniCfg = kind => { const o = miniOpts(); return { kind, mode: kind === 'balloons' ? o.balloonMode : kind === 'race' ? 'ffa' : 'hunt', balloons: o.balloons, laps: o.laps, minutes: kind === 'balloons' ? o.balloonMinutes : o.huntMinutes, items: !!o.items[kind] }; };
+const miniCfg = kind => { const o = miniOpts(); return { kind, mode: kind === 'balloons' ? o.balloonMode : kind === 'race' ? 'ffa' : 'hunt', balloons: o.balloons, laps: o.laps, track: o.track || 'rink', minutes: kind === 'balloons' ? o.balloonMinutes : o.huntMinutes, items: !!o.items[kind] }; };
 const miniSizes = n => [Math.ceil(n / 2), Math.floor(n / 2)];
-function makeMatch(opts) { return opts.mini ? new MiniMatch(opts) : new Match(opts); }
+function makeMatch(opts, world = true) { if (world) setWorld(opts.mini); return opts.mini ? new MiniMatch(opts) : new Match(opts); }   // world: the playing area follows a race map (not for the camera preview)
 function miniLabel(cfg) {
   if (!cfg) return 'Hockey';
-  return MINI.names[cfg.kind] + (cfg.kind === 'balloons' ? ` (${cfg.mode === 'teams' ? 'teams' : 'free for all'}, ${cfg.balloons} balloons, ${cfg.minutes} min)` : cfg.kind === 'race' ? ` (${cfg.laps} laps)` : ` (${cfg.minutes} min)`) + (cfg.items ? ', power-ups' : '');
+  return MINI.names[cfg.kind] + (cfg.kind === 'balloons' ? ` (${cfg.mode === 'teams' ? 'teams' : 'free for all'}, ${cfg.balloons} balloons, ${cfg.minutes} min)` : cfg.kind === 'race' ? ` (${raceMap(cfg.track).name}, ${cfg.laps} lap${cfg.laps === 1 ? '' : 's'})` : ` (${cfg.minutes} min)`) + (cfg.items ? ', power-ups' : '');
 }
 
 class MiniMatch extends Match {
@@ -96,7 +96,7 @@ class MiniMatch extends Match {
     const W = this.width, H = this.height, cy = this.centerY, n = this.chairs.length, base = { vx: 0, vy: 0, omega: 0, spinLeft: 0, spinCooldown: 0, stuckFor: 0 };
     this.chairs.forEach((c, i) => {
       let x, y, heading;
-      if (this.kind === 'race') {                                       // a grid behind the line on the bottom straight, two abreast
+      if (this.kind === 'race' && this.island) {                        // (the rink oval) a grid behind the line on the bottom straight, two abreast
         const I = this.island, row = Math.floor(i / 2), lane = i % 2;
         x = W / 2 - 1.3 - row * 1.6; y = I.cy + I.r + 1.2 + lane * 2.1; heading = 0;
         c.lastI = this.nearestI(x, y); c.prog = -(((this.startI - c.lastI) + this.rline.length) % this.rline.length); c.lap = 0;
@@ -334,8 +334,14 @@ function miniAI(c, m, h) {
   const others = m.chairs.filter(o => o !== c && !o.out), use = () => { if (Math.random() < 0.7) c.wantUse = true; };
   let cmd = { x: 0, y: 0, speed };
   if (m.kind === 'race') {
-    const N = m.rline.length, i = m.nearestI(c.x, c.y, c.lastI), look = Math.round(N * 0.045), p = m.rline[(i + look) % N], q = m.rline[(i + look + 1) % N];
-    const lane = ((c.k % 3) - 1) * 0.9, dx = q.x - p.x, dy = q.y - p.y, l = Math.hypot(dx, dy) || 1; cmd = to(p.x - dy / l * lane, p.y + dx / l * lane);
+    const N = m.rline.length, i = m.nearestI(c.x, c.y, c.lastI), look = m.map ? 11 : Math.round(N * 0.045), p = m.rline[(i + look) % N], q = m.rline[(i + look + 1) % N];
+    let lane = ((c.k % 3) - 1) * 0.9;
+    if (m.obs) {                                                        // a map: steer round the next solid obstacle (and through sliders / sweepers as best it can)
+      const next = m.obs.filter(o => o.type !== 'pad' && o.type !== 'sweeper' && ((o.i - i + N) % N) < 34).sort((a, b) => ((a.i - i + N) % N) - ((b.i - i + N) % N))[0];
+      if (next) { const off = next.type === 'slider' ? -Math.sin(m.simTime * next.speed + next.phase) * next.amp : next.off; lane = (off > 0 ? -1 : 1) * Math.min(m.hw - 1.1, Math.abs(off) < 0.5 ? m.hw * 0.55 : 1.6 + next.r); }
+      else { const pad = m.obs.find(o => o.type === 'pad' && ((o.i - i + N) % N) < 30); if (pad) lane = 0; }
+    }
+    const dx = q.x - p.x, dy = q.y - p.y, l = Math.hypot(dx, dy) || 1; cmd = to(p.x - dy / l * lane, p.y + dx / l * lane);
     if (c.item === 'boost') { const far = m.rline[(i + look * 3) % N]; if (Math.abs(normalizeAngle(Math.atan2(far.y - c.y, far.x - c.x) - c.heading)) < 0.25) use(); }
     if (c.item === 'zap' && others.some(o => ahead(o, 0.96) < 9)) use();
     if (c.item === 'oil' && others.some(o => behind(o) < 5)) use();

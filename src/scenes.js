@@ -421,7 +421,7 @@ class GameScene extends Phaser.Scene {
     else {
       const se = this.setup.season || null;                                                   // Season mode: these two teams, each at its own skill, with the season's game length
       this.match = makeMatch({ mini: this.setup.mini || null, teamA: se ? se.teams[0] : Settings.teamA, teamB: se ? se.teams[1] : Settings.teamB, players: this.setup.players, difficulty: se ? se.difficulty : Settings.difficulty, sizes: this.setup.sizes, practice: this.setup.practice,
-        periodSeconds: se ? se.periodSeconds : undefined, diffBySide: se ? se.levels : undefined });
+        periodSeconds: se ? se.periodSeconds : undefined, diffBySide: se ? se.levels : undefined }, !this.setup.demo);
       this.setup.players.forEach((p, i) => { p.tag = 'P' + (i + 1); });
     }
     /* The camera: everything on the court is drawn in metres inside one container that is moved, turned and scaled every frame so the view follows the ball
@@ -429,7 +429,7 @@ class GameScene extends Phaser.Scene {
     this.demo = !!this.setup.demo; if (this.demo) this.match.call = () => {}; this.flipped = false; if (!this.demo) viewFlip = false; this.readView(); this.focus = { x: C.width / 2, y: C.height / 2 }; this.camSeen = false;
     this.world = this.add.container(0, 0);
     const layer = () => { const g = this.add.graphics(); this.world.add(g); return g; };    // drawn in metres
-    this.crowd = Settings.crowd !== false ? new Crowd(this) : null;
+    this.crowd = Settings.crowd !== false && !this.match.map ? new Crowd(this) : null;     // (a race map is outdoors: no stands)
     if (this.crowd) { this.standG = layer(); this.fansG = layer(); this.crowd.drawStands(this.standG); this.crowd.initTexts(this.world); if (!this.demo && Sound.crowd) Sound.crowd.start(); }
     if (!this.demo) Commentator.warm(this.match);
     this.layers = [layer(), layer(), layer()]; this.drawFloor(...this.layers); this.arenaKey = this.arenaId();
@@ -439,7 +439,7 @@ class GameScene extends Phaser.Scene {
     this.arrows = this.add.graphics().setDepth(24); this.arrowTags = [];
     this.buildScoreboard(V, C);
     this.cap = this.add.text(V.width / 2, V.height - 40, '', { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: '#ffffff', align: 'center', backgroundColor: '#0d151bcc', padding: { x: 16, y: 8 }, wordWrap: { width: V.width - 120 } }).setOrigin(0.5).setDepth(30).setVisible(false); this.capLeft = 0;
-    this.events.once('shutdown', () => { Commentator.stop(); if (this.crowd) { this.crowd.destroyTexts(); this.crowd = null; } if (Sound.crowd) Sound.crowd.stop(); if (!this.demo) { viewFlip = false; viewInv = null; } this.teardownTilt(); });
+    this.events.once('shutdown', () => { if (!this.demo && this.match && this.match.map) setWorld(null); Commentator.stop(); if (this.crowd) { this.crowd.destroyTexts(); this.crowd = null; } if (Sound.crowd) Sound.crowd.stop(); if (!this.demo) { viewFlip = false; viewInv = null; } this.teardownTilt(); });
     this.events.on('resume', () => { try { this.applyCamera(); } catch (e) {} });
     this.lastScore = this.match.score.slice();
     this.banner = this.add.text(this.courtCX, this.viewY, '', STYLE.big).setOrigin(0.5).setStroke('#0d151b', 8);
@@ -763,7 +763,7 @@ class GameScene extends Phaser.Scene {
   /* Tilted camera ("looking down the court"): the court is drawn flat into a big off-screen texture, which is shown on a plane that leans back in perspective.
      The plane's four corners tell us where any texture pixel lands on the screen (a homography), so tags and arrows can still be placed exactly. */
   readView() {                                             // work out the view from the settings: which way up, how close, and whether it is tilted
-    const V = CONFIG.view, C = CONFIG.court;
+    const V = CONFIG.view, C = this.match && this.match.map ? { ...CONFIG.court, ...CONFIG.courtBase } : CONFIG.court;     // a big race map: the same closeness as on the rink (the view follows you round it)
     this.viewX = V.width / 2; this.viewTop = V.hudHeight; this.viewW = V.width; this.viewH = V.height - V.hudHeight; this.viewY = this.viewTop + this.viewH / 2; this.courtCX = V.width / 2;
     this.vertical = Settings.vertical !== false; this.baseRot = this.vertical ? -Math.PI / 2 : 0; this.rot = this.baseRot + (this.flipped ? Math.PI : 0);      // vertical: the far end of the court (x = width) is at the top of the screen, like a hockey broadcast
     this.classic = Settings.view === 'classic';

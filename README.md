@@ -11,7 +11,13 @@ CPU carts, split screen, every camera (first / third person, broadcast, classic 
 - **Balloon Bash** (free for all or teams): balloons on every cart's back (1-5). Hit someone's back with your front: a balloon pops and they
   restart somewhere safe (blinking: 2 s of protection). No balloons left: out, watching from the sin bin. Round clock: when it runs out,
   the most balloons left wins.
-- **Race**: a barrier island makes the rink an oval track. Laps and positions are tracked; the winner crossing the line starts a 20 s
+- **Race tracks (v9.1)**: Rink Oval (on the hockey court), **Figure Eight** (96 x 56 m, the loops cross), **Serpent Canyon** (desert
+  switchbacks, 150 x 90 m), **Grand Prix** (230 x 140 m circuit), **Pinball Palace** (neon bumpers, spinning arms, sliding blocks),
+  **Frozen Lake** (ice: almost no grip) and **Mega Marathon** (nearly 1 km, 360 x 240 m). Obstacles: rocks, pillars, cones, tyre stacks,
+  snowmen, bumpers, spinning sweepers, sliding blocks and boost pads. Pick the track on the Race setup page (or in the room). Add or change
+  tracks in `src/racemaps.js` (`RACE_MAPS`: a list of points or a formula for the centre line, a width, a theme and obstacles placed by
+  how far round the lap they are).
+- **Race** on the Rink Oval: a barrier island makes the rink an oval track. Laps and positions are tracked; the winner crossing the line starts a 20 s
   window for the rest to finish.
 - **Manhunt**: one random cart is IT. Whoever IT touches turns IT (changes colour and freezes for 2 s). IT wins when everyone is caught;
   anyone still free when the clock runs out wins.

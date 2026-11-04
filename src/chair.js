@@ -71,7 +71,7 @@ class Chair {
     }
     const hx = Math.cos(this.heading), hy = Math.sin(this.heading);
     let forward = this.vx * hx + this.vy * hy;
-    const grip = Math.exp(-K.sideGrip * dt), sideX = (this.vx - hx * forward) * grip, sideY = (this.vy - hy * forward) * grip;
+    const grip = Math.exp(-K.sideGrip * (this.gripMul || 1) * dt), sideX = (this.vx - hx * forward) * grip, sideY = (this.vy - hy * forward) * grip;
     const rate = Math.abs(targetSpeed) > Math.abs(forward) && targetSpeed * forward >= 0 ? K.accel : K.brake;
     forward += clamp(targetSpeed - forward, -rate * dt, rate * dt);
     this.vx = hx * forward + sideX; this.vy = hy * forward + sideY;
