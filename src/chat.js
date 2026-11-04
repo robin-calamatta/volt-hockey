@@ -161,7 +161,7 @@ const Chat = {
     const g = window.voltGame, playing = g && g.scene.isActive('Game') && !g.scene.isActive('Pause') && this.channel() && this.channel() !== 'dm';
     if (playing) for (const src of Controls.list()) {
       if (!src.id.startsWith('pad')) continue;
-      if (src.pressed.quick) { if (this.quickOpen && this.quickSrc === src) this.quickIdx = (this.quickIdx + 1) % QUICK.length; else this.quickIdx = 0; this.showQuick(src); }
+      if (src.quickTap) { src.quickTap = false;   /* a quick tap of D-pad up: holding it opens the emoji wheel instead (emotes.js) */ if (this.quickOpen && this.quickSrc === src) this.quickIdx = (this.quickIdx + 1) % QUICK.length; else this.quickIdx = 0; this.showQuick(src); }
       else if (this.quickOpen && this.quickSrc === src) { if (src.pressed.a) { this.sendQuick(this.quickIdx + 1); this.hideQuick(); } else if (src.pressed.b) this.hideQuick(); }
     }
     if (this.quickOpen && this.quickSrc && performance.now() - this.quickAt > 5000) this.hideQuick();

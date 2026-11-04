@@ -15,6 +15,7 @@ function brAimInput(p, src, dt) {
   let a = p.brAp || 0; if (k) { a += k * BR_AIM.rate * dt; p.brAimT = 0; } else { p.brAimT = (p.brAimT || 0) + dt; if (p.brAimT > BR_AIM.idle) a -= Math.sign(a) * Math.min(Math.abs(a), BR_AIM.back * dt); }
   p.brAp = Math.max(BR_AIM.min, Math.min(BR_AIM.max, a));
 }
+function brAds(c) { return c.player && c.player.brAds !== undefined ? c.player.brAds : (c.gs && c.gs.ads) || 0; }   // LT held: aiming down the sights
 function brPitch(c) { return c.player && c.player.brAp !== undefined ? c.player.brAp : (c.gs && c.gs.ap) || 0; }
 const BR_GUNS = {
   pistol: { name: 'PISTOL', dmg: 12, cd: 0.32, spd: 24, life: 0.9, spread: 0.03, ammo: 24, range: 16, col: 0xbfc7d0 },
@@ -137,7 +138,7 @@ MODES.br = {
   init(m) {
     const g = m.gs, M = this.map(m), sq = m.mini.squad || 1; g.map = m.mini.map; g.t = 0; g.L = []; g.lid = 0; g.dead = [];
     const order = m.chairs.slice().sort((a, b) => (b.player ? 1 : 0) - (a.player ? 1 : 0));   // people first, so friends on one screen share a team
-    order.forEach((c, i) => { c.gs = { team: Math.floor(i / sq), lv: 0, z: 0, ramp: -1, air: 0, vz: 0, ap: 0, hp: BR.hp, sh: 0, inv: [], sel: 0, cd: 0, boost: 0, kills: 0, dmg: 0 }; });
+    order.forEach((c, i) => { c.gs = { team: Math.floor(i / sq), lv: 0, z: 0, ramp: -1, air: 0, vz: 0, ap: 0, ads: 0, hp: BR.hp, sh: 0, inv: [], sel: 0, cd: 0, boost: 0, kills: 0, dmg: 0 }; });
     g.teams = Math.ceil(m.chairs.length / sq);
     const R = Math.hypot(m.width, m.height) / 2 + 4; g.st = { x: m.width / 2, y: m.height / 2, r: R, fx: m.width / 2, fy: m.height / 2, fr: R, ph: 0, wait: 45, shrink: 0, sx: 0, sy: 0, sr: R };
     for (const [x, y, lv] of M.loot) this.drop(m, x, y, lv, Math.random() < 0.72 ? 'chest' : 'ammo');      // chests (guns) and ammo crates where the map puts loot
@@ -230,6 +231,7 @@ MODES.br = {
   },
   take(m, c, L) {
     const G = c.gs, [, k, , , , a] = L, inv = G.inv;
+    if (k === 'chest' && c.player && !c.player.remote) Progress.ev('chest');   // (a quest)
     if (k === 'chest') {                                                  // a chest: it bursts open with a gun (and its ammo), and often something else
       const gun = (L[4] > 0 && Math.random() < 0.6 ? ['rifle', 'sniper', 'rocket', 'shotgun'] : ['pistol', 'pistol', 'smg', 'smg', 'shotgun', 'rifle', 'rifle', 'sniper', 'rocket'])[Math.floor(Math.random() * (L[4] > 0 ? 4 : 9))], g2 = BR_GUNS[gun];
       const a0 = c.heading + Math.PI, out = (k2, a2, n) => this.drop(m, L[2] + Math.cos(a0 + n) * 1.1, L[3] + Math.sin(a0 + n) * 1.1, L[4], k2, a2);
@@ -291,14 +293,15 @@ MODES.br = {
     m.finishGame(team === undefined ? 'NOBODY SURVIVED' : sq === 1 ? `${MG.up(m.name(win[0]))} WINS!` : `TEAM ${team + 1} WINS!`, rows, -1, team === undefined ? '' : sq > 1 ? win.map(c => m.name(c)).join(' + ') + ': victory royale' : 'Victory royale!');
   },
   /* A / X: fire the gun you hold, or use the item. Y: next slot. */
-  cycle(c, m) { const G = c.gs; if (!G.inv.length || c.out) return; G.sel = (G.sel + 1) % G.inv.length; if (c.player) m.sfx('blip'); },
+  cycle(c, m, d = 1) { const G = c.gs; if (!G.inv.length || c.out) return; G.sel = (G.sel + (d < 0 ? G.inv.length - 1 : 1)) % G.inv.length; if (c.player) m.sfx('blip'); },
+  shooterPad: true,                                                      // a controller here: RT fires, LB / RB step through your items, no spin buttons (see scenes.js / net.js)
   use(c, m) {
     const G = c.gs, it = G.inv[G.sel]; if (!it || G.cd > 0 || c.out) return;
     const gun = BR_GUNS[it.k];
     if (gun) {
       if (it.a <= 0) { G.cd = 0.4; if (c.player) { m.sfx('back'); this.say(m, c, 'OUT OF AMMO'); } return; }
       it.a--; G.cd = gun.cd; const f = c.toWorld(0.8, 0), err = c.player ? 0 : (Math.random() - 0.5) * (0.08 + ((m.difficulty || {}).reaction || 0.2) * 0.6), aim = this.aim(c, m, gun), pitch = this.aimP, cp = Math.cos(pitch), vz = Math.round(Math.sin(pitch) * gun.spd * 1000) / 1000;
-      for (let p = 0; p < (gun.pellets || 1); p++) { const a = aim + err + (Math.random() - 0.5) * gun.spread * (gun.pellets ? 1 : 1.4); MG.add(m, { t: 'bul', w: it.k, k: c.k, x: MG.r2(f.x), y: MG.r2(f.y), z: G.z, vx: MG.r2(Math.cos(a) * gun.spd * cp + c.vx * 0.3), vy: MG.r2(Math.sin(a) * gun.spd * cp + c.vy * 0.3), vz, until: MG.r2(m.gs.t + gun.life) }); }
+      for (let p = 0; p < (gun.pellets || 1); p++) { const a = aim + err + (Math.random() - 0.5) * gun.spread * (gun.pellets ? 1 : 1.4) * (G.ads ? (gun.pellets ? 0.6 : 0.3) : 1);   /* aiming tightens the spread */ MG.add(m, { t: 'bul', w: it.k, k: c.k, x: MG.r2(f.x), y: MG.r2(f.y), z: G.z, vx: MG.r2(Math.cos(a) * gun.spd * cp + c.vx * 0.3), vy: MG.r2(Math.sin(a) * gun.spd * cp + c.vy * 0.3), vz, until: MG.r2(m.gs.t + gun.life) }); }
       m.sfx(it.k === 'rocket' || it.k === 'sniper' || it.k === 'shotgun' ? 'bump' : 'blip'); return;
     }
     const I = it.k;                                                       // items
@@ -308,7 +311,7 @@ MODES.br = {
     else if (I === 'wall') { const p = c.toWorld(1.6, 0); MG.add(m, { t: 'dwall', x: MG.r2(p.x), y: MG.r2(p.y), a: MG.r2(c.heading), lv: G.lv, z: G.z, hp: 150, until: m.gs.t + 25 }); }
     m.sfx('select'); G.cd = 0.8; it.a--; if (it.a <= 0) { G.inv.splice(G.sel, 1); G.sel = Math.max(0, Math.min(G.sel, G.inv.length - 1)); }
   },
-  cmd(c, cmd, m) { if (c.player && c.player.invOpen) return { x: 0, y: 0, spin: 0, speed: 0 }; if (c.gs.boost > 0) c.speedMul *= 1.75; return cmd; },   // (the inventory is open: the cart coasts to a stop)
+  cmd(c, cmd, m) { if (c.player && c.player.invOpen) return { x: 0, y: 0, spin: 0, speed: 0 }; if (c.gs.boost > 0) c.speedMul *= 1.75; if (c.gs.ads) c.speedMul *= 0.55; return cmd; },   // (aiming: you creep along)   // (the inventory is open: the cart coasts to a stop)
   aim(c, m, gun) {                                                        // where a shot goes: your heading turned by the right stick, tilted up or down (this.aimP), with a little aim assist for people
     const G = c.gs, L = this.map(m); let a = c.heading + (c.player && c.player._look ? c.player._look.x * CONFIG.view3d.look.yaw * Math.PI / 180 : 0), p = brPitch(c);
     let best = null, bo = c.player ? 0.16 : 0.45;
@@ -432,6 +435,6 @@ GAME_INFO.br = { name: 'Battle Royale', cat: 'sneaky', noCarts: true, blurb: 'Lo
   rules: ['You start with nothing. Drive into a CHEST to burst it open: it holds a gun (pistol, SMG, shotgun, rifle, sniper or rockets) and often an item. AMMO CRATES refill the guns you have. Medkits, shield potions, boosts and shield walls lie around the map.', 'You carry up to 5 things. Y switches between them; A uses the one you hold (hold A for automatic guns).',
     'You have 100 health and up to 100 shield (shield takes damage first). Medkits heal, shield potions top up your shield.', 'BOOST: a few seconds of extra speed. SHIELD WALL: drops a wall in front of you that stops bullets (and carts).',
     'Buildings have doors; ramps lead up into garages, onto roofs and up the jungle tree. JUMP with X, and drive (or jump) off any ledge to drop down: a long fall costs a little health. Tilt your gun up or down to shoot at carts above or below you (floors stop bullets).', 'B opens your bag: move and swap your things, pick what to hold, or drop something on the ground.', 'The STORM closes in: outside the circle you lose health, faster and faster. Last cart or team standing wins.'],
-  controls: [CTRL.drive, 'Use / fire: A  /  Space  /  Right Shift  /  touch A  (hold for automatic guns)', 'Jump: X  /  X  /  \\  /  touch X', 'Aim up and down: right stick  /  I and K  /  Page Up and Page Down', 'Bag (inventory): B  /  Backspace  /  Right Ctrl  /  touch B', 'Switch item: Y  /  F  /  /  /  touch Y', CTRL.spin, CTRL.pause],
+  controls: [CTRL.drive, 'Use / fire: A or RT  /  Space or E  /  Right Shift or .  /  touch A  (hold for automatic guns)', 'Previous / next item: LB / RB  /  Z / R  /  [ / ]  (or Y for next)', 'Jump: X  /  X  /  \\  /  touch X', 'Aim up and down: right stick  /  I and K  /  Page Up and Page Down', 'Bag (inventory): B  /  Backspace  /  Right Ctrl  /  touch B', 'Switch item: Y  /  F  /  /  /  touch Y', 'Aim (zoom in, tighter shots, slower cart): hold LT  /  Q  /  ,', 'No spin buttons in Battle Royale. When you are out: LB / RB switch whose view you watch', CTRL.pause],
   opts: [{ key: 'map', label: 'Map', values: ['downtown', 'jungle', 'port', 'suburbs', 'canyon'], names: ['Downtown', 'The Jungle', 'The Port', 'The Suburbs', 'The Canyon'], def: 'downtown', hint: () => (BR_MAPS[modeOpts('br').map] || BR_MAPS.downtown).blurb },
     { key: 'squad', label: 'Teams', values: [1, 2, 3], names: ['Solo', 'Duos (teams of 2)', 'Trios (teams of 3)'], def: 1 }, { key: 'carts', label: 'Carts', values: [6, 8, 10, 12], def: 10, hint: 'Carts nobody drives are played by the CPU.' }] };

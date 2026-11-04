@@ -241,7 +241,7 @@ class RoomScene extends ListMenuScene {
   }
   beginClient(msg) {
     const s = this.session; Settings.applyRules(msg.rules || {});
-    const players = msg.players.map(p => ({ id: p.id, name: p.name, side: p.side, tag: p.tag, speedLevel: Settings.speedLevel, chair: null, spinQueued: 0 }));
+    const players = msg.players.map(p => ({ id: p.id, name: p.name, side: p.side, tag: p.tag, speedLevel: Settings.speedLevel, chair: null, spinQueued: 0, look: p.id === s.myId ? null : Avatar.cleanLook(p.look) }));
     const match = makeMatch({ mini: msg.cfg.mini || null, teamA: msg.cfg.teamA, teamB: msg.cfg.teamB, players, difficulty: msg.cfg.difficulty, sizes: msg.cfg.sizes, practice: msg.cfg.practice, remote: true, periodSeconds: msg.cfg.season ? msg.cfg.season.periodSeconds : undefined });
     this.scene.start('Game', { online: { role: 'client', session: s, match, players, sim: new ClientSim(s, match, players) } });
   }

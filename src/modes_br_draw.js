@@ -10,9 +10,9 @@ function brRectMinus(f, holes) {                                         // a re
       const y0 = Math.max(p.y0, h.y0), y1 = Math.min(p.y1, h.y1); if (h.x0 > p.x0) next.push({ x0: p.x0, y0, x1: h.x0, y1 }); if (h.x1 < p.x1) next.push({ x0: h.x1, y0, x1: p.x1, y1 }); } parts = next; }
   return parts.filter(p => p.x1 - p.x0 > 0.05 && p.y1 - p.y0 > 0.05);
 }
-function brWorldUV(geo, scale) {                                          // texture co-ordinates from world position: every wall shows its surface at the same size
+function brWorldUV(geo, scale, vs = scale) {                                          // texture co-ordinates from world position: every wall shows its surface at the same size
   const g = geo.index ? geo.toNonIndexed() : geo; g.computeVertexNormals(); const p = g.attributes.position, n = g.attributes.normal, uv = [];
-  for (let i = 0; i < p.count; i++) { const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i)); if (ay >= ax && ay >= az) uv.push(p.getX(i) / scale, p.getZ(i) / scale); else if (ax >= az) uv.push(p.getZ(i) / scale, p.getY(i) / scale); else uv.push(p.getX(i) / scale, p.getY(i) / scale); }
+  for (let i = 0; i < p.count; i++) { const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i)); if (ay >= ax && ay >= az) uv.push(p.getX(i) / scale, p.getZ(i) / scale); else if (ax >= az) uv.push(p.getZ(i) / scale, p.getY(i) / vs); else uv.push(p.getX(i) / scale, p.getY(i) / vs); }
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return g;
 }
 const BR_SURFACES = {};
@@ -30,31 +30,35 @@ Object.assign(View3D.prototype, {
     if (this.arena) this.scene.remove(this.arena);
     const g = this.arena = new THREE.Group(), byCol = new Map(), put = (col, geo) => { if (!byCol.has(col)) byCol.set(col, []); byCol.get(col).push(geo); };
     this.scene.background = new THREE.Color(T.sky); this.scene.fog = new THREE.Fog(T.sky, 45, 150);
-    const gt = Look.tex({ downtown: 'asphalt', jungle: 'jungle', port: 'concrete', suburbs: 'grass', canyon: 'dirt' }[m.mini.map] || 'grass').clone(); gt.needsUpdate = true; gt.repeat.set((W + 160) / 7, (D + 160) / 7);
-    const ground = new THREE.Mesh(G3.layFlat(new THREE.PlaneGeometry(W + 160, D + 160)), new THREE.MeshStandardMaterial({ map: gt, roughness: 0.95 })); ground.position.set(W / 2, -0.01, D / 2); ground.receiveShadow = true; g.add(ground);
+    const gt = Look.tex({ downtown: 'asphalt', jungle: 'jungle', port: 'concrete', suburbs: 'grass', canyon: 'dirt' }[m.mini.map] || 'grass').clone(); gt.needsUpdate = true; gt.repeat.set(900 / 7, 900 / 7);
+    const gg = G3.layFlat(new THREE.PlaneGeometry(900, 900, 90, 90)), gp = gg.attributes.position, nz = LookWorld.noise(W + D), gc = [];   // the ground, with big soft patches so it never looks like one tile
+    for (let i = 0; i < gp.count; i++) { const x = gp.getX(i), z = gp.getZ(i), k = 0.78 + 0.32 * nz.n2(x / 23 + 50, z / 23 + 50) + 0.1 * nz.n2(x / 6 + 9, z / 6); gc.push(k, k * (0.98 + 0.04 * nz.n2(x / 40, z / 40)), k * 0.97); }
+    gg.setAttribute('color', new THREE.Float32BufferAttribute(gc, 3));
+    const ground = new THREE.Mesh(gg, new THREE.MeshStandardMaterial({ map: gt, roughness: 0.95, vertexColors: true })); ground.position.set(W / 2, -0.01, D / 2); ground.receiveShadow = true; g.add(ground);
     for (const [x0, y0, x1, y1] of [[-0.4, -0.4, W + 0.4, 0], [-0.4, D, W + 0.4, D + 0.4], [-0.4, 0, 0, D], [W, 0, W + 0.4, D]]) put(0x5a5f66, new THREE.BoxGeometry(x1 - x0, 1.2, y1 - y0).translate((x0 + x1) / 2, 0.6, (y0 + y1) / 2));   // the fence round the map
     for (const w of M.walls) { const h = w.h || BR_WALLH[w.kind] || H; put(BR_COLS[w.kind] || 0xb8b2a6, new THREE.BoxGeometry(w.x1 - w.x0, h, w.y1 - w.y0).translate((w.x0 + w.x1) / 2, w.lv * H + h / 2, (w.y0 + w.y1) / 2)); }
     for (const f of M.floors) { for (const q of brRectMinus(f, M.ramps.filter(r => r.lv + 1 === f.lv).map(r => ({ x0: r.x0 - 0.05, y0: r.y0 - 0.05, x1: r.x1 + 0.05, y1: r.y1 + 0.05 })))) put(BR_FLOORS[f.kind] || 0x8e949b, new THREE.BoxGeometry(q.x1 - q.x0, 0.22, q.y1 - q.y0).translate((q.x0 + q.x1) / 2, f.lv * H - 0.11, (q.y0 + q.y1) / 2));
-      for (const [ax, ay, bx, by] of [[f.x0, f.y0, f.x1, f.y0], [f.x0, f.y1, f.x1, f.y1], [f.x0, f.y0, f.x0, f.y1], [f.x1, f.y0, f.x1, f.y1]]) put(0xf2c200, new THREE.BoxGeometry(Math.max(0.12, bx - ax), 0.03, Math.max(0.12, by - ay)).translate((ax + bx) / 2, f.lv * H + 0.01, (ay + by) / 2)); }   // a yellow edge line: the railing is there
+      for (const [ax, ay, bx, by] of [[f.x0, f.y0, f.x1, f.y0], [f.x0, f.y1, f.x1, f.y1], [f.x0, f.y0, f.x0, f.y1], [f.x1, f.y0, f.x1, f.y1]]) put(0xb59a3e, new THREE.BoxGeometry(Math.max(0.08, bx - ax), 0.02, Math.max(0.08, by - ay)).translate((ax + bx) / 2, f.lv * H + 0.01, (ay + by) / 2)); }   // a worn painted line at the edge
     for (const r of M.ramps) {                                             // ramps: a sloping deck with rails
       const along = r.dir % 2 === 0, L = along ? r.x1 - r.x0 : r.y1 - r.y0, w = along ? r.y1 - r.y0 : r.x1 - r.x0, len = Math.hypot(L, H), tilt = Math.atan2(H, L), grp = new THREE.Group();
       const deck = new THREE.Mesh(brWorldUV(new THREE.BoxGeometry(len, 0.2, w), 3), brSurface(BR_FLOORS[r.kind] || 0x8e949b)); deck.rotation.z = tilt; deck.castShadow = deck.receiveShadow = true; grp.add(deck);
-      for (const sd of [-1, 1]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.35, 0.1), this.mat(0xf2c200, { rough: 0.5 })); rail.rotation.z = tilt; rail.position.set(0, 0.25, sd * (w / 2 - 0.05)); grp.add(rail); }
+      for (const sd of [-1, 1]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.3, 0.08), new THREE.MeshStandardMaterial({ color: 0xa7adb3, roughness: 0.35, metalness: 0.75 }));   /* a galvanised guardrail */ rail.rotation.z = tilt; rail.position.set(0, 0.25, sd * (w / 2 - 0.05)); grp.add(rail); }
       grp.position.set((r.x0 + r.x1) / 2, r.lv * H + H / 2 - 0.05, (r.y0 + r.y1) / 2); grp.rotation.y = -[0, Math.PI / 2, Math.PI, -Math.PI / 2][r.dir]; g.add(grp);
     }
     for (const d of M.deco) {
       if (d.t === 'tree') {                                                // the giant tree: a huge trunk through the spiral, leaves round the canopy
-        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.9, d.levels * H - 0.2, 16), this.mat(0x6b4a2b, { rough: 0.95 })); trunk.position.set(d.x, (d.levels * H - 0.2) / 2, d.y); trunk.castShadow = true; g.add(trunk);
-        for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2, rr = d.canopy + 1.5, leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(3 + (i % 3), 0), this.mat(i % 2 ? 0x2f6b2a : 0x3f8a35, { rough: 0.9 })); leaf.position.set(d.x + Math.cos(a) * rr, d.levels * H + 1.5 + (i % 3), d.y + Math.sin(a) * rr); leaf.castShadow = true; g.add(leaf); }
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.9, d.levels * H - 0.2, 24), LookWorld.barkMat()); trunk.position.set(d.x, (d.levels * H - 0.2) / 2, d.y); trunk.castShadow = true; g.add(trunk);
+        for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2, rr = d.canopy + 1.5, leaf = new THREE.Mesh(LookWorld.canopyGeo(), LookWorld.leafMat()); leaf.scale.setScalar(3 + (i % 3)); leaf.rotation.y = i; leaf.position.set(d.x + Math.cos(a) * rr, d.levels * H + 1.5 + (i % 3), d.y + Math.sin(a) * rr); leaf.castShadow = true; g.add(leaf); }
       }
       if (d.t === 'garage') { const cv = G3.canvas(64, 64), c = cv.getContext('2d'); c.fillStyle = '#1f4fa8'; c.fillRect(0, 0, 64, 64); c.fillStyle = '#fff'; c.font = '900 50px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('P', 32, 35); const tx = new THREE.CanvasTexture(cv); tx.encoding = THREE.sRGBEncoding; const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), new THREE.MeshBasicMaterial({ map: tx, side: THREE.DoubleSide })); sign.position.set(d.x + d.w / 2, d.levels * H + 1.6, d.y + d.h + 0.3); g.add(sign); }
     }
-    for (const [col, geos] of byCol) { const mesh = new THREE.Mesh(brWorldUV(G3.merge(geos), 3), brSurface(col)); mesh.castShadow = mesh.receiveShadow = true; g.add(mesh); }
+    const FAC = { 0xc9c1b1: 'bldg', 0xe0dbd0: 'mall', 0xd8c3a5: 'house', 0x8a8f96: 'metal', 0xc0392b: 'metal' };   // building fronts: windows on every storey; metal siding
+    for (const [col, geos] of byCol) { const f = FAC[col]; let mt = f ? LookWorld.facade(f) : brSurface(col); if (col === 0xc0392b) { mt = mt.clone(); mt.color.setHex(0xe0705f); }
+      const mesh = new THREE.Mesh(f ? brWorldUV(G3.merge(geos), 3, H) : brWorldUV(G3.merge(geos), 3), mt); mesh.castShadow = mesh.receiveShadow = true; g.add(mesh); }
     if (M.trees.length) {                                                  // the forest: one instanced trunk and canopy each
-      const n = M.trees.length, trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1.15, 1, 7), this.mat(0x6b4a2b), n), leaves = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), this.mat(0x2f6b2a, { rough: 0.9 }), n), X = new THREE.Matrix4(), q = new THREE.Quaternion();
-      M.trees.forEach((t, i) => { const h = 4 + (i % 5) * 0.6; trunk.setMatrixAt(i, X.compose(new THREE.Vector3(t.x, h / 2, t.y), q, new THREE.Vector3(t.r, h, t.r))); leaves.setMatrixAt(i, X.compose(new THREE.Vector3(t.x, h + 1, t.y), q.setFromAxisAngle(V3UP, i), new THREE.Vector3(2 + t.r * 1.5, 1.8 + t.r, 2 + t.r * 1.5))); });
-      trunk.castShadow = leaves.castShadow = true; g.add(trunk, leaves);
+      g.add(LookWorld.trees(M.trees.map((t, i) => ({ x: t.x, y: t.y, r: t.r, h: 3.6 + (i % 5) * 0.6, s: 2.2 + t.r * 1.6 })), m.mini.map === 'jungle' ? 0.02 : 0));
     }
+    LookWorld.dressBR(this, g, m.mini.map || 'downtown', T, W, D);       // sky, haze and the horizon
     this.scene.add(g);
   },
   brLootMesh(L) {
@@ -81,8 +85,8 @@ Object.assign(View3D.prototype, {
     const seen = new Set();
     for (const L of g.L || []) { let mesh = this.brLoot.get(L[0]); if (!mesh) { mesh = this.brLootMesh(L); this.brG.add(mesh); this.brLoot.set(L[0], mesh); } if (mesh.userData.still) { mesh.position.set(L[2], L[4] * BR.H + 0.25, L[3]); mesh.rotation.y = L[0]; } else { mesh.position.set(L[2], L[4] * BR.H + 0.45 + Math.sin(t * 2 + L[0]) * 0.08, L[3]); mesh.rotation.y = t * 1.2 + L[0]; } seen.add(L[0]); }
     for (const [id, mesh] of this.brLoot) if (!seen.has(id)) { this.brG.remove(mesh); this.brLoot.delete(id); }
-    if (!this.storm) { this.storm = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 40, 64, 1, true), new THREE.MeshBasicMaterial({ color: 0x9b4dff, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false })); this.scene.add(this.storm); }
-    const S = g.st; if (S) { this.storm.position.set(S.x, 20, S.y); this.storm.scale.set(Math.max(0.5, S.r), 1, Math.max(0.5, S.r)); this.storm.material.opacity = 0.18 + 0.06 * Math.sin(t * 3); }
+    if (!this.storm) { this.storm = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 40, 64, 1, true), new THREE.MeshBasicMaterial({ map: LookWorld.stormTex(), color: 0xffffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, fog: false })); this.scene.add(this.storm); }
+    const S = g.st; if (S) { this.storm.position.set(S.x, 20, S.y); this.storm.scale.set(Math.max(0.5, S.r), 1, Math.max(0.5, S.r)); this.storm.material.opacity = 0.5 + 0.08 * Math.sin(t * 2); this.storm.material.map.offset.x = t * 0.01; }
     this.brRings = this.brRings || new Map();
     for (const cart of this.carts) {
       const ch = cart.ch, G = ch.gs || {}; cart.group.visible = !ch.out; if (ch.out) continue;
@@ -97,7 +101,7 @@ Object.assign(View3D.prototype, {
   P.buildArena = function () { if (this.m && this.m.mini && modeOf(this.m) && modeOf(this.m).outdoor) return this.buildBRWorld(); return arena.call(this); };
   P.updateMode = function (dt) { if (this.m.kind === 'br') { this.modeS = this.modeS || new THREE.Group(); this.updateBR(dt); } return upd.call(this, dt); };
   P.placeCamera = function (vp, dt) {
-    const c = cam.call(this, vp, dt), m = this.m, M = modeOf(m);
+    const c = cam.call(this, vp, dt), m = this.m, M = modeOf(m), far = M && M.outdoor ? 420 : 160; if (c.far !== far) { c.far = far; c.updateProjectionMatrix(); }   // outdoors: see the horizon
     if (M && M.outdoor && vp.mode === 'broadcast') {                         // a big outdoor map: a high camera chasing the action
       const st = this.camFor(vp.key), f = vp.chair || m.ball, k = 1 - Math.exp(-3 * dt), z = (f.gs && f.gs.z) || 0;
       st.bx = st.bx === undefined ? f.x : st.bx + (f.x - st.bx) * k; st.by = st.by === undefined ? f.y : st.by + (f.y - st.by) * k;
@@ -105,6 +109,8 @@ Object.assign(View3D.prototype, {
     }
     const ch = vp.chair, z = ch && ch.gs && ch.gs.z; if (z && vp.mode !== 'broadcast') { c.position.y += z; c.updateMatrixWorld(); }   // your camera rides up the ramps with you
     if (m.kind === 'br' && ch && !vp.spect && (vp.mode === 'first' || vp.mode === 'third')) {        // Battle Royale: the view tilts with your gun
+      const st = this.camFor(vp.key), it = ch.gs.inv && ch.gs.inv[ch.gs.sel], zt = brAds(ch) ? (it && it.k === 'sniper' ? 0.38 : it && it.k === 'rifle' ? 0.62 : 0.75) : 1; st.zoom = (st.zoom || 1) + (zt - (st.zoom || 1)) * (1 - Math.exp(-14 * dt));   // LT: zoom in
+      if (Math.abs(st.zoom - 1) > 0.002) { c.fov *= st.zoom; c.updateProjectionMatrix(); }
       const pt = (vp.mode === 'first' ? 0.3 + brPitch(ch) : brPitch(ch) * 0.6); if (pt) { const d = new THREE.Vector3(); c.getWorldDirection(d); const yaw = Math.atan2(d.z, d.x), p0 = Math.asin(Math.max(-1, Math.min(1, d.y))), np = Math.max(-1.2, Math.min(1.2, p0 + pt)); c.lookAt(c.position.x + Math.cos(yaw) * Math.cos(np), c.position.y + Math.sin(np), c.position.z + Math.sin(yaw) * Math.cos(np)); c.updateMatrixWorld(); }
     }
     return c;
@@ -190,7 +196,7 @@ Object.assign(GameScene.prototype, {
       s.img.setTexture(this.brIcon(it.k)).setDisplaySize(84, 47).setPosition(x + sw / 2, y0 + sh / 2 - 3).setAlpha(BR_GUNS[it.k] && it.a <= 0 ? 0.35 : 1);
       s.txt.setText(BR_GUNS[it.k] ? String(it.a) : 'x' + it.a).setColor(BR_GUNS[it.k] && it.a <= 0 ? '#ff6b6b' : '#ffffff').setPosition(x + sw - 6, y0 + sh - 3);
     }
-    const it = G.inv[G.sel]; H.name.setText(it ? `${(BR_GUNS[it.k] || BR_ITEMS[it.k]).name}      A: ${BR_GUNS[it.k] ? 'fire' : 'use'}   Y: switch   X: jump   B: bag` : 'Empty-handed: drive into a CHEST for a gun').setPosition(x0 + bwid / 2, y0 - 16);
+    const it = G.inv[G.sel]; H.name.setText(it ? `${(BR_GUNS[it.k] || BR_ITEMS[it.k]).name}    RT ${BR_GUNS[it.k] ? 'fire' : 'use'} · LT aim · LB/RB switch · X jump · B bag` : 'Empty-handed: drive into a CHEST for a gun').setPosition(x0 + bwid / 2, y0 - 16);
     return true;
   }
 });
@@ -205,12 +211,13 @@ Object.assign(GameScene.prototype, {
     const feed = (g.feed || []).filter(f => g.t - f[3] < 7);                 // the kill feed, under the minimap
     X.feed.forEach((t, i) => { const f = feed[feed.length - 1 - i]; if (!f) return t.setVisible(false); const gun = BR_GUNS[f[2]]; t.setText(f[0] ? `${f[0]}  [${gun ? gun.name : '?'}]  ${f[1]}` : `${f[1]}  was caught in the storm`).setPosition(V.width - 10, 112 + i * 24).setColor(c && (f[4] === c.gs.team) ? '#7dff6a' : c && f[5] === c.gs.team ? '#ff6b6b' : '#ffffff').setVisible(true); });
     const vp = this.vps && this.vps.length === 1 ? this.vps[0] : null;
-    if (c && c.out) { const s = vp && vp.spect; X.spec.setText(s ? `ELIMINATED  -  spectating ${m.name(s)}` : 'ELIMINATED').setVisible(m.state !== 'over'); } else X.spec.setVisible(false);
+    if (c && c.out) { const s = vp && vp.spect; X.spec.setText(s ? `ELIMINATED  -  watching ${m.name(s)}${s.gs.team === c.gs.team && (m.mini.squad || 1) > 1 ? ' (team-mate)' : ''}     LB / RB: switch` : 'ELIMINATED').setVisible(m.state !== 'over'); } else X.spec.setVisible(false);
     if (!c || c.out || m.state === 'over' || !vp || !this.v3 || this.flat) return;
     const G = c.gs, it = G.inv[G.sel], gun = it && BR_GUNS[it.k];
     if (gun) {                                                                // the crosshair: where your shots will go (heading + right stick), 12 m out
       const a = c.heading + (p0._look ? p0._look.x * CONFIG.view3d.look.yaw * Math.PI / 180 : 0), pt = brPitch(c), q = this.v3.project(vp, c.x + Math.cos(a) * 12 * Math.cos(pt), (G.z || 0) + 0.55 + Math.sin(pt) * 12, c.y + Math.sin(a) * 12 * Math.cos(pt));
-      if (!q.behind) { const sz = 7 + gun.spread * 60, hit = G.hm !== undefined && g.t - G.hm < 0.25; G2.lineStyle(2, 0x000000, 0.5).strokeCircle(q.x, q.y, sz + 1).lineStyle(2, hit ? 0xff4d4d : 0xffffff, 0.9).strokeCircle(q.x, q.y, sz).fillStyle(0xffffff, 1).fillCircle(q.x, q.y, 1.6);
+      if (!q.behind) { const ads = brAds(c), sz = 7 + gun.spread * 60 * (ads ? 0.35 : 1), hit = G.hm !== undefined && g.t - G.hm < 0.25; G2.lineStyle(2, 0x000000, 0.5).strokeCircle(q.x, q.y, sz + 1).lineStyle(2, hit ? 0xff4d4d : 0xffffff, 0.9).strokeCircle(q.x, q.y, sz).fillStyle(0xffffff, 1).fillCircle(q.x, q.y, 1.6);
+        if (ads && it.k === 'sniper' && vp.mode === 'first') G2.lineStyle(520, 0x05080a, 0.88).strokeCircle(q.x, q.y, 560).lineStyle(2, 0x000000, 0.8).lineBetween(q.x - 290, q.y, q.x - 12, q.y).lineBetween(q.x + 12, q.y, q.x + 290, q.y).lineBetween(q.x, q.y - 290, q.x, q.y - 12).lineBetween(q.x, q.y + 12, q.x, q.y + 290);   // the sniper's scope
         if (hit) G2.lineStyle(3, 0xff4d4d, 1).lineBetween(q.x - 14, q.y - 14, q.x - 6, q.y - 6).lineBetween(q.x + 14, q.y - 14, q.x + 6, q.y - 6).lineBetween(q.x - 14, q.y + 14, q.x - 6, q.y + 6).lineBetween(q.x + 14, q.y + 14, q.x + 6, q.y + 6); }
     }
     if (G.hitT > 0) { const k = G.hitT / 0.25 * 0.35; G2.fillStyle(0xff2a2a, k).fillRect(0, 0, V.width, 24).fillRect(0, V.height - 24, V.width, 24).fillRect(0, 0, 24, V.height).fillRect(V.width - 24, 0, 24, V.height); }   // you were hit
@@ -233,7 +240,15 @@ Object.assign(GameScene.prototype, {
   P.viewports3d = function (LP) {                                           // eliminated in Battle Royale: watch a team-mate (or whoever got you, or anyone still in)
     const list = vps.call(this, LP), m = this.match; if (m.kind !== 'br') return list;
     for (const vp of list) if (vp.look) vp.look = { x: vp.look.x, y: 0 };                    // (the right stick's up / down tilts your gun instead)
-    for (const vp of list) { const ch = vp.benchChair; if (!vp.p || !ch || !ch.out) continue; const live = m.chairs.filter(c => !c.out), t = live.find(c => c.gs.team === ch.gs.team) || m.chairs[ch.gs.by] && !m.chairs[ch.gs.by].out && m.chairs[ch.gs.by] || live[0]; if (t) { vp.chair = t; vp.mode = 'third'; vp.benched = false; vp.spect = t; } }
+    for (const vp of list) {                                                  // (your team-mates if any are left, otherwise anyone still in; LB / RB switch between them)
+      const ch = vp.benchChair, p = vp.p; if (!p || !ch || !ch.out) continue;
+      const live = m.chairs.filter(c => !c.out), mates = live.filter(c => c.gs.team === ch.gs.team), pool = mates.length ? mates : live; if (!pool.length) continue;
+      let t = pool.find(c => c.k === p.specK);
+      if (!t) { const killer = m.chairs[ch.gs.by]; t = mates[0] || (killer && !killer.out ? killer : pool[0]); }
+      const src = p.src || Controls.mine, fr = this.game.loop.frame;
+      if (src && src.pressed && p.specFrame !== fr && (src.pressed.halfCW || src.pressed.halfCCW || src.pressed.right || src.pressed.left)) { p.specFrame = fr; const d = src.pressed.halfCCW || src.pressed.left ? -1 : 1; t = pool[(pool.indexOf(t) + d + pool.length) % pool.length]; Sound.play('blip'); }
+      p.specK = t.k; vp.chair = t; vp.mode = 'third'; vp.benched = false; vp.spect = t;
+    }
     return list;
   };
   P.drawMinimap = function () {                                             // the storm and the next safe circle on the minimap

@@ -282,3 +282,5 @@ class HistoryScene extends Phaser.Scene {
   }
   update() { Controls.update(this.game.loop.frame); const e = Controls.menu(); if (e.a || e.b || e.start) { Sound.play('back'); this.scene.start(this.from); } }
 }
+
+{ const P = TrophyScene.prototype, cr = P.create; P.create = function (...a) { const s = Season.cur; if (s && s.stage === 'done' && !s.questCounted) { s.questCounted = true; Season.save(s); Progress.ev('seasonDone'); Progress.addXp(500, 'Season finished'); } return cr.apply(this, a); }; }   // a full season counts for the quests

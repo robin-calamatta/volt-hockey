@@ -3,6 +3,30 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v12: the lobby, your character, Season 1 "The Beginning", quests and the emoji wheel
+
+- **New main screen (lobby):** your character sits on a lit stage, with tabs along the top. Switch tabs with LB / RB (keyboard Q / E) or click them. The right stick turns your character.
+  - **PLAY:** shows the mode you picked, today's quests and a big PLAY button. Press ▼ (or click the mode card) to pick a mode: Volt Hockey, Battle Royale, Minigames, Season, Practice Arena or Online.
+  - **LOCKER:** outfit (Rookie Tee, Team Jersey, Cozy Hoodie) and its colour, hat and hat colour, face, hair, skin tone, cart decal, and your emoji wheel. Hover an item to try it on. Locked items show the pass tier that unlocks them.
+  - **PASS:** Season 1, "The Beginning". A free pass with 20 tiers and one small reward each (hats, faces, outfits, cart decals, emojis). Browse the rewards to try them on.
+  - **QUESTS:** 3 daily quests (reset at midnight) and 6 weekly quests (reset on Monday), picked from a larger pool. Examples: play a minigame to the end, play or win a Battle Royale, win a match of Volt Hockey, spend time in the Practice Arena, get a penalty, play a full season, open chests, score goals, drive 10 km.
+  - **CAREER:** your stats, the leaderboard, and changing your name.
+  - **Start / Esc** opens the menu: Settings, Controls, your name, the leaderboard.
+- **XP and levels:** matches give 80 XP (150 for a win) and quests give 300–3,000. Every 1,000 XP is a level, and each level unlocks the next pass tier.
+- **Your look in matches:** your hat, face, outfit and cart decal show on your cart, for everyone online too. In Volt Hockey your shirt stays in your team's colour so teams are easy to tell apart.
+- **Emoji wheel:** in a match, hold D-pad up (keyboard: H, or M for keyboard 2), point a stick at an emoji and let go. A quick tap of D-pad up still opens quick chat online. Touch and mouse: the 😀 button. The emoji pops up over your cart, online too. Choose your 8 emojis in the Locker.
+- Everything is saved with your settings (and to your account when you're logged in). There's no shop yet: the Locker and pass are ready for skins to be added later.
+
+## v11.4: a more realistic outdoors, LT to aim
+
+- **Battle Royale looks more real:**
+  - A painted sky with clouds and a sun glow, and haze that thickens with distance.
+  - A horizon on every map: rolling hills and far mountains, a city skyline (Downtown, Port), the sea (Port), red mesas and boulders (Canyon), and woods all round (Suburbs, Jungle).
+  - Leafy trees with bark, and building fronts with real windows on every storey. Warehouses and containers have corrugated metal.
+  - Ramps have steel guardrails, floor edges are worn paint instead of bright yellow, the ground has natural patches, and the storm wall rises like haze.
+- The race maps use the new sky too.
+- **LT (hold) to aim:** zooms in (most with the sniper, which also shows a scope), tightens your shots, and slows your cart while held. Keyboards: Q or `,`.
+
 ## v11.2: Battle Royale bag, jumping, aiming up and down
 
 - **B opens your bag** (inventory screen): pictures of all 5 slots with ammo and gun stats. ◀ ▶ choose, A picks a slot up and A again swaps or moves it, Y holds that item, X drops it on the ground, B closes. You can't pick something up again for 2.5 s after dropping it. Works for online guests too (the host applies it).
@@ -12,6 +36,8 @@ Phaser loads from a CDN; download `phaser.min.js` and change the first script ta
 - See-through openings: the floor above a ramp now has a real hole, so you can see where you're going.
 - New HUD: crosshair, hit marker, red flash when you're hit, low-health pulse, kill feed, "spectating" label when you're out, and the storm's current and next circle on the minimap. Health and shield are bottom-left under the speed meter; the inventory bar is bottom-right.
 - Surfaces use real textures (asphalt, concrete, grass and so on) instead of flat colours.
+- **Controller in Battle Royale:** RT fires (hold it for automatic guns), LT does nothing, and LB / RB step back and forward through your items. There are no spin buttons in this game. On keyboards: E fires, Z / R step through items (keyboard 2: `.` fires, `[` / `]` step).
+- **Watching when you're out:** you follow a living teammate. If your team is gone, you can watch anyone still in. LB / RB (or left / right) switch between them.
 - Settings: **Invert right stick Y axis** (on/off) applies to looking around in every game and to aiming in Battle Royale.
 
 ## v11.1: Battle Royale loot and HUD, players-only games, a more realistic look

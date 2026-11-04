@@ -12,8 +12,8 @@ const STYLE = {
 };
 // The controls guide (Settings > Controls and screen > Controls guide). Edit freely: one block per device.
 const CONTROLS_GUIDE = [
-  ['GAMEPAD', ['Left stick   drive  (1st / 3rd person: up = go, ◀ ▶ = turn)', 'Right stick   look around (springs back)', 'L3 (hold)   push to talk      D-pad ▲   quick chat', 'D-pad ▼   camera      Select (View)   friends and party', 'RT / LT   spin clockwise / counter-clockwise', 'RB / LB   half spin (half a trigger)', 'D-pad ◀ ▶   speed down / up', 'X   full press on / off  (minigames: A or X uses a power-up)', 'Y   switch cart', 'Start   pause      A / B   select / back']],
-  ['KEYBOARD 1', ['WASD   drive', 'T   camera view', 'Tab chat   1-9 quick chat   G (hold) talk   ` friends', 'E / Q   spin', 'R / Z   half spin', 'X   full press  (minigames: Space or X = power-up)', 'V / C   speed up / down', 'F   switch cart', 'Esc   pause', 'Space / Backspace   select / back']],
+  ['GAMEPAD', ['Left stick   drive  (1st / 3rd person: up = go, ◀ ▶ = turn)', 'Right stick   look around (springs back)', 'L3 (hold)   push to talk      D-pad ▲   tap: quick chat, hold: emoji wheel', 'D-pad ▼   camera      Select (View)   friends and party', 'RT / LT   spin clockwise / counter-clockwise', 'RB / LB   half spin (half a trigger)', 'D-pad ◀ ▶   speed down / up', 'X   full press on / off  (minigames: A or X uses a power-up)', 'Y   switch cart', 'Start   pause      A / B   select / back']],
+  ['KEYBOARD 1', ['WASD   drive', 'T   camera view', 'Tab chat   1-9 quick chat   G (hold) talk   ` friends   H (hold) emoji wheel', 'E / Q   spin', 'R / Z   half spin', 'X   full press  (minigames: Space or X = power-up)', 'V / C   speed up / down', 'F   switch cart', 'Esc   pause', 'Space / Backspace   select / back']],
   ['KEYBOARD 2', ['Arrows   drive', 'P   camera view', 'L (hold)   push to talk', '. / ,   spin', '] / [   half spin', '\\   full press  (minigames: Right Shift or \\ = power-up)', "' / ;   speed up / down", '/   switch cart', 'Right Shift / Right Ctrl   select / back']],
   ['TOUCH', ['Stick   drive', 'VIEW   camera view', '💬   chat      🎙   talk (hold) / mic on-off (tap)', 'Spin buttons   spin', 'Small spin buttons   half spin', 'PRESS   full press  (minigames: A = power-up)', '+ / -   speed up / down', 'Cart button   switch cart', 'II   pause', 'Settings > Touch and screen   move the buttons']]
 ];
@@ -498,11 +498,14 @@ class GameScene extends Phaser.Scene {
       const locals = [[o.me, Controls.mine], ...guests.map(([id, src]) => [o.players.find(q => q.id === id), src])];
       for (const [me, src] of locals) {
         if (!me) continue; const input = menuOpen ? idle : src; me.src = menuOpen ? o.idle : src;
-        if (input.pressed.halfCW) me.spinQueued = 0.5; if (input.pressed.halfCCW) me.spinQueued = -0.5;
-        if (input.pressed.spinCW) me.spinQueued = 1; if (input.pressed.spinCCW) me.spinQueued = -1;
+        const SP = m.mini && modeOf(m) && modeOf(m).shooterPad;
+        if (SP && me.chair) { me.brAds = !me.chair.out && !me.invOpen && input.held && input.held.spinCCW ? 1 : 0; me.chair.gs.ads = me.brAds; }
+        if (SP) { if (me.chair && !me.chair.out && !me.invOpen && (input.pressed.halfCW || input.pressed.halfCCW)) modeOf(m).cycle(me.chair, m, input.pressed.halfCCW ? -1 : 1); }
+        else { if (input.pressed.halfCW) me.spinQueued = 0.5; if (input.pressed.halfCCW) me.spinQueued = -0.5;
+        if (input.pressed.spinCW) me.spinQueued = 1; if (input.pressed.spinCCW) me.spinQueued = -1; }
         const MJ = m.mini && modeOf(m) && modeOf(m).jump; if (MJ && me.chair && !me.invOpen) { brAimInput(me, input, dt); me.chair.gs.ap = MG.r2(me.brAp || 0); if (input.pressed.x) modeOf(m).jump(me.chair, m); }
         if (me.invOpen) continue;
-        if (m.mini && (input.pressed.a || (input.pressed.x && !MJ))) m.useBy(me); else if (input.pressed.x && !MJ) m.togglePress(me.side);
+        if (m.mini && (input.pressed.a || (SP && input.pressed.spinCW) || (input.pressed.x && !MJ) || (modeOf(m) && modeOf(m).holdFire && input.held && (input.held.a || (SP && input.held.spinCW))))) m.useBy(me); else if (input.pressed.x && !MJ) m.togglePress(me.side);
         if (input.pressed.y) m.switchChair(me);
         if (input.pressed.speedUp && me.speedLevel < Settings.speedCap) { me.speedLevel++; Sound.play('blip'); }
         if (input.pressed.speedDown && me.speedLevel > 1) { me.speedLevel--; Sound.play('blip'); }
@@ -748,16 +751,20 @@ class GameScene extends Phaser.Scene {
       if (vid && this.match.state === 'countdown' && this.match.timer > 0.3) this.match.timer = 0.3;      // no 3-2-1 in a demo
       this.match.update(dt); this.pre3d(dt); this.render(); return;
     }          // the camera-settings preview: the CPU plays itself, nobody can pause it
+    Progress.tick(this, Math.min(delta / 1000, 0.05)); Emotes.frame(this);         // quests and XP; the emoji wheel
     if (this.online) return this.updateOnline(delta);
     const m = this.match;
     for (const p of this.setup.players) {
       if (p.invOpen) continue;                                                       // (their inventory screen has their buttons)
       if (m.mini && modeOf(m) && modeOf(m).invAct && p.src.pressed.b && p.chair && !p.chair.out && m.state === 'play') { this.openInventory(p); continue; }   // B: the inventory
-      if (p.src.pressed.halfCW) p.spinQueued = 0.5; if (p.src.pressed.halfCCW) p.spinQueued = -0.5;
-      if (p.src.pressed.spinCW) p.spinQueued = 1; if (p.src.pressed.spinCCW) p.spinQueued = -1;
+      const SP = m.mini && modeOf(m) && modeOf(m).shooterPad;                         // Battle Royale: RT fires, LB / RB step through your items, no spins
+      if (SP && p.chair) { p.brAds = !p.chair.out && p.src.held && p.src.held.spinCCW ? 1 : 0; p.chair.gs.ads = p.brAds; }
+      if (SP) { if (p.chair && !p.chair.out && (p.src.pressed.halfCW || p.src.pressed.halfCCW)) modeOf(m).cycle(p.chair, m, p.src.pressed.halfCCW ? -1 : 1); }
+      else { if (p.src.pressed.halfCW) p.spinQueued = 0.5; if (p.src.pressed.halfCCW) p.spinQueued = -0.5;
+      if (p.src.pressed.spinCW) p.spinQueued = 1; if (p.src.pressed.spinCCW) p.spinQueued = -1; }
       const MJ = m.mini && modeOf(m) && modeOf(m).jump;                                // Battle Royale: X jumps, the right stick (or I / K) aims up and down
       if (MJ && p.chair) { brAimInput(p, p.src, Math.min(delta / 1000, 0.05)); p.chair.gs.ap = MG.r2(p.brAp || 0); if (p.src.pressed.x) modeOf(m).jump(p.chair, m); }
-      if (m.mini && (p.src.pressed.a || (p.src.pressed.x && !MJ) || (modeOf(m) && modeOf(m).holdFire && p.src.held && (p.src.held.a || (p.src.held.x && !MJ))))) m.useBy(p); else if (p.src.pressed.x && !MJ) m.togglePress(p.side);   // (some games: hold to keep firing)
+      if (m.mini && (p.src.pressed.a || (SP && p.src.pressed.spinCW) || (p.src.pressed.x && !MJ) || (modeOf(m) && modeOf(m).holdFire && p.src.held && (p.src.held.a || (SP && p.src.held.spinCW) || (p.src.held.x && !MJ))))) m.useBy(p); else if (p.src.pressed.x && !MJ) m.togglePress(p.side);   // (some games: hold to keep firing)
       if (p.src.pressed.y) m.switchChair(p);
       if (p.src.pressed.speedUp && p.speedLevel < Settings.speedCap) { p.speedLevel++; Sound.play('blip'); }   // RB
       if (p.src.pressed.speedDown && p.speedLevel > 1) { p.speedLevel--; Sound.play('blip'); }                      // LB

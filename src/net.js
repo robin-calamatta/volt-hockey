@@ -13,7 +13,7 @@ const STATE_CODE = { countdown: 0, play: 1, goal: 2, over: 3 }, STATE_NAME = ['c
 const r3 = v => Math.round(v * 1000) / 1000;
 const randomCode = () => Array.from({ length: CONFIG.online.codeLength }, () => CONFIG.online.codeAlphabet[Math.floor(Math.random() * CONFIG.online.codeAlphabet.length)]).join('');
 // Who you are, for other players' chat and voice rules (guests: no account, so quick chat only and no voice).
-const accountTag = () => ({ acct: typeof Account !== 'undefined' ? Account.name : '', adult: typeof Account !== 'undefined' && Account.adult, vid: typeof Voice !== 'undefined' ? Voice.myId() : '' });
+const accountTag = () => ({ look: typeof Progress !== 'undefined' ? Progress.look() : null, acct: typeof Account !== 'undefined' ? Account.name : '', adult: typeof Account !== 'undefined' && Account.adult, vid: typeof Voice !== 'undefined' ? Voice.myId() : '' });
 const cleanCode = text => String(text || '').toUpperCase().split('').filter(ch => CONFIG.online.codeAlphabet.includes(ch)).join('').slice(0, CONFIG.online.codeLength);
 
 /* ---- transport: a "connection" is { send(obj), close(), onMessage, onClose } ---- */
@@ -229,7 +229,7 @@ class HostSession {
       const side = this.openSide();
       if (this.roster.length >= CONFIG.online.maxPlayers || side === undefined) return this.reject(entry, 'full');
       entry.id = this.nextId++; clearTimeout(entry.hello);
-      this.roster.push({ id: entry.id, name: this.uniqueName(Settings.cleanName(msg.name) || 'Player ' + (this.roster.length + 1)), side, acct: cleanText(msg.acct, 20), adult: !!msg.adult, vid: cleanText(msg.vid, 80) });
+      this.roster.push({ id: entry.id, name: this.uniqueName(Settings.cleanName(msg.name) || 'Player ' + (this.roster.length + 1)), side, look: Avatar.cleanLook(msg.look), acct: cleanText(msg.acct, 20), adult: !!msg.adult, vid: cleanText(msg.vid, 80) });
       entry.conn.send({ t: 'welcome', id: entry.id, code: this.code, roster: this.roster, cfg: this.cfg });
       return this.sendRoster();
     }
@@ -284,14 +284,14 @@ class HostSession {
 
   /* ---- in a match ---- */
   start(localSource) {                                           // returns the Match; call from the host's room screen
-    const players = this.roster.map((r, i) => ({ id: r.id, name: r.name, side: r.side, locked: !!r.lock, tag: 'P' + (i + 1), speedLevel: Settings.speedLevel, chair: null, spinQueued: 0,
+    const players = this.roster.map((r, i) => ({ id: r.id, name: r.name, side: r.side, locked: !!r.lock, tag: 'P' + (i + 1), speedLevel: Settings.speedLevel, chair: null, spinQueued: 0, look: r.host ? null : r.look || null,
       remote: !(r.host || r.own === 1), src: r.host ? localSource : r.own === 1 ? this.guestSrc.get(r.id) : { ax: 0, ay: 0, pressed: {} } }));
     for (const e of this.entries.values()) e.players = new Map(players.filter(p => p.id === e.id || (this.roster.find(r => r.id === p.id) || {}).own === e.id).map(p => [p.id, p]));
     if (this.cfg.mini) { this.cfg.sizesRoom = this.cfg.sizesRoom || this.cfg.sizes; this.cfg.sizes = fitSizes(this.cfg.mini, players, this.cfg.sizesRoom); }   // no CPU carts: just the people in the room
     const se = this.cfg.season;                                    // a party season game: the season's length and each team's own skill
     this.match = makeMatch({ mini: this.cfg.mini || null, teamA: this.cfg.teamA, teamB: this.cfg.teamB, players, difficulty: this.cfg.difficulty, sizes: this.cfg.sizes, practice: this.cfg.practice, periodSeconds: se ? se.periodSeconds : undefined, diffBySide: se ? se.levels : undefined });
     this.match.sfxQueue = []; this.match.callQueue = []; this.state = 'playing'; this.snapAcc = 0; this.relist();
-    this.broadcast({ t: 'start', cfg: this.cfg, rules: Settings.rules(), players: players.map(p => ({ id: p.id, name: p.name, side: p.side, tag: p.tag })) });
+    this.broadcast({ t: 'start', cfg: this.cfg, rules: Settings.rules(), players: players.map(p => ({ id: p.id, name: p.name, side: p.side, tag: p.tag, look: p.look || ((this.roster.find(r => r.id === p.id) || {}).host ? Progress.look() : null) })) });
     return this.match;
   }
   applyInput(entry, msg) {                                       // a player's stick and button events (plus those of their local guests, in msg.g)
@@ -311,6 +311,9 @@ class HostSession {
       else if (ev === 'up') p.speedLevel = Math.min(Settings.speedCap, p.speedLevel + 1);
       else if (ev === 'down') p.speedLevel = Math.max(1, p.speedLevel - 1);
       else if (ev === 'sw') this.match.switchChair(p);
+      else if (typeof ev === 'string' && ev.startsWith('emo:') && p.chair) Emotes.recv(this.match, p.chair, ev.slice(4));   // a guest's emoji
+      else if ((ev === 'cyc:1' || ev === 'cyc:-1') && p.chair && !p.chair.out && modeOf(this.match) && modeOf(this.match).cycle) modeOf(this.match).cycle(p.chair, this.match, ev === 'cyc:-1' ? -1 : 1);
+      else if ((ev === 'ads:1' || ev === 'ads:0') && p.chair && p.chair.gs) { p.brAds = ev === 'ads:1' ? 1 : 0; p.chair.gs.ads = p.brAds; }
       else if (ev === 'jmp' && p.chair && modeOf(this.match) && modeOf(this.match).jump) modeOf(this.match).jump(p.chair, this.match);
       else if (typeof ev === 'string' && ev.startsWith('ap:') && p.chair && p.chair.gs) { const v = +ev.slice(3); if (isFinite(v)) { p.brAp = Math.max(BR_AIM.min, Math.min(BR_AIM.max, v)); p.chair.gs.ap = MG.r2(p.brAp); } }   // a guest tilting their gun
       else if (typeof ev === 'string' && ev.startsWith('inv:') && p.chair && modeOf(this.match) && modeOf(this.match).invAct) { const [, op, x, y] = ev.split(':'); modeOf(this.match).invAct(p.chair, { op, a: +x, b: +y }, this.match); }   // a guest rearranging their inventory
@@ -331,7 +334,7 @@ class HostSession {
     return { t: 'snap', n: ++this.tickNo, st: STATE_CODE[m.state], tm: r3(m.timer), ck: r3(m.clock), ot: m.overtime ? 1 : 0, pe: m.period, sc: m.score.slice(), sh: m.shots.slice(), pr: m.press.map(v => v ? 1 : 0),
       bn: m.bannerLeft > 0 ? m.banner : '', nt: m.noticeLeft > 0 ? m.notice : '',
       c: m.chairs.map(c => [r3(c.x), r3(c.y), r3(c.heading), r3(c.vx), r3(c.vy), r3(Math.max(0, c.binLeft)), c.player ? c.player.id : 0]),
-      b: [r3(b.x), r3(b.y), r3(b.vx), r3(b.vy)], lv: m.players.map(p => [p.id, p.speedLevel]), sf: m.sfxQueue.splice(0), cm: m.callQueue.splice(0), mg: m.mini ? m.miniSnap() : undefined };
+      b: [r3(b.x), r3(b.y), r3(b.vx), r3(b.vy)], lv: m.players.map(p => [p.id, p.speedLevel]), sf: m.sfxQueue.splice(0), cm: m.callQueue.splice(0), em: m.emoQ && m.emoQ.length ? m.emoQ.splice(0) : undefined, mg: m.mini ? m.miniSnap() : undefined };
   }
   sendSnapshots() { const snap = this.snapshot(); for (const e of this.entries.values()) if (e.id) e.conn.send({ ...snap, a: e.seq }); }
   backToLobby() { this.state = 'lobby'; this.match = null; for (const e of this.entries.values()) e.players = null; this.broadcast({ t: 'lobby' }); this.sendRoster(); }
@@ -422,6 +425,7 @@ class ClientSim {
     m.banner = s.bn; m.bannerLeft = s.bn ? 1 : 0; m.notice = s.nt; m.noticeLeft = s.nt ? 1 : 0;
     for (const [id, lv] of s.lv) { const p = this.byId.get(id); if (p && !this.localIds.has(id)) p.speedLevel = lv; }
     if (s.cm) for (const t of s.cm) m.hear(t);
+    if (s.em) for (const [i, e] of s.em) if (m.chairs[i] && !(this.localIds.has(m.chairs[i].player && m.chairs[i].player.id))) Emotes.show(m.chairs[i], e);   // emojis (your own already showed)
     if (s.mg && m.miniApply) m.miniApply(s.mg);
     for (const [name, pid] of s.sf) if (!this.localIds.has(pid)) Sound.play(name);          // your own spin screech already played locally
     for (const L of this.locals) L.predIndex = s.c.findIndex(row => row[6] === L.id);
@@ -431,11 +435,14 @@ class ClientSim {
     const C = CONFIG.online; dt = Math.min(dt, 0.05); this.clock += dt;
     for (const L of this.locals) {
       const found = inputs.find(x => x.id === L.id), input = found ? found.input : { ax: 0, ay: 0, pressed: {} }, p = input.pressed || {}; let spin = 0;
-      if (p.halfCW) { L.pending.push('hcw'); spin = 0.5; } if (p.halfCCW) { L.pending.push('hccw'); spin = -0.5; }
-      if (p.spinCW) { L.pending.push('cw'); spin = 1; } if (p.spinCCW) { L.pending.push('ccw'); spin = -1; }
+      const SP = this.m.mini && modeOf(this.m) && modeOf(this.m).shooterPad;    // Battle Royale: RT fires, LB / RB step through your items, no spins
+      if (SP && L.me) { const ads = !L.me.invOpen && input.held && input.held.spinCCW ? 1 : 0; if (ads !== (L.me.brAds || 0)) L.pending.push('ads:' + ads); L.me.brAds = ads; }   // LT: aim (zoom, slower)
+      if (SP) { if (!(L.me && L.me.invOpen) && (p.halfCW || p.halfCCW)) L.pending.push(p.halfCCW ? 'cyc:-1' : 'cyc:1'); }
+      else { if (p.halfCW) { L.pending.push('hcw'); spin = 0.5; } if (p.halfCCW) { L.pending.push('hccw'); spin = -0.5; }
+      if (p.spinCW) { L.pending.push('cw'); spin = 1; } if (p.spinCCW) { L.pending.push('ccw'); spin = -1; } }
       const MJ = this.m.mini && modeOf(this.m) && modeOf(this.m).jump;         // Battle Royale: X jumps; your gun's tilt goes to the host when it changes
       if (MJ && L.me && !L.me.invOpen) { brAimInput(L.me, input, dt); const ap = MG.r2(L.me.brAp || 0); if (Math.abs(ap - (L.sentAp || 0)) > 0.015 || (ap !== L.sentAp && this.clock - (L.apAt || 0) > 0.3)) { L.pending.push('ap:' + ap); L.sentAp = ap; L.apAt = this.clock; } if (p.x) L.pending.push('jmp'); }
-      if (this.m.mini && !(L.me && L.me.invOpen)) { const M = modeOf(this.m), hold = M && M.holdFire && input.held && (input.held.a || (input.held.x && !MJ)) && this.clock - (L.holdAt || 0) > 0.08; if (p.a || (p.x && !MJ) || hold) { L.pending.push('use'); L.holdAt = this.clock; } } else if (p.x && !MJ) L.pending.push('x');
+      if (this.m.mini && !(L.me && L.me.invOpen)) { const M = modeOf(this.m), hold = M && M.holdFire && input.held && (input.held.a || (SP && input.held.spinCW) || (input.held.x && !MJ)) && this.clock - (L.holdAt || 0) > 0.08; if (p.a || (SP && p.spinCW) || (p.x && !MJ) || hold) { L.pending.push('use'); L.holdAt = this.clock; } } else if (p.x && !MJ) L.pending.push('x');
       if (spin) { Sound.play('screech'); L.spins.push({ t: this.clock, dir: Math.sign(spin), amt: Math.abs(spin) }); if (L.spins.length > 8) L.spins.shift(); }
       if (p.speedUp && L.me.speedLevel < Settings.speedCap) { L.me.speedLevel++; L.pending.push('up'); }
       if (p.speedDown && L.me.speedLevel > 1) { L.me.speedLevel--; L.pending.push('down'); }

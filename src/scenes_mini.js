@@ -260,7 +260,7 @@ Object.assign(View3D.prototype, {
     const m = this.m, map = m.map, T = RACE_THEMES[map.theme] || RACE_THEMES.grass, L = m.rline, N = L.length, hw = m.hw, W = map.w, H = map.h;
     if (this.arena) this.scene.remove(this.arena);
     const g = this.arena = new THREE.Group(), glow = !!T.glow;
-    this.scene.background = new THREE.Color(T.sky); this.scene.fog = new THREE.Fog(T.sky, 45, Math.max(W, H) > 150 ? 190 : 130);
+    this.scene.background = T.glow ? new THREE.Color(T.sky) : LookWorld.sky(T.sky); this.scene.fog = new THREE.Fog(T.glow ? T.sky : LookWorld.haze(T.sky), 45, Math.max(W, H) > 150 ? 190 : 130);
     const gk = { grass: 'grass', sand: 'sand', canyon: 'dirt', forest: 'jungle' }[map.theme], gt = gk ? Look.tex(gk).clone() : null; if (gt) { gt.needsUpdate = true; gt.repeat.set((W + 160) / 7, (H + 160) / 7); }
     const ground = new THREE.Mesh(G3.layFlat(new THREE.PlaneGeometry(W + 160, H + 160)), new THREE.MeshStandardMaterial(gt ? { map: gt, roughness: 0.95 } : { color: T.ground, roughness: map.theme === 'ice' ? 0.35 : 0.95 }));
     ground.position.set(W / 2, -0.01, H / 2); ground.receiveShadow = true; g.add(ground);

@@ -3,9 +3,9 @@
 const BUTTONS = ['up', 'down', 'left', 'right', 'a', 'b', 'y', 'start', 'spinCW', 'spinCCW', 'speedUp', 'speedDown', 'x', 'halfCW', 'halfCCW', 'camera', 'talk', 'quick', 'social', 'aimUp', 'aimDown'];   // aimUp / aimDown: Battle Royale, tilt your gun (keyboards; a pad uses the right stick)   // social: Select / View opens Friends and party   // quick: D-pad up on its own, for quick chat in a match   // talk: push to talk (voice chat)
 const KEYMAP = {
   kb1: { label: 'Keyboard 1 (WASD)',   up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], a: ['Space'], b: ['Backspace'],
-         y: ['KeyF'], start: ['Enter', 'Escape'], spinCW: ['KeyE'], spinCCW: ['KeyQ'], speedUp: ['KeyV'], speedDown: ['KeyC'], x: ['KeyX'], halfCW: ['KeyR'], halfCCW: ['KeyZ'], camera: ['KeyT'], talk: ['KeyG'], quick: [], social: [], aimUp: ['KeyI'], aimDown: ['KeyK'] },
+         y: ['KeyF'], start: ['Enter', 'Escape'], spinCW: ['KeyE'], spinCCW: ['KeyQ'], speedUp: ['KeyV'], speedDown: ['KeyC'], x: ['KeyX'], halfCW: ['KeyR'], halfCCW: ['KeyZ'], camera: ['KeyT'], talk: ['KeyG'], quick: ['KeyH'], social: [], aimUp: ['KeyI'], aimDown: ['KeyK'] },
   kb2: { label: 'Keyboard 2 (Arrows)', up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], a: ['ShiftRight'],
-         b: ['ControlRight'], y: ['Slash'], start: ['Escape'], spinCW: ['Period'], spinCCW: ['Comma'], speedUp: ['Quote'], speedDown: ['Semicolon'], x: ['Backslash'], halfCW: ['BracketRight'], halfCCW: ['BracketLeft'], camera: ['KeyP'], talk: ['KeyL'], quick: [], social: [], aimUp: ['PageUp'], aimDown: ['PageDown'] }
+         b: ['ControlRight'], y: ['Slash'], start: ['Escape'], spinCW: ['Period'], spinCCW: ['Comma'], speedUp: ['Quote'], speedDown: ['Semicolon'], x: ['Backslash'], halfCW: ['BracketRight'], halfCCW: ['BracketLeft'], camera: ['KeyP'], talk: ['KeyL'], quick: ['KeyM'], social: [], aimUp: ['PageUp'], aimDown: ['PageDown'] }
 };
 const PAD_BUTTON = { a: 0, b: 1, y: 3, start: 9, spinCW: 7, spinCCW: 6, speedUp: 15, speedDown: 14, x: 2, halfCW: 5, halfCCW: 4, camera: 13, social: 8, talk: 10, quick: 12, up: 12, down: 13, left: 14, right: 15 };
 const PAD = { deadzone: 0.2, menuThreshold: 0.55 };
