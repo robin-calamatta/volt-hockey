@@ -135,7 +135,7 @@ Object.assign(GameScene.prototype, {
       }
       // speed meter for your own cart (the ring on the floor is out of sight in first person)
       if (vp.p && vp.chair && vp.mode !== 'broadcast') {
-        const n = CONFIG.speedLevels.length, lv = vp.p.speedLevel || 0, x0 = R.x + 18, y0 = R.y + R.h - 22;
+        const n = CONFIG.speedLevels.length, lv = vp.p.speedLevel || 0, x0 = R.x + 18, y0 = R.y + R.h - 22 - (this.match && this.match.kind === 'br' && !this.flat ? 44 : 0);   // (Battle Royale: health and shield sit under it)
         g.fillStyle(0x0d151b, 0.6).fillRoundedRect(x0 - 8, y0 - 28, n * 16 + 84, 40, 8);
         for (let i = 0; i < n; i++) g.fillStyle(i < lv ? 0xffffff : 0x55626c, i < lv ? 1 : 0.6).fillRect(x0 + 66 + i * 16, y0 - i * 3.5, 11, 6 + i * 3.5);
         this.pooled(this.vpText, nv++, { ...vpStyle, fontSize: '17px' }).setText('SPEED').setOrigin(0, 0.5).setPosition(x0, y0 - 8).setColor('#9fb2bf').setVisible(true);

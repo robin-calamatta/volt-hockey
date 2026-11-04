@@ -7,7 +7,15 @@
      ramps  { x0, y0, x1, y1, dir, lv }       from level lv up to lv + 1, rising in direction dir (0 +x, 1 +y, 2 -x, 3 -y)
      trees  { x, y, r }                       round trunks on the ground
      loot   [x, y, lv]                        where loot appears (plus random spots on the ground) */
-const BR = { H: 2.2, hp: 100, maxShield: 100, slots: 5, grace: 4 };
+const BR = { H: 2.2, hp: 100, maxShield: 100, slots: 5, grace: 4, grav: 15, jumpV: 5.6, headroom: 1.25, fallSafe: 9.5, fallDmg: 4 };
+/* Aiming up and down: a gamepad's right stick (or I / K, PageUp / PageDown on the keyboards) tilts your gun. It stays where you put it, and eases back to level a moment after you let go. */
+const BR_AIM = { min: -0.5, max: 0.7, rate: 1.4, back: 0.45, idle: 1.4 };
+function brAimInput(p, src, dt) {
+  if (!p || !src) return; const h = src.held || {}, ly = (src.ry || 0) * (Settings.invertLook ? -1 : 1), k = (h.aimUp ? 1 : 0) - (h.aimDown ? 1 : 0) - (Math.abs(ly) > 0.15 ? ly : 0);
+  let a = p.brAp || 0; if (k) { a += k * BR_AIM.rate * dt; p.brAimT = 0; } else { p.brAimT = (p.brAimT || 0) + dt; if (p.brAimT > BR_AIM.idle) a -= Math.sign(a) * Math.min(Math.abs(a), BR_AIM.back * dt); }
+  p.brAp = Math.max(BR_AIM.min, Math.min(BR_AIM.max, a));
+}
+function brPitch(c) { return c.player && c.player.brAp !== undefined ? c.player.brAp : (c.gs && c.gs.ap) || 0; }
 const BR_GUNS = {
   pistol: { name: 'PISTOL', dmg: 12, cd: 0.32, spd: 24, life: 0.9, spread: 0.03, ammo: 24, range: 16, col: 0xbfc7d0 },
   smg: { name: 'SMG', dmg: 6, cd: 0.09, spd: 22, life: 0.7, spread: 0.1, ammo: 60, auto: 1, range: 12, col: 0x7dff6a },
@@ -129,7 +137,7 @@ MODES.br = {
   init(m) {
     const g = m.gs, M = this.map(m), sq = m.mini.squad || 1; g.map = m.mini.map; g.t = 0; g.L = []; g.lid = 0; g.dead = [];
     const order = m.chairs.slice().sort((a, b) => (b.player ? 1 : 0) - (a.player ? 1 : 0));   // people first, so friends on one screen share a team
-    order.forEach((c, i) => { c.gs = { team: Math.floor(i / sq), lv: 0, z: 0, ramp: -1, hp: BR.hp, sh: 0, inv: [], sel: 0, cd: 0, boost: 0, kills: 0, dmg: 0 }; });
+    order.forEach((c, i) => { c.gs = { team: Math.floor(i / sq), lv: 0, z: 0, ramp: -1, air: 0, vz: 0, ap: 0, hp: BR.hp, sh: 0, inv: [], sel: 0, cd: 0, boost: 0, kills: 0, dmg: 0 }; });
     g.teams = Math.ceil(m.chairs.length / sq);
     const R = Math.hypot(m.width, m.height) / 2 + 4; g.st = { x: m.width / 2, y: m.height / 2, r: R, fx: m.width / 2, fy: m.height / 2, fr: R, ph: 0, wait: 45, shrink: 0, sx: 0, sy: 0, sr: R };
     for (const [x, y, lv] of M.loot) this.drop(m, x, y, lv, Math.random() < 0.72 ? 'chest' : 'ammo');      // chests (guns) and ammo crates where the map puts loot
@@ -150,8 +158,35 @@ MODES.br = {
     const inF = (px, py) => M.floors.some(f => f.lv === lv && px >= f.x0 && px <= f.x1 && py >= f.y0 && py <= f.y1), inR = (px, py) => M.ramps.some(q => (q.lv === lv || q.lv + 1 === lv) && px >= q.x0 && px <= q.x1 && py >= q.y0 && py <= q.y1);
     if (!inF(x, y)) return false; for (const [px, py] of [[x - pad, y], [x + pad, y], [x, y - pad], [x, y + pad]]) if (!inF(px, py) && !inR(px, py)) return false; return true;
   },
-  move(m, c) {
+  jump(c, m) {                                                            // X: hop (off a roof, over a gap, to dodge)
+    const G = c.gs; if (c.out || G.air || !m || m.state !== 'play') return;
+    G.air = 1; G.vz = BR.jumpV; G.ramp = -1; m.sfx('bump');
+  },
+  floorAt(M, lv, x, y) { return lv === 0 || M.floors.some(f => f.lv === lv && x >= f.x0 && x <= f.x1 && y >= f.y0 && y <= f.y1); },
+  fly(m, c, h) {                                                          // in the air: gravity, walls at the height you are at, and land on whatever is below
+    const M = this.map(m), G = c.gs, R = R_CART(), K = CONFIG.chair, z0 = G.z; let z = z0 + G.vz * h; G.vz -= BR.grav * h;
+    const top = Math.max(0, ...M.floors.map(f => f.lv));
+    if (G.vz > 0) for (let k = 1; k <= top; k++) if (k * BR.H > z0 && z + BR.headroom > k * BR.H && this.floorAt(M, k, c.x, c.y)) { z = k * BR.H - BR.headroom; G.vz = 0; }   // bonk: the floor above
+    const lvNow = Math.max(0, Math.floor((z + 0.3) / BR.H));
+    for (const w of M.walls) if (w.lv === lvNow) MG.rectPush(c, R, w, K.boardBounce);
+    if (lvNow === 0 && z < 3) for (const t of M.trees) { const dx = c.x - t.x, dy = c.y - t.y, d = Math.hypot(dx, dy), mn = R + t.r; if (d < mn && d > 0) { c.x = t.x + dx / d * mn; c.y = t.y + dy / d * mn; } }
+    for (const q of M.ramps) {                                            // a ramp: land on its deck, or bump its side if you are below the deck
+      if (c.x < q.x0 || c.x > q.x1 || c.y < q.y0 || c.y > q.y1) continue; const t = this.ramp(q, c.x, c.y), sz = (q.lv + Math.max(0, Math.min(1, t))) * BR.H;
+      if (z <= sz && z0 >= sz - 0.6 && G.vz <= 0) { this.land(m, c, sz); G.ramp = q.id; G.lv = t >= 1 ? q.lv + 1 : q.lv; return; }
+      if (z < sz - 0.6) MG.rectPush(c, R, q, K.boardBounce);
+    }
+    if (G.vz <= 0) for (let k = Math.min(top, Math.floor(z0 / BR.H + 0.01)); k >= 0; k--) if (z <= k * BR.H && z0 >= k * BR.H - 0.05 && this.floorAt(M, k, c.x, c.y)) { this.land(m, c, k * BR.H); G.lv = k; return; }
+    if (c.x < R) c.x = R; if (c.y < R) c.y = R; if (c.x > m.width - R) c.x = m.width - R; if (c.y > m.height - R) c.y = m.height - R;
+    G.z = MG.r2(z); G.lv = Math.max(0, Math.floor((z + 0.05) / BR.H));
+  },
+  land(m, c, z) {
+    const G = c.gs, v = -G.vz; G.air = 0; G.vz = 0; G.z = MG.r2(z);
+    if (v > BR.fallSafe) { this.hurt(m, c, (v - BR.fallSafe) * BR.fallDmg, null, true); if (c.player) this.say(m, c, 'OOF'); }   // a long drop hurts a little
+    if (v > 3) m.sfx('bump');
+  },
+  move(m, c, h) {
     const M = this.map(m), G = c.gs, R = R_CART(), K = CONFIG.chair;
+    if (G.air) return this.fly(m, c, h || 1 / 120);
     let r = G.ramp >= 0 ? M.ramps[G.ramp] : null;
     if (!r) for (const q of M.ramps) { if (c.x < q.x0 || c.x > q.x1 || c.y < q.y0 || c.y > q.y1) continue; const t = this.ramp(q, c.x, c.y); if ((q.lv === G.lv && t < 0.3) || (q.lv + 1 === G.lv && t > 0.7)) { r = q; break; } }
     if (r) {                                                                // on a ramp: the side rails keep you on it; leave by either end
@@ -169,7 +204,8 @@ MODES.br = {
     }
     for (const o of MG.all(m, 'dwall')) if (o.lv === G.lv) for (const p of this.wallPosts(o)) { const dx = c.x - p.x, dy = c.y - p.y, d = Math.hypot(dx, dy), mn = R + 0.42; if (d < mn && d > 0) { c.x = p.x + dx / d * mn; c.y = p.y + dy / d * mn; } }
     if (G.lv === 0) { for (const t of M.trees) { const dx = c.x - t.x, dy = c.y - t.y, d = Math.hypot(dx, dy), mn = R + t.r; if (d < mn && d > 0) { c.x = t.x + dx / d * mn; c.y = t.y + dy / d * mn; const vn = (c.vx * dx + c.vy * dy) / d; if (vn < 0) { c.vx -= 1.4 * vn * dx / d; c.vy -= 1.4 * vn * dy / d; } } } }
-    else if (!this.onFloor(M, G.lv, c.x, c.y)) {                             // an upper level: railings at the edge of every floor
+    else if (c.player && !this.floorAt(M, G.lv, c.x, c.y) && !M.ramps.some(q => (q.lv === G.lv || q.lv + 1 === G.lv) && c.x >= q.x0 && c.x <= q.x1 && c.y >= q.y0 && c.y <= q.y1)) { G.air = 1; G.vz = 0; }   // people can drive off the edge (and drop)
+    else if (!c.player && !this.onFloor(M, G.lv, c.x, c.y)) {                // the CPU: railings at the edge of every floor (so it keeps to its route)
       if (this.onFloor(M, G.lv, c.x, c.py)) { c.y = c.py; c.vy = 0; } else if (this.onFloor(M, G.lv, c.px, c.y)) { c.x = c.px; c.vx = 0; } else { c.x = c.px; c.y = c.py; c.vx = c.vy = 0; }
     }
   },
@@ -180,10 +216,10 @@ MODES.br = {
     for (const c of m.chairs) {
       const G = c.gs; if (c.out) continue;
       G.cd = Math.max(0, G.cd - h); G.boost = Math.max(0, G.boost - h); G.hitT = Math.max(0, (G.hitT || 0) - h);
-      this.move(m, c);
+      this.move(m, c, h);
       const S = g.st; if (Math.hypot(c.x - S.x, c.y - S.y) > S.r && g.t > BR.grace) this.hurt(m, c, [1, 2, 4, 6, 8, 12, 20][Math.min(6, S.ph)] * h, null, true);   // outside the storm circle
       for (const L of g.L) {                                              // drive over loot to pick it up
-        if (L[4] !== G.lv || G.ramp >= 0 || Math.hypot(c.x - L[2], c.y - L[3]) > R_CART() + 0.4) continue;
+        if (L[4] !== G.lv || G.ramp >= 0 || G.air || Math.hypot(c.x - L[2], c.y - L[3]) > R_CART() + 0.4 || (L[7] === c.k && L[6] > g.t)) continue;   // (not what you just dropped)
         if (this.take(m, c, L)) { g.L = g.L.filter(x => x !== L); break; }
       }
     }
@@ -204,7 +240,7 @@ MODES.br = {
     const same = inv.find(it => it.k === k);
     if (BR_GUNS[k] && same) { if (same.a >= BR_GUNS[k].ammo * 2) return false; same.a = Math.min(BR_GUNS[k].ammo * 2, same.a + a); if (c.player) this.say(m, c, '+' + BR_GUNS[k].name + ' AMMO'); return true; }
     if (BR_ITEMS[k] && same && same.a < BR_ITEMS[k].stack) { same.a++; if (c.player) this.say(m, c, BR_ITEMS[k].name); return true; }
-    if (inv.length >= BR.slots) { if (c.player && !(G.fullAt > m.simTime)) { G.fullAt = m.simTime + 2; this.say(m, c, 'INVENTORY FULL (5)'); } return false; }
+    if (inv.length >= BR.slots) { if (c.player && !(G.fullAt > m.simTime)) { G.fullAt = m.simTime + 2; this.say(m, c, 'INVENTORY FULL: press B to drop something'); } return false; }
     inv.push({ k, a }); if (c.player) { m.sfx('select'); this.say(m, c, (BR_GUNS[k] || BR_ITEMS[k]).name); }
     if (!c.player) G.sel = this.bestSlot(c, 99);                         // the CPU holds its best gun
     return true;
@@ -218,26 +254,30 @@ MODES.br = {
     if (S.shrink <= 0) { S.ph++; S.wait = S.ph < PH.length ? PH[S.ph][0] : 0; }
   },
   bullet(m, o, h) {
-    const M = this.map(m), n = 4; let hit = false; const lv = Math.round(o.z / BR.H);
+    const M = this.map(m), n = 4; let hit = false, lv = 0; const top = Math.max(0, ...M.floors.map(f => f.lv));
     for (let s = 0; s < n && !hit; s++) {
-      o.x += o.vx * h / n; o.y += o.vy * h / n;
-      if (o.x < 0 || o.y < 0 || o.x > m.width || o.y > m.height) { hit = true; break; }
+      const hz0 = o.z + 0.55; o.x += o.vx * h / n; o.y += o.vy * h / n; o.z += (o.vz || 0) * h / n; const hz = o.z + 0.55; lv = Math.max(0, Math.floor(hz / BR.H));
+      if (o.x < 0 || o.y < 0 || o.x > m.width || o.y > m.height || hz < 0.02 || hz > (top + 2) * BR.H) { hit = true; break; }
+      if (o.vz) for (let k = 1; k <= top; k++) if ((hz0 - k * BR.H) * (hz - k * BR.H) < 0 && this.floorAt(M, k, o.x, o.y)) { hit = true; break; }   // a floor (or ceiling) stops it
+      if (hit) break;
       if (M.walls.some(w => w.lv === lv && o.x > w.x0 && o.x < w.x1 && o.y > w.y0 && o.y < w.y1) || (lv === 0 && M.trees.some(t => Math.hypot(o.x - t.x, o.y - t.y) < t.r))) { hit = true; break; }
       for (const w of MG.all(m, 'dwall')) if (w.lv === lv && this.wallPosts(w).some(p => Math.hypot(o.x - p.x, o.y - p.y) < 0.5)) { w.hp -= BR_GUNS[o.w].dmg * (o.w === 'rocket' ? 3 : 1); hit = true; break; }
       if (hit) break;
       const sh = m.chairs[o.k];
-      for (const c of m.chairs) { if (c === sh || c.out || (sh && c.gs.team === sh.gs.team) || Math.abs(c.gs.z - o.z) > 1.1) continue; if (Math.hypot(c.x - o.x, c.y - o.y) < R_CART() + 0.12) { if (o.w !== 'rocket') this.hurt(m, c, BR_GUNS[o.w].dmg, sh); hit = true; break; } }
+      for (const c of m.chairs) { if (c === sh || c.out || (sh && c.gs.team === sh.gs.team) || (o.z + 0.55) < c.gs.z - 0.1 || (o.z + 0.55) > c.gs.z + 1.3) continue; if (Math.hypot(c.x - o.x, c.y - o.y) < R_CART() + 0.12) { if (o.w !== 'rocket') this.hurt(m, c, BR_GUNS[o.w].dmg, sh); hit = true; break; } }
     }
     if (hit && o.w === 'rocket') { const G = BR_GUNS.rocket; MG.add(m, { t: 'boom', x: MG.r2(o.x), y: MG.r2(o.y), z: o.z, life: 0.7 }); m.sfx('goal'); for (const c of m.chairs) { if (c.out || Math.abs(c.gs.z - o.z) > 1.5) continue; const d = Math.hypot(c.x - o.x, c.y - o.y); if (d < G.splash) { const sh = m.chairs[o.k]; if (!(sh && c.gs.team === sh.gs.team && c !== sh)) this.hurt(m, c, G.dmg * (1 - d / G.splash * 0.6) * (c === sh ? 0.4 : 1), sh); const k = 5 * (1 - d / G.splash); c.vx += (c.x - o.x) / (d || 1) * k; c.vy += (c.y - o.y) / (d || 1) * k; } } }
-    if (hit || m.gs.t > o.until) MG.remove(m, o); else { o.x = MG.r2(o.x); o.y = MG.r2(o.y); }
+    if (hit || m.gs.t > o.until) MG.remove(m, o); else { o.x = MG.r2(o.x); o.y = MG.r2(o.y); o.z = Math.round(o.z * 1000) / 1000; }
   },
   hurt(m, c, dmg, by, storm) {
     const G = c.gs; if (c.out || (!storm && m.gs.t < BR.grace)) return;
-    if (!storm) { const s = Math.min(G.sh, dmg); G.sh -= s; dmg -= s; } G.hp -= dmg; G.hitT = 0.25; if (by && by !== c) by.gs.dmg += dmg;
+    if (!storm) { const s = Math.min(G.sh, dmg); G.sh -= s; dmg -= s; } G.hp -= dmg; G.hitT = 0.25; if (by && by !== c) { by.gs.dmg += dmg; by.gs.hm = MG.r2(m.gs.t); }
     G.sh = Math.round(G.sh * 10) / 10; G.hp = Math.round(G.hp * 10) / 10;
     if (G.hp > 0) return;
     MH.out(m, c); G.hp = 0; m.gs.dead.push(c.k); m.sfx('foul');                 // eliminated: drop everything
     G.inv.forEach((it, i) => this.drop(m, c.x + Math.cos(i * 1.3) * 0.9, c.y + Math.sin(i * 1.3) * 0.9, G.lv, it.k, it.a)); G.inv = [];
+    const feed = m.gs.feed || (m.gs.feed = []); feed.push([by && by !== c ? m.name(by) : '', m.name(c), by && by !== c && by.gs.inv[by.gs.sel] ? by.gs.inv[by.gs.sel].k : 'storm', MG.r2(m.gs.t), by ? by.gs.team : -1, c.gs.team]); if (feed.length > 5) feed.shift();
+    c.gs.by = by && by !== c ? by.k : -1;
     if (by && by !== c) { by.gs.kills++; MG.notice(m, `${MG.up(m.name(by))} ELIMINATED ${MG.up(m.name(c))}`, 2); if (Math.random() < 0.4) m.line(`${m.name(c)} is out. ${m.name(by)} gets the elimination.`); }
     else MG.notice(m, `${MG.up(m.name(c))} WAS CAUGHT IN THE STORM`, 2);
     const alive = new Set(MG.live(m).map(o => o.gs.team));
@@ -257,8 +297,8 @@ MODES.br = {
     const gun = BR_GUNS[it.k];
     if (gun) {
       if (it.a <= 0) { G.cd = 0.4; if (c.player) { m.sfx('back'); this.say(m, c, 'OUT OF AMMO'); } return; }
-      it.a--; G.cd = gun.cd; const f = c.toWorld(0.8, 0), err = c.player ? 0 : (Math.random() - 0.5) * (0.08 + ((m.difficulty || {}).reaction || 0.2) * 0.6);
-      for (let p = 0; p < (gun.pellets || 1); p++) { const a = c.heading + err + (Math.random() - 0.5) * gun.spread * (gun.pellets ? 1 : 1.4); MG.add(m, { t: 'bul', w: it.k, k: c.k, x: MG.r2(f.x), y: MG.r2(f.y), z: G.z, vx: MG.r2(Math.cos(a) * gun.spd + c.vx * 0.3), vy: MG.r2(Math.sin(a) * gun.spd + c.vy * 0.3), until: MG.r2(m.gs.t + gun.life) }); }
+      it.a--; G.cd = gun.cd; const f = c.toWorld(0.8, 0), err = c.player ? 0 : (Math.random() - 0.5) * (0.08 + ((m.difficulty || {}).reaction || 0.2) * 0.6), aim = this.aim(c, m, gun), pitch = this.aimP, cp = Math.cos(pitch), vz = Math.round(Math.sin(pitch) * gun.spd * 1000) / 1000;
+      for (let p = 0; p < (gun.pellets || 1); p++) { const a = aim + err + (Math.random() - 0.5) * gun.spread * (gun.pellets ? 1 : 1.4); MG.add(m, { t: 'bul', w: it.k, k: c.k, x: MG.r2(f.x), y: MG.r2(f.y), z: G.z, vx: MG.r2(Math.cos(a) * gun.spd * cp + c.vx * 0.3), vy: MG.r2(Math.sin(a) * gun.spd * cp + c.vy * 0.3), vz, until: MG.r2(m.gs.t + gun.life) }); }
       m.sfx(it.k === 'rocket' || it.k === 'sniper' || it.k === 'shotgun' ? 'bump' : 'blip'); return;
     }
     const I = it.k;                                                       // items
@@ -268,7 +308,26 @@ MODES.br = {
     else if (I === 'wall') { const p = c.toWorld(1.6, 0); MG.add(m, { t: 'dwall', x: MG.r2(p.x), y: MG.r2(p.y), a: MG.r2(c.heading), lv: G.lv, z: G.z, hp: 150, until: m.gs.t + 25 }); }
     m.sfx('select'); G.cd = 0.8; it.a--; if (it.a <= 0) { G.inv.splice(G.sel, 1); G.sel = Math.max(0, Math.min(G.sel, G.inv.length - 1)); }
   },
-  cmd(c, cmd, m) { if (c.gs.boost > 0) c.speedMul *= 1.75; return cmd; },
+  cmd(c, cmd, m) { if (c.player && c.player.invOpen) return { x: 0, y: 0, spin: 0, speed: 0 }; if (c.gs.boost > 0) c.speedMul *= 1.75; return cmd; },   // (the inventory is open: the cart coasts to a stop)
+  aim(c, m, gun) {                                                        // where a shot goes: your heading turned by the right stick, tilted up or down (this.aimP), with a little aim assist for people
+    const G = c.gs, L = this.map(m); let a = c.heading + (c.player && c.player._look ? c.player._look.x * CONFIG.view3d.look.yaw * Math.PI / 180 : 0), p = brPitch(c);
+    let best = null, bo = c.player ? 0.16 : 0.45;
+    for (const o of MG.live(m)) {
+      if (o.gs.team === G.team) continue; const d = MH.dist(c, o); if (d > gun.range * 1.3 || d < 0.3) continue;
+      const lead = d / gun.spd, oa = Math.atan2(o.y + (o.vy || 0) * lead - c.y, o.x + (o.vx || 0) * lead - c.x), op = Math.atan2(o.gs.z - G.z + 0.25, d), off = Math.abs(normalizeAngle(oa - a));
+      if (off > bo || (c.player && Math.abs(op - p) > 0.28)) continue;
+      if (o.gs.lv === G.lv && !MG.clearPath(c.x, c.y, o.x, o.y, L.walls.filter(w => w.lv === G.lv), 0.05)) continue;
+      bo = off; best = { a: oa, p: op };
+    }
+    if (!c.player) { this.aimP = best ? best.p : 0; return a; }               // the CPU: its own heading, tilted at whoever it is facing
+    this.aimP = best ? best.p : p; return best ? best.a : a;
+  },
+  invAct(c, act, m) {                                                        // the inventory screen (B): swap two slots, hold one, drop one
+    const G = c.gs, inv = G.inv; if (c.out || !act || !m) return; const { op, a, b } = act;
+    if (op === 'swap' && inv[a] && b >= 0 && b < BR.slots) { const held = inv[G.sel]; if (b >= inv.length) { inv.push(inv.splice(a, 1)[0]); } else [inv[a], inv[b]] = [inv[b], inv[a]]; G.sel = Math.max(0, inv.indexOf(held)); }
+    else if (op === 'sel' && inv[a]) G.sel = a;
+    else if (op === 'drop' && inv[a]) { const it = inv.splice(a, 1)[0], q = c.toWorld(-1.3, 0), g = m.gs; this.drop(m, q.x, q.y, G.lv, it.k, it.a); const L = g.L[g.L.length - 1]; L[6] = MG.r2(g.t + 2.5); L[7] = c.k; G.sel = Math.max(0, Math.min(G.sel > a ? G.sel - 1 : G.sel, inv.length - 1)); m.sfx('back'); }
+  },
   bestSlot(c, d) { const inv = c.gs.inv; let best = -1, bs = -1; inv.forEach((it, i) => { const g = BR_GUNS[it.k]; if (!g || it.a <= 0) return; const s = (d <= g.range ? 10 : 2) + g.dmg * (g.pellets || 1) / g.cd / 20 - Math.max(0, d - g.range) * 0.5; if (s > bs) { bs = s; best = i; } }); return best < 0 ? c.gs.sel : best; },
   /* The CPU: a route over every level (A* on a 1.2 m grid per level, with the ramps as links between levels). */
   nav(m) {
@@ -329,7 +388,7 @@ MODES.br = {
     const armed = G.inv.some(it => BR_GUNS[it.k] && it.a > 0 && it.k !== 'pistol');
     if (inStorm || (Math.hypot(c.x - S.x, c.y - S.y) > S.r * 0.85 && S.shrink > 0) || (S.shrink > 0 && Math.hypot(c.x - S.fx, c.y - S.fy) > S.fr * 0.9)) { goal = safe; gl = 0; }   // head for the next circle while the storm moves
     if (!goal || !inStorm) { let best = null, bd = armed ? 24 : 60; for (const L of g.L) { if (Math.hypot(L[2] - S.x, L[3] - S.y) > S.r - 2) continue; const anyGun = G.inv.some(i => BR_GUNS[i.k]), lowAmmo = G.inv.some(i => BR_GUNS[i.k] && i.a < BR_GUNS[i.k].ammo * 0.4); const want = L[1] === 'chest' ? (anyGun ? (G.inv.length < BR.slots ? 1.2 : 0) : 5) : L[1] === 'ammo' ? (lowAmmo ? 3 : 0) : L[1] === 'med' && G.hp < 70 ? 3 : BR_GUNS[L[1]] ? (G.inv.some(i => i.k === L[1]) ? 0.3 : G.inv.length < BR.slots ? 2 : 0) : (G.inv.length < BR.slots || G.inv.some(i => i.k === L[1] && i.a < BR_ITEMS[L[1]].stack)) ? 1 : 0; if (!want) continue; const d = Math.hypot(L[2] - c.x, L[3] - c.y) + Math.abs(L[4] - G.lv) * 2 - want * 3 - (L[4] > 0 ? 5 : 0); if (d < bd) { bd = d; best = L; } } if (best) { goal = { x: best[2], y: best[3] }; gl = best[4]; } }
-    if (!goal) { const t = MG.live(m).filter(o => o.gs.team !== G.team).sort((a, b) => MH.dist(c, a) - MH.dist(c, b))[0]; if (t && armed && (S.ph >= 1 || G.inv.length >= 3)) { goal = t; gl = t.gs.lv; } else if (!G.camp || m.simTime > G.camp.until) { const f = this.map(m).floors.filter(f => Math.hypot((f.x0 + f.x1) / 2 - S.x, (f.y0 + f.y1) / 2 - S.y) < S.r * 0.8); const h = f[Math.floor(Math.random() * f.length)]; G.camp = h && Math.random() < 0.6 ? { x: (h.x0 + h.x1) / 2, y: (h.y0 + h.y1) / 2, lv: h.lv, until: m.simTime + 20 } : { x: safe.x, y: safe.y, lv: 0, until: m.simTime + 10 }; } if (!goal) { goal = G.camp; gl = G.camp.lv; } }   // early on: loot, or take the high ground
+    if (!goal) { const t = MG.live(m).filter(o => o.gs.team !== G.team).sort((a, b) => MH.dist(c, a) - MH.dist(c, b))[0]; if (t && G.inv.some(it => BR_GUNS[it.k] && it.a > 0) && (g.t > 35 || S.ph >= 1 || G.inv.length >= 2)) { goal = t; gl = t.gs.lv; } else if (!G.camp || m.simTime > G.camp.until) { const f = this.map(m).floors.filter(f => Math.hypot((f.x0 + f.x1) / 2 - S.x, (f.y0 + f.y1) / 2 - S.y) < S.r * 0.8); const h = f[Math.floor(Math.random() * f.length)]; G.camp = h && Math.random() < 0.6 ? { x: (h.x0 + h.x1) / 2, y: (h.y0 + h.y1) / 2, lv: h.lv, until: m.simTime + 20 } : { x: safe.x, y: safe.y, lv: 0, until: m.simTime + 10 }; } if (!goal) { goal = G.camp; gl = G.camp.lv; } }   // early on: loot, or take the high ground
     if (c.goTo) { goal = c.goTo; gl = c.goTo.lv; }                       // (a fixed destination: tests and demos)
     if (G.boost <= 0 && Math.hypot(goal.x - c.x, goal.y - c.y) > 18 && G.inv.some(x => x.k === 'boost') && G.cd <= 0 && G.ramp < 0) { const prev = G.sel; G.sel = G.inv.findIndex(x => x.k === 'boost'); c.wantUse = true; G.selBack = prev; }
     const Nv = c.brNav || (c.brNav = {}), key = Math.round(goal.x) + ',' + Math.round(goal.y) + ',' + gl;
@@ -361,18 +420,18 @@ MODES.br = {
   itemLine(c, m) {
     const G = c.gs; if (c.out) return 'ELIMINATED: spectating';
     const inv = G.inv.map((it, i) => { const g = BR_GUNS[it.k], I = BR_ITEMS[it.k], txt = g ? `${g.name} ${it.a}` : `${I.icon}${I.name} x${it.a}`; return i === G.sel ? `[${txt}]` : txt; }).join('  ');
-    return `❤ ${Math.ceil(G.hp)}  🛡 ${Math.ceil(G.sh)}${G.boost > 0 ? '  🚀' : ''}     ${inv || '(empty: drive over loot)'}     Y: switch  A: use`;
+    return `❤ ${Math.ceil(G.hp)}  🛡 ${Math.ceil(G.sh)}${G.boost > 0 ? '  🚀' : ''}     ${inv || '(empty: drive over loot)'}     A: use  Y: switch  X: jump  B: bag`;
   },
   startLine: () => 'Drop in! Grab a gun and stay inside the circle.'
 };
-{ const P = MiniMatch.prototype, sw = P.switchChair; P.switchChair = function (p) { const M = modeOf(this); if (M && M.cycle && p && p.chair) return M.cycle(p.chair, this); return sw.call(this, p); }; }
+{ const P = MiniMatch.prototype, sw = P.switchChair; P.switchChair = function (p) { const M = modeOf(this); if (p && p.invOpen) return; if (M && M.cycle && p && p.chair) return M.cycle(p.chair, this); return sw.call(this, p); }; }
 
 GAME_INFO.br = { name: 'Battle Royale', cat: 'sneaky', noCarts: true, blurb: 'Loot guns and items, stay in the circle, be the last team standing. Five big maps with buildings, garages and ramps.', noItems: true, noClockOpt: true,
   court: mini => (BR_MAPS[mini && mini.map] || BR_MAPS.downtown).size, label: cfg => `${(BR_MAPS[cfg.map] || BR_MAPS.downtown).name}, ${['solo', 'duos', 'trios'][(cfg.squad || 1) - 1]}`,
   goal: 'Be the last cart (or team) left alive.',
   rules: ['You start with nothing. Drive into a CHEST to burst it open: it holds a gun (pistol, SMG, shotgun, rifle, sniper or rockets) and often an item. AMMO CRATES refill the guns you have. Medkits, shield potions, boosts and shield walls lie around the map.', 'You carry up to 5 things. Y switches between them; A uses the one you hold (hold A for automatic guns).',
     'You have 100 health and up to 100 shield (shield takes damage first). Medkits heal, shield potions top up your shield.', 'BOOST: a few seconds of extra speed. SHIELD WALL: drops a wall in front of you that stops bullets (and carts).',
-    'Buildings have doors; ramps lead up into garages, onto roofs and up the jungle tree. You only hit carts on your own level.', 'The STORM closes in: outside the circle you lose health, faster and faster. Last cart or team standing wins.'],
-  controls: [CTRL.drive, 'Use / fire: A or X  /  Space or X  /  Right Shift or \\  /  touch A  (hold for automatic guns)', 'Switch item: Y  /  F  /  /  /  touch Y', CTRL.spin, CTRL.pause],
+    'Buildings have doors; ramps lead up into garages, onto roofs and up the jungle tree. JUMP with X, and drive (or jump) off any ledge to drop down: a long fall costs a little health. Tilt your gun up or down to shoot at carts above or below you (floors stop bullets).', 'B opens your bag: move and swap your things, pick what to hold, or drop something on the ground.', 'The STORM closes in: outside the circle you lose health, faster and faster. Last cart or team standing wins.'],
+  controls: [CTRL.drive, 'Use / fire: A  /  Space  /  Right Shift  /  touch A  (hold for automatic guns)', 'Jump: X  /  X  /  \\  /  touch X', 'Aim up and down: right stick  /  I and K  /  Page Up and Page Down', 'Bag (inventory): B  /  Backspace  /  Right Ctrl  /  touch B', 'Switch item: Y  /  F  /  /  /  touch Y', CTRL.spin, CTRL.pause],
   opts: [{ key: 'map', label: 'Map', values: ['downtown', 'jungle', 'port', 'suburbs', 'canyon'], names: ['Downtown', 'The Jungle', 'The Port', 'The Suburbs', 'The Canyon'], def: 'downtown', hint: () => (BR_MAPS[modeOpts('br').map] || BR_MAPS.downtown).blurb },
     { key: 'squad', label: 'Teams', values: [1, 2, 3], names: ['Solo', 'Duos (teams of 2)', 'Trios (teams of 3)'], def: 1 }, { key: 'carts', label: 'Carts', values: [6, 8, 10, 12], def: 10, hint: 'Carts nobody drives are played by the CPU.' }] };

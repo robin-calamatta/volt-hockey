@@ -3,6 +3,27 @@
 const BR_COLS = { wall: 0xb8b2a6, bldg: 0xc9c1b1, mall: 0xe0dbd0, warehouse: 0x8a8f96, house: 0xd8c3a5, hut: 0x8b6a45, column: 0x9aa0a6, trunk: 0x6b4a2b, cliff: 0xa8643a, crate: 0x9a6b3a, container: 0xc0392b, rock: 0x8a8f94, log: 0x6b4a2b };
 const BR_FLOORS = { garage: 0x8e949b, roof: 0x6f757c, canopy: 0x4f8a3a, wood: 0x8b5a2b, rock: 0xb8774a, stone: 0xa89f8f, bridge: 0x5f6a75, mall: 0xd9d4c7, container: 0x2f6f8f, concrete: 0x8e949b, metal: 0x6f7f8f };
 const BR_WALLH = { crate: 1.3, container: 2.5, rock: 1.6, log: 0.7, column: BR.H - 0.05 };
+function brRectMinus(f, holes) {                                         // a rectangle with rectangular holes, as a few rectangles
+  let parts = [{ x0: f.x0, y0: f.y0, x1: f.x1, y1: f.y1 }];
+  for (const h of holes) { const next = []; for (const p of parts) { if (h.x1 <= p.x0 || h.x0 >= p.x1 || h.y1 <= p.y0 || h.y0 >= p.y1) { next.push(p); continue; }
+      if (h.y0 > p.y0) next.push({ x0: p.x0, y0: p.y0, x1: p.x1, y1: h.y0 }); if (h.y1 < p.y1) next.push({ x0: p.x0, y0: h.y1, x1: p.x1, y1: p.y1 });
+      const y0 = Math.max(p.y0, h.y0), y1 = Math.min(p.y1, h.y1); if (h.x0 > p.x0) next.push({ x0: p.x0, y0, x1: h.x0, y1 }); if (h.x1 < p.x1) next.push({ x0: h.x1, y0, x1: p.x1, y1 }); } parts = next; }
+  return parts.filter(p => p.x1 - p.x0 > 0.05 && p.y1 - p.y0 > 0.05);
+}
+function brWorldUV(geo, scale) {                                          // texture co-ordinates from world position: every wall shows its surface at the same size
+  const g = geo.index ? geo.toNonIndexed() : geo; g.computeVertexNormals(); const p = g.attributes.position, n = g.attributes.normal, uv = [];
+  for (let i = 0; i < p.count; i++) { const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i)); if (ay >= ax && ay >= az) uv.push(p.getX(i) / scale, p.getZ(i) / scale); else if (ax >= az) uv.push(p.getZ(i) / scale, p.getY(i) / scale); else uv.push(p.getX(i) / scale, p.getY(i) / scale); }
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return g;
+}
+const BR_SURFACES = {};
+function brSurface(col) {                                                 // a material for a wall / floor colour: a real surface texture tinted to that colour
+  if (BR_SURFACES[col]) return BR_SURFACES[col];
+  const kind = col === 0x9a6b3a || col === 0x8b6a45 || col === 0x6b4a2b || col === 0x8b5a2b || col === 0xc9a26b ? 'dirt' : col === 0x4f8a3a ? 'jungle' : col === 0xa8643a || col === 0xb8774a ? 'dirt' : 'concrete';
+  const t = Look.tex(kind).clone(); t.needsUpdate = true; t.repeat.set(1, 1); const c = new THREE.Color(col), base = new THREE.Color(kind === 'concrete' ? 0x9c9b96 : kind === 'jungle' ? 0x3d6630 : 0xa8764a);
+  c.r = Math.min(2, c.r / base.r); c.g = Math.min(2, c.g / base.g); c.b = Math.min(2, c.b / base.b);
+  const metal = col === 0xc0392b || col === 0x8a8f96 || col === 0x5f6a75 || col === 0x2f6f8f || col === 0x6f7f8f;
+  return (BR_SURFACES[col] = new THREE.MeshStandardMaterial({ map: t, color: c, roughness: metal ? 0.5 : 0.88, metalness: metal ? 0.35 : 0, bumpMap: Look.grain(), bumpScale: 0.03 }));
+}
 Object.assign(View3D.prototype, {
   buildBRWorld() {
     const m = this.m, M = MODES.br.map(m), T = M.theme, H = BR.H, W = m.width, D = m.height;
@@ -13,11 +34,11 @@ Object.assign(View3D.prototype, {
     const ground = new THREE.Mesh(G3.layFlat(new THREE.PlaneGeometry(W + 160, D + 160)), new THREE.MeshStandardMaterial({ map: gt, roughness: 0.95 })); ground.position.set(W / 2, -0.01, D / 2); ground.receiveShadow = true; g.add(ground);
     for (const [x0, y0, x1, y1] of [[-0.4, -0.4, W + 0.4, 0], [-0.4, D, W + 0.4, D + 0.4], [-0.4, 0, 0, D], [W, 0, W + 0.4, D]]) put(0x5a5f66, new THREE.BoxGeometry(x1 - x0, 1.2, y1 - y0).translate((x0 + x1) / 2, 0.6, (y0 + y1) / 2));   // the fence round the map
     for (const w of M.walls) { const h = w.h || BR_WALLH[w.kind] || H; put(BR_COLS[w.kind] || 0xb8b2a6, new THREE.BoxGeometry(w.x1 - w.x0, h, w.y1 - w.y0).translate((w.x0 + w.x1) / 2, w.lv * H + h / 2, (w.y0 + w.y1) / 2)); }
-    for (const f of M.floors) { put(BR_FLOORS[f.kind] || 0x8e949b, new THREE.BoxGeometry(f.x1 - f.x0, 0.22, f.y1 - f.y0).translate((f.x0 + f.x1) / 2, f.lv * H - 0.11, (f.y0 + f.y1) / 2));
+    for (const f of M.floors) { for (const q of brRectMinus(f, M.ramps.filter(r => r.lv + 1 === f.lv).map(r => ({ x0: r.x0 - 0.05, y0: r.y0 - 0.05, x1: r.x1 + 0.05, y1: r.y1 + 0.05 })))) put(BR_FLOORS[f.kind] || 0x8e949b, new THREE.BoxGeometry(q.x1 - q.x0, 0.22, q.y1 - q.y0).translate((q.x0 + q.x1) / 2, f.lv * H - 0.11, (q.y0 + q.y1) / 2));
       for (const [ax, ay, bx, by] of [[f.x0, f.y0, f.x1, f.y0], [f.x0, f.y1, f.x1, f.y1], [f.x0, f.y0, f.x0, f.y1], [f.x1, f.y0, f.x1, f.y1]]) put(0xf2c200, new THREE.BoxGeometry(Math.max(0.12, bx - ax), 0.03, Math.max(0.12, by - ay)).translate((ax + bx) / 2, f.lv * H + 0.01, (ay + by) / 2)); }   // a yellow edge line: the railing is there
     for (const r of M.ramps) {                                             // ramps: a sloping deck with rails
       const along = r.dir % 2 === 0, L = along ? r.x1 - r.x0 : r.y1 - r.y0, w = along ? r.y1 - r.y0 : r.x1 - r.x0, len = Math.hypot(L, H), tilt = Math.atan2(H, L), grp = new THREE.Group();
-      const deck = new THREE.Mesh(new THREE.BoxGeometry(len, 0.2, w), this.mat(BR_FLOORS[r.kind] || 0x8e949b, { rough: 0.8 })); deck.rotation.z = tilt; deck.castShadow = deck.receiveShadow = true; grp.add(deck);
+      const deck = new THREE.Mesh(brWorldUV(new THREE.BoxGeometry(len, 0.2, w), 3), brSurface(BR_FLOORS[r.kind] || 0x8e949b)); deck.rotation.z = tilt; deck.castShadow = deck.receiveShadow = true; grp.add(deck);
       for (const sd of [-1, 1]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.35, 0.1), this.mat(0xf2c200, { rough: 0.5 })); rail.rotation.z = tilt; rail.position.set(0, 0.25, sd * (w / 2 - 0.05)); grp.add(rail); }
       grp.position.set((r.x0 + r.x1) / 2, r.lv * H + H / 2 - 0.05, (r.y0 + r.y1) / 2); grp.rotation.y = -[0, Math.PI / 2, Math.PI, -Math.PI / 2][r.dir]; g.add(grp);
     }
@@ -28,7 +49,7 @@ Object.assign(View3D.prototype, {
       }
       if (d.t === 'garage') { const cv = G3.canvas(64, 64), c = cv.getContext('2d'); c.fillStyle = '#1f4fa8'; c.fillRect(0, 0, 64, 64); c.fillStyle = '#fff'; c.font = '900 50px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('P', 32, 35); const tx = new THREE.CanvasTexture(cv); tx.encoding = THREE.sRGBEncoding; const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), new THREE.MeshBasicMaterial({ map: tx, side: THREE.DoubleSide })); sign.position.set(d.x + d.w / 2, d.levels * H + 1.6, d.y + d.h + 0.3); g.add(sign); }
     }
-    for (const [col, geos] of byCol) { const mesh = new THREE.Mesh(G3.merge(geos), this.mat(col, { rough: 0.85 })); mesh.castShadow = mesh.receiveShadow = true; g.add(mesh); }
+    for (const [col, geos] of byCol) { const mesh = new THREE.Mesh(brWorldUV(G3.merge(geos), 3), brSurface(col)); mesh.castShadow = mesh.receiveShadow = true; g.add(mesh); }
     if (M.trees.length) {                                                  // the forest: one instanced trunk and canopy each
       const n = M.trees.length, trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1.15, 1, 7), this.mat(0x6b4a2b), n), leaves = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), this.mat(0x2f6b2a, { rough: 0.9 }), n), X = new THREE.Matrix4(), q = new THREE.Quaternion();
       M.trees.forEach((t, i) => { const h = 4 + (i % 5) * 0.6; trunk.setMatrixAt(i, X.compose(new THREE.Vector3(t.x, h / 2, t.y), q, new THREE.Vector3(t.r, h, t.r))); leaves.setMatrixAt(i, X.compose(new THREE.Vector3(t.x, h + 1, t.y), q.setFromAxisAngle(V3UP, i), new THREE.Vector3(2 + t.r * 1.5, 1.8 + t.r, 2 + t.r * 1.5))); });
@@ -83,6 +104,9 @@ Object.assign(View3D.prototype, {
       c.position.set(st.bx, 16 + z, st.by + 13); c.lookAt(st.bx, z, st.by - 1); c.fov = 50; c.updateProjectionMatrix(); c.updateMatrixWorld(); return c;
     }
     const ch = vp.chair, z = ch && ch.gs && ch.gs.z; if (z && vp.mode !== 'broadcast') { c.position.y += z; c.updateMatrixWorld(); }   // your camera rides up the ramps with you
+    if (m.kind === 'br' && ch && !vp.spect && (vp.mode === 'first' || vp.mode === 'third')) {        // Battle Royale: the view tilts with your gun
+      const pt = (vp.mode === 'first' ? 0.3 + brPitch(ch) : brPitch(ch) * 0.6); if (pt) { const d = new THREE.Vector3(); c.getWorldDirection(d); const yaw = Math.atan2(d.z, d.x), p0 = Math.asin(Math.max(-1, Math.min(1, d.y))), np = Math.max(-1.2, Math.min(1.2, p0 + pt)); c.lookAt(c.position.x + Math.cos(yaw) * Math.cos(np), c.position.y + Math.sin(np), c.position.z + Math.sin(yaw) * Math.cos(np)); c.updateMatrixWorld(); }
+    }
     return c;
   };
   P.modeMake = function (o) {
@@ -91,7 +115,7 @@ Object.assign(View3D.prototype, {
     return make.call(this, o);
   };
   P.modePlace = function (mesh, o, t) {
-    if (o.t === 'bul') { mesh.position.set(o.x, (o.z || 0) + 0.55, o.y); mesh.rotation.y = -Math.atan2(o.vy, o.vx); return; }
+    if (o.t === 'bul') { mesh.position.set(o.x, (o.z || 0) + 0.55, o.y); mesh.rotation.order = 'YZX'; mesh.rotation.y = -Math.atan2(o.vy, o.vx); mesh.rotation.z = Math.atan2(o.vz || 0, Math.hypot(o.vx, o.vy)); return; }
     if (o.t === 'dwall') { mesh.position.set(o.x, o.z || 0, o.y); mesh.rotation.y = -o.a; mesh.children[0].material.opacity = 0.3 + 0.3 * Math.max(0, o.hp) / 150; return; }
     place.call(this, mesh, o, t); if (o.t === 'boom' && o.z) mesh.position.y += o.z;
   };
@@ -152,9 +176,9 @@ Object.assign(GameScene.prototype, {
     const H = this.brH, all = [H.g, H.hp, H.name, ...H.slots.flatMap(s => [s.img, s.txt, s.key])];
     if (!show) { all.forEach(o => o.setVisible(false)); return false; }
     all.forEach(o => o.setVisible(true));
-    const V = CONFIG.view, G = c.gs, sw = 96, sh = 62, gap = 8, x0 = V.width / 2 - (BR.slots * sw + (BR.slots - 1) * gap) / 2, y0 = V.height - 74, g = H.g; g.clear();
-    const bw = 300, bx = V.width / 2 - bw / 2, by = y0 - 26;                 // health (green to red) and shield (blue) bars
-    g.fillStyle(0x0d151b, 0.75).fillRoundedRect(bx - 6, by - 20, bw + 12, 34, 6);
+    const V = CONFIG.view, G = c.gs, sw = 96, sh = 62, gap = 8, bwid = BR.slots * sw + (BR.slots - 1) * gap, x0 = V.width - 16 - bwid, y0 = V.height - 74, g = H.g; g.clear();   // the inventory: bottom right
+    const bw = 260, bx = 16, by = V.height - 24;                              // health (green to red) and shield (blue) bars: bottom left, under the speed meter
+    g.fillStyle(0x0d151b, 0.75).fillRoundedRect(bx - 6, by - 20, bw + 100, 34, 6);
     g.fillStyle(0x223040, 1).fillRect(bx, by - 14, bw, 9).fillStyle(0x3d8bff, 1).fillRect(bx, by - 14, bw * Math.max(0, G.sh) / BR.maxShield, 9);
     const hpk = Math.max(0, G.hp) / BR.hp; g.fillStyle(0x3a2025, 1).fillRect(bx, by - 2, bw, 11).fillStyle(hpk > 0.5 ? 0x5ad45a : hpk > 0.25 ? 0xffc23d : 0xff4d4d, 1).fillRect(bx, by - 2, bw * hpk, 11);
     H.hp.setText(`${Math.ceil(G.hp)}  |  ${Math.ceil(G.sh)}${G.boost > 0 ? '   🚀' : ''}`).setPosition(bx + bw + 14, by - 4);
@@ -166,8 +190,95 @@ Object.assign(GameScene.prototype, {
       s.img.setTexture(this.brIcon(it.k)).setDisplaySize(84, 47).setPosition(x + sw / 2, y0 + sh / 2 - 3).setAlpha(BR_GUNS[it.k] && it.a <= 0 ? 0.35 : 1);
       s.txt.setText(BR_GUNS[it.k] ? String(it.a) : 'x' + it.a).setColor(BR_GUNS[it.k] && it.a <= 0 ? '#ff6b6b' : '#ffffff').setPosition(x + sw - 6, y0 + sh - 3);
     }
-    const it = G.inv[G.sel]; H.name.setText(it ? `${(BR_GUNS[it.k] || BR_ITEMS[it.k]).name}      Y: switch   A: ${BR_GUNS[it.k] ? 'fire' : 'use'}` : 'Empty-handed: drive into a CHEST for a gun').setPosition(V.width / 2, by - 34);
+    const it = G.inv[G.sel]; H.name.setText(it ? `${(BR_GUNS[it.k] || BR_ITEMS[it.k]).name}      A: ${BR_GUNS[it.k] ? 'fire' : 'use'}   Y: switch   X: jump   B: bag` : 'Empty-handed: drive into a CHEST for a gun').setPosition(x0 + bwid / 2, y0 - 16);
     return true;
   }
 });
 { const P = GameScene.prototype, hud = P.updateMiniHud; P.updateMiniHud = function (m) { hud.call(this, m); if (m.kind === 'br' && this.brHud(m) && this.itemText) this.itemText.setVisible(false); }; }
+
+/* ===== v11.2: crosshair, hit markers, damage flash, kill feed, spectating, the storm on the minimap, and the inventory screen (B) ===== */
+Object.assign(GameScene.prototype, {
+  brExtras(m) {
+    const V = CONFIG.view, g = m.gs, mine = (this.setup.players || []).filter(p => !p.remote && p.chair), p0 = mine[0] || (this.online ? { chair: this.brMyChair() } : null), c = p0 && p0.chair;
+    if (!this.brX || !this.brX.g.scene) this.brX = { g: this.add.graphics().setDepth(29), feed: Array.from({ length: 5 }, () => this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '15px', fontStyle: 'bold', color: '#ffffff', backgroundColor: '#0d151bb0', padding: { x: 6, y: 2 } }).setOrigin(1, 0).setDepth(31)), spec: this.add.text(V.width / 2, 108, '', { fontFamily: FONT, fontSize: '20px', fontStyle: 'bold', color: '#ffd23f', backgroundColor: '#0d151bc0', padding: { x: 10, y: 4 } }).setOrigin(0.5).setDepth(31) };
+    const X = this.brX, G2 = X.g; G2.clear();
+    const feed = (g.feed || []).filter(f => g.t - f[3] < 7);                 // the kill feed, under the minimap
+    X.feed.forEach((t, i) => { const f = feed[feed.length - 1 - i]; if (!f) return t.setVisible(false); const gun = BR_GUNS[f[2]]; t.setText(f[0] ? `${f[0]}  [${gun ? gun.name : '?'}]  ${f[1]}` : `${f[1]}  was caught in the storm`).setPosition(V.width - 10, 112 + i * 24).setColor(c && (f[4] === c.gs.team) ? '#7dff6a' : c && f[5] === c.gs.team ? '#ff6b6b' : '#ffffff').setVisible(true); });
+    const vp = this.vps && this.vps.length === 1 ? this.vps[0] : null;
+    if (c && c.out) { const s = vp && vp.spect; X.spec.setText(s ? `ELIMINATED  -  spectating ${m.name(s)}` : 'ELIMINATED').setVisible(m.state !== 'over'); } else X.spec.setVisible(false);
+    if (!c || c.out || m.state === 'over' || !vp || !this.v3 || this.flat) return;
+    const G = c.gs, it = G.inv[G.sel], gun = it && BR_GUNS[it.k];
+    if (gun) {                                                                // the crosshair: where your shots will go (heading + right stick), 12 m out
+      const a = c.heading + (p0._look ? p0._look.x * CONFIG.view3d.look.yaw * Math.PI / 180 : 0), pt = brPitch(c), q = this.v3.project(vp, c.x + Math.cos(a) * 12 * Math.cos(pt), (G.z || 0) + 0.55 + Math.sin(pt) * 12, c.y + Math.sin(a) * 12 * Math.cos(pt));
+      if (!q.behind) { const sz = 7 + gun.spread * 60, hit = G.hm !== undefined && g.t - G.hm < 0.25; G2.lineStyle(2, 0x000000, 0.5).strokeCircle(q.x, q.y, sz + 1).lineStyle(2, hit ? 0xff4d4d : 0xffffff, 0.9).strokeCircle(q.x, q.y, sz).fillStyle(0xffffff, 1).fillCircle(q.x, q.y, 1.6);
+        if (hit) G2.lineStyle(3, 0xff4d4d, 1).lineBetween(q.x - 14, q.y - 14, q.x - 6, q.y - 6).lineBetween(q.x + 14, q.y - 14, q.x + 6, q.y - 6).lineBetween(q.x - 14, q.y + 14, q.x - 6, q.y + 6).lineBetween(q.x + 14, q.y + 14, q.x + 6, q.y + 6); }
+    }
+    if (G.hitT > 0) { const k = G.hitT / 0.25 * 0.35; G2.fillStyle(0xff2a2a, k).fillRect(0, 0, V.width, 24).fillRect(0, V.height - 24, V.width, 24).fillRect(0, 0, 24, V.height).fillRect(V.width - 24, 0, 24, V.height); }   // you were hit
+    if (G.hp < 30) G2.lineStyle(10, 0xff2a2a, 0.15 + 0.1 * Math.sin(this.time.now / 150)).strokeRect(5, 5, V.width - 10, V.height - 10);
+  },
+  brMyChair() { const o = this.online, m = this.match; if (!o) return null; const id = o.role === 'host' ? (o.me && o.me.id) : o.session.myId; return m.chairs.find(c => c.player && c.player.id === id) || null; },
+  openInventory(p) {
+    if (this.scene.isActive('BRInv')) return; const m = this.match, M = modeOf(m), o = this.online, chair = p.chair;
+    const act = a => { if (o && o.role === 'client') { const L = o.sim && o.sim.locals.find(x => x.id === p.id) || (o.sim && o.sim.locals[0]); if (L) L.pending.push(`inv:${a.op}:${a.a}:${a.b === undefined ? -1 : a.b}`); } else M.invAct(chair, a, this.match); };
+    p.invOpen = true; Sound.play('select'); this.scene.launch('BRInv', { game: this, p, chair, act, src: p.src || Controls.mine });
+  }
+});
+{ const P = GameScene.prototype, hud = P.updateMiniHud, onl = P.updateOnline, vps = P.viewports3d, mm = P.drawMinimap;
+  P.updateMiniHud = function (m) { hud.call(this, m); if (m.kind === 'br') this.brExtras(m); };
+  P.updateOnline = function (delta) {                                       // online: B opens your inventory too
+    const m = this.match, o = this.online, src = Controls.mine;
+    if (m && m.kind === 'br' && m.state === 'play' && src && src.pressed && src.pressed.b && !this.scene.isActive('BRInv') && !this.scene.isActive('Pause')) { const chair = this.brMyChair(); if (chair && !chair.out) this.openInventory({ chair, src, id: chair.player.id, get invOpen() { return chair.player.invOpen; }, set invOpen(v) { chair.player.invOpen = v; } }); }
+    return onl.call(this, delta);
+  };
+  P.viewports3d = function (LP) {                                           // eliminated in Battle Royale: watch a team-mate (or whoever got you, or anyone still in)
+    const list = vps.call(this, LP), m = this.match; if (m.kind !== 'br') return list;
+    for (const vp of list) if (vp.look) vp.look = { x: vp.look.x, y: 0 };                    // (the right stick's up / down tilts your gun instead)
+    for (const vp of list) { const ch = vp.benchChair; if (!vp.p || !ch || !ch.out) continue; const live = m.chairs.filter(c => !c.out), t = live.find(c => c.gs.team === ch.gs.team) || m.chairs[ch.gs.by] && !m.chairs[ch.gs.by].out && m.chairs[ch.gs.by] || live[0]; if (t) { vp.chair = t; vp.mode = 'third'; vp.benched = false; vp.spect = t; } }
+    return list;
+  };
+  P.drawMinimap = function () {                                             // the storm and the next safe circle on the minimap
+    mm.call(this); const m = this.match; if (m.kind !== 'br' || !m.gs || !m.gs.st) return;
+    const g = this.mapG, M = CONFIG.view3d.minimap, C = CONFIG.court, B = CONFIG.courtBase || C, fit = Math.min(1, B.width / C.width, B.height / C.height), s = M.scale * fit, ox = M.x + (B.width - C.width * fit) * M.scale, oy = M.y, S = m.gs.st;
+    if (S.shrink > 0 || S.wait > 0) g.lineStyle(1.5, 0xffffff, 0.8).strokeCircle(ox + S.fx * s, oy + S.fy * s, S.fr * s);
+    g.lineStyle(2, 0x9b4dff, 1).strokeCircle(ox + S.x * s, oy + S.y * s, S.r * s);
+  };
+}
+
+/* The inventory screen (B in Battle Royale): your five slots, big. Move along them, A picks one up and puts it down in another slot
+   (swapping), Y holds it, X drops it on the ground, B closes. Mouse / touch: click a slot, then the buttons. */
+class BRInvScene extends Phaser.Scene {
+  constructor() { super('BRInv'); }
+  init(d) { this.d = d; this.cur = d.chair.gs.sel || 0; this.pick = -1; }
+  create() {
+    const V = CONFIG.view, cx = V.width / 2, cy = V.height / 2 - 20, W = 820, Hh = 360; this.cx = cx; this.cy = cy;
+    this.add.rectangle(cx, V.height / 2, V.width, V.height, 0x000000, 0.35); panel(this, cx - W / 2, cy - Hh / 2, W, Hh, { alpha: 0.95, radius: 18 });
+    this.add.text(cx, cy - Hh / 2 + 28, 'INVENTORY', { fontFamily: FONT, fontSize: '26px', fontStyle: 'bold', color: THEME.gold_css }).setOrigin(0.5);
+    this.g = this.add.graphics(); this.slots = [];
+    for (let i = 0; i < BR.slots; i++) { const x = cx + (i - 2) * 150, y = cy - 30, img = this.add.image(x, y - 6, this.d.game.brIcon('pistol')).setDisplaySize(124, 70), t = this.add.text(x + 60, y + 44, '', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(1, 1), n = this.add.text(x - 60, y - 50, String(i + 1), { fontFamily: FONT, fontSize: '14px', color: '#9fb2bf' });
+      const z = this.add.zone(x, y, 136, 104).setInteractive({ useHandCursor: true }); z.on('pointerdown', () => { this.cur = i; this.press('a'); }); this.slots.push({ x, y, img, t, n }); }
+    this.info = this.add.text(cx, cy + 50, '', { fontFamily: FONT, fontSize: '18px', color: '#e8eef2', align: 'center' }).setOrigin(0.5);
+    this.help = this.add.text(cx, cy + Hh / 2 - 84, '◀ ▶ choose     A: move / swap     Y: hold this     X: drop on the ground     B: close', { fontFamily: FONT, fontSize: '16px', color: '#9fb2bf' }).setOrigin(0.5);
+    [['Hold', 'y', -220], ['Drop', 'x', 0], ['Close', 'b', 220]].forEach(([l, k, dx]) => tapButton(this, cx + dx, cy + Hh / 2 - 28, 180, l, () => this.press(k)));
+    this.events.once('shutdown', () => { this.d.p.invOpen = false; });
+  }
+  press(k) {
+    const inv = this.d.chair.gs.inv, act = this.d.act;
+    if (k === 'b') { Sound.play('back'); this.d.p.invOpen = false; this.scene.stop(); return; }
+    if (k === 'a') { if (this.pick < 0) { if (inv[this.cur]) { this.pick = this.cur; Sound.play('select'); } } else { if (this.pick !== this.cur) act({ op: 'swap', a: this.pick, b: this.cur }); this.pick = -1; Sound.play('blip'); } }
+    if (k === 'y' && inv[this.cur]) { act({ op: 'sel', a: this.cur }); Sound.play('select'); }
+    if (k === 'x' && inv[this.cur]) { act({ op: 'drop', a: this.cur }); this.pick = -1; Sound.play('back'); }
+  }
+  update() {
+    const d = this.d, c = d.chair, G = c.gs, src = d.src; if (!this.d.game.scene.isActive() || c.out || d.game.match.state !== 'play') { this.d.p.invOpen = false; return this.scene.stop(); }
+    Controls.update(this.game.loop.frame); const P = (src && src.pressed) || {};
+    if (P.left) { this.cur = (this.cur + BR.slots - 1) % BR.slots; Sound.play('blip'); } if (P.right) { this.cur = (this.cur + 1) % BR.slots; Sound.play('blip'); }
+    for (const k of ['a', 'b', 'x', 'y']) if (P[k]) this.press(k); if (P.start) this.press('b');
+    const g = this.g; g.clear();
+    this.slots.forEach((s, i) => { const it = G.inv[i], cur = i === this.cur, held = i === G.sel && it, pk = i === this.pick, y = s.y - (pk ? 12 : 0);
+      g.fillStyle(cur ? 0x2a3a48 : 0x14202a, 1).fillRoundedRect(s.x - 68, y - 52, 136, 104, 10).lineStyle(cur ? 4 : 2, pk ? 0x3dd6ff : cur ? 0xffd23f : held ? 0x7dff6a : 0x3a4a58, 1).strokeRoundedRect(s.x - 68, y - 52, 136, 104, 10);
+      if (held) g.fillStyle(0x7dff6a, 1).fillCircle(s.x + 56, y - 40, 5);
+      s.img.setVisible(!!it).setY(y - 6); s.t.setY(y + 44); if (it) { s.img.setTexture(d.game.brIcon(it.k)).setDisplaySize(124, 70); s.t.setText(BR_GUNS[it.k] ? String(it.a) : 'x' + it.a); } else s.t.setText(''); });
+    const it = G.inv[this.cur], gun = it && BR_GUNS[it.k];
+    this.info.setText(!it ? (this.pick >= 0 ? 'Empty slot: A puts it here' : 'Empty slot') : gun ? `${gun.name}   ammo ${it.a}     damage ${gun.dmg}${gun.pellets ? ' x' + gun.pellets : ''}   ${(1 / gun.cd).toFixed(1)} shots/s   range ${gun.range} m${gun.auto ? '   (hold to fire)' : ''}` : `${BR_ITEMS[it.k].name} x${it.a}     ${{ med: 'heals 50', pot: '+50 shield', boost: '3 s of speed', wall: 'a wall that stops bullets' }[it.k] || ''}`);
+  }
+}

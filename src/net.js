@@ -311,6 +311,9 @@ class HostSession {
       else if (ev === 'up') p.speedLevel = Math.min(Settings.speedCap, p.speedLevel + 1);
       else if (ev === 'down') p.speedLevel = Math.max(1, p.speedLevel - 1);
       else if (ev === 'sw') this.match.switchChair(p);
+      else if (ev === 'jmp' && p.chair && modeOf(this.match) && modeOf(this.match).jump) modeOf(this.match).jump(p.chair, this.match);
+      else if (typeof ev === 'string' && ev.startsWith('ap:') && p.chair && p.chair.gs) { const v = +ev.slice(3); if (isFinite(v)) { p.brAp = Math.max(BR_AIM.min, Math.min(BR_AIM.max, v)); p.chair.gs.ap = MG.r2(p.brAp); } }   // a guest tilting their gun
+      else if (typeof ev === 'string' && ev.startsWith('inv:') && p.chair && modeOf(this.match) && modeOf(this.match).invAct) { const [, op, x, y] = ev.split(':'); modeOf(this.match).invAct(p.chair, { op, a: +x, b: +y }, this.match); }   // a guest rearranging their inventory
     }
   }
   tick(dt) {                                                      // call every frame during a match
@@ -430,11 +433,13 @@ class ClientSim {
       const found = inputs.find(x => x.id === L.id), input = found ? found.input : { ax: 0, ay: 0, pressed: {} }, p = input.pressed || {}; let spin = 0;
       if (p.halfCW) { L.pending.push('hcw'); spin = 0.5; } if (p.halfCCW) { L.pending.push('hccw'); spin = -0.5; }
       if (p.spinCW) { L.pending.push('cw'); spin = 1; } if (p.spinCCW) { L.pending.push('ccw'); spin = -1; }
-      if (this.m.mini) { const M = modeOf(this.m), hold = M && M.holdFire && input.held && (input.held.a || input.held.x) && this.clock - (L.holdAt || 0) > 0.08; if (p.a || p.x || hold) { L.pending.push('use'); L.holdAt = this.clock; } } else if (p.x) L.pending.push('x');
+      const MJ = this.m.mini && modeOf(this.m) && modeOf(this.m).jump;         // Battle Royale: X jumps; your gun's tilt goes to the host when it changes
+      if (MJ && L.me && !L.me.invOpen) { brAimInput(L.me, input, dt); const ap = MG.r2(L.me.brAp || 0); if (Math.abs(ap - (L.sentAp || 0)) > 0.015 || (ap !== L.sentAp && this.clock - (L.apAt || 0) > 0.3)) { L.pending.push('ap:' + ap); L.sentAp = ap; L.apAt = this.clock; } if (p.x) L.pending.push('jmp'); }
+      if (this.m.mini && !(L.me && L.me.invOpen)) { const M = modeOf(this.m), hold = M && M.holdFire && input.held && (input.held.a || (input.held.x && !MJ)) && this.clock - (L.holdAt || 0) > 0.08; if (p.a || (p.x && !MJ) || hold) { L.pending.push('use'); L.holdAt = this.clock; } } else if (p.x && !MJ) L.pending.push('x');
       if (spin) { Sound.play('screech'); L.spins.push({ t: this.clock, dir: Math.sign(spin), amt: Math.abs(spin) }); if (L.spins.length > 8) L.spins.shift(); }
       if (p.speedUp && L.me.speedLevel < Settings.speedCap) { L.me.speedLevel++; L.pending.push('up'); }
       if (p.speedDown && L.me.speedLevel > 1) { L.me.speedLevel--; L.pending.push('down'); }
-      if (p.y) L.pending.push('sw');
+      if (p.y && !(L.me && L.me.invOpen)) L.pending.push('sw');
       const v = screenToCourt(input.ax, input.ay, L.me && L.me.chair && L.me.chair.x, L.me && L.me.chair && L.me.chair.y, L.me);                            // the stick is read on screen; the host (and our prediction) work in court directions
       L.in = { ax: v.x, ay: v.y };
       L.frames.push({ seq: this.seq, t: this.clock, dt, ax: v.x, ay: v.y, spin, speed: Math.min(CONFIG.speedLevels[L.me.speedLevel - 1], Settings.maxSpeed()) });

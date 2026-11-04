@@ -294,7 +294,7 @@ class MiniMatch extends Match {
     else { c.stunLeft = MINI.item.stunSeconds; this.notice = `${this.name(by).toUpperCase()} ZAPS ${this.name(c).toUpperCase()}`; this.noticeLeft = 1.6; this.sfx('foul'); }
   }
   /* A person presses A / X (also called for an online player by the host). */
-  useBy(p) { if (p && p.chair) p.chair.wantUse = true; }
+  useBy(p) { if (p && p.chair && !p.invOpen) p.chair.wantUse = true; }
 
   /* ----- the scoreboard ----- */
   hud() {

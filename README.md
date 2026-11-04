@@ -3,6 +3,17 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v11.2: Battle Royale bag, jumping, aiming up and down
+
+- **B opens your bag** (inventory screen): pictures of all 5 slots with ammo and gun stats. ◀ ▶ choose, A picks a slot up and A again swaps or moves it, Y holds that item, X drops it on the ground, B closes. You can't pick something up again for 2.5 s after dropping it. Works for online guests too (the host applies it).
+- **Jump with X** (Battle Royale only; A still fires). You can jump or simply **drive off any roof, floor or ledge** and drop to whatever is below. A long fall costs a little health. You bump your head on a floor above you. CPU carts keep to their railings.
+- **Aim up and down**: right stick, or I / K (keyboard 1) and Page Up / Page Down (keyboard 2). The tilt stays where you put it and eases back to level after a moment. Aim assist also tilts onto carts above or below you. Bullets now fly in 3D: floors and ceilings stop them, so you can shoot up at someone on a roof.
+- First-person view in Battle Royale sits higher so the crosshair is near the middle of the screen, and it tilts with your gun.
+- See-through openings: the floor above a ramp now has a real hole, so you can see where you're going.
+- New HUD: crosshair, hit marker, red flash when you're hit, low-health pulse, kill feed, "spectating" label when you're out, and the storm's current and next circle on the minimap. Health and shield are bottom-left under the speed meter; the inventory bar is bottom-right.
+- Surfaces use real textures (asphalt, concrete, grass and so on) instead of flat colours.
+- Settings: **Invert right stick Y axis** (on/off) applies to looking around in every game and to aiming in Battle Royale.
+
 ## v11.1: Battle Royale loot and HUD, players-only games, a more realistic look
 - **Battle Royale**: you start with nothing. Search CHESTS (a gun with its ammo, often an item too) and AMMO CRATES; medkits, shield
   potions and other items lie out in the open. A new inventory bar shows a picture of every gun and item you carry (the one in your hands

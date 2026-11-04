@@ -75,7 +75,7 @@ const SETTINGS_PAGES = {
     { label: () => `The CPU keeps learning how you play   (${Learn.data.shots} shots, ${Learn.data.passes} passes seen)`, hint: 'Always on: it remembers your habits from game to game' }],
   'Controls and screen': sc => [
     { label: () => 'Controls guide', hint: 'What every button does on a gamepad, keyboard and touch', select: () => sc.scene.start('ControlsGuide', { ctx: sc.ctx, page: 'Controls and screen' }) },
-    { label: () => `Look up / down (right stick)   ◀ ${Settings.invertLook ? 'Inverted' : 'Normal'} ▶`, change: () => Settings.toggle('invertLook'), select: () => Settings.toggle('invertLook') },
+    { label: () => `Invert right stick Y axis   ◀ ${Settings.invertLook ? 'On' : 'Off'} ▶`, hint: 'On: push the right stick up to look (and aim) down, like a flight game. Works in every game and view.', change: () => Settings.toggle('invertLook'), select: () => Settings.toggle('invertLook') },
     { label: () => `Touch controls   ◀ ${Settings.touch ? 'On' : 'Off'} ▶`, change: () => TouchPad.toggle(), select: () => TouchPad.toggle() },
     { label: () => 'Adjust touch buttons', select: () => TouchPad.edit() },
     { label: () => `Fullscreen   ◀ ${isFullscreen() ? 'On' : 'Off'} ▶`, change: () => toggleFullscreen(), select: () => toggleFullscreen() },
@@ -500,7 +500,9 @@ class GameScene extends Phaser.Scene {
         if (!me) continue; const input = menuOpen ? idle : src; me.src = menuOpen ? o.idle : src;
         if (input.pressed.halfCW) me.spinQueued = 0.5; if (input.pressed.halfCCW) me.spinQueued = -0.5;
         if (input.pressed.spinCW) me.spinQueued = 1; if (input.pressed.spinCCW) me.spinQueued = -1;
-        if (m.mini && (input.pressed.a || input.pressed.x)) m.useBy(me); else if (input.pressed.x) m.togglePress(me.side);
+        const MJ = m.mini && modeOf(m) && modeOf(m).jump; if (MJ && me.chair && !me.invOpen) { brAimInput(me, input, dt); me.chair.gs.ap = MG.r2(me.brAp || 0); if (input.pressed.x) modeOf(m).jump(me.chair, m); }
+        if (me.invOpen) continue;
+        if (m.mini && (input.pressed.a || (input.pressed.x && !MJ))) m.useBy(me); else if (input.pressed.x && !MJ) m.togglePress(me.side);
         if (input.pressed.y) m.switchChair(me);
         if (input.pressed.speedUp && me.speedLevel < Settings.speedCap) { me.speedLevel++; Sound.play('blip'); }
         if (input.pressed.speedDown && me.speedLevel > 1) { me.speedLevel--; Sound.play('blip'); }
@@ -749,9 +751,13 @@ class GameScene extends Phaser.Scene {
     if (this.online) return this.updateOnline(delta);
     const m = this.match;
     for (const p of this.setup.players) {
+      if (p.invOpen) continue;                                                       // (their inventory screen has their buttons)
+      if (m.mini && modeOf(m) && modeOf(m).invAct && p.src.pressed.b && p.chair && !p.chair.out && m.state === 'play') { this.openInventory(p); continue; }   // B: the inventory
       if (p.src.pressed.halfCW) p.spinQueued = 0.5; if (p.src.pressed.halfCCW) p.spinQueued = -0.5;
       if (p.src.pressed.spinCW) p.spinQueued = 1; if (p.src.pressed.spinCCW) p.spinQueued = -1;
-      if (m.mini && (p.src.pressed.a || p.src.pressed.x || (modeOf(m) && modeOf(m).holdFire && p.src.held && (p.src.held.a || p.src.held.x)))) m.useBy(p); else if (p.src.pressed.x) m.togglePress(p.side);   // (some games: hold to keep firing)
+      const MJ = m.mini && modeOf(m) && modeOf(m).jump;                                // Battle Royale: X jumps, the right stick (or I / K) aims up and down
+      if (MJ && p.chair) { brAimInput(p, p.src, Math.min(delta / 1000, 0.05)); p.chair.gs.ap = MG.r2(p.brAp || 0); if (p.src.pressed.x) modeOf(m).jump(p.chair, m); }
+      if (m.mini && (p.src.pressed.a || (p.src.pressed.x && !MJ) || (modeOf(m) && modeOf(m).holdFire && p.src.held && (p.src.held.a || (p.src.held.x && !MJ))))) m.useBy(p); else if (p.src.pressed.x && !MJ) m.togglePress(p.side);   // (some games: hold to keep firing)
       if (p.src.pressed.y) m.switchChair(p);
       if (p.src.pressed.speedUp && p.speedLevel < Settings.speedCap) { p.speedLevel++; Sound.play('blip'); }   // RB
       if (p.src.pressed.speedDown && p.speedLevel > 1) { p.speedLevel--; Sound.play('blip'); }                      // LB
