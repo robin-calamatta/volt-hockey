@@ -3,6 +3,24 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## Minigames (v9)
+Main menu > **Minigames** > a game > **Play on this screen** (local: split screen, controllers, CPUs) or **Host an online room**
+(a room already set to that game). Also Online > **Create a minigame room**, and every online room has a **Game** row (hockey or any
+minigame). A party leader brings the party along either way. Every minigame works with
+CPU carts, split screen, every camera (first / third person, broadcast, classic 2D), touch, and online.
+- **Balloon Bash** (free for all or teams): balloons on every cart's back (1-5). Hit someone's back with your front: a balloon pops and they
+  restart somewhere safe (blinking: 2 s of protection). No balloons left: out, watching from the sin bin. Round clock: when it runs out,
+  the most balloons left wins.
+- **Race**: a barrier island makes the rink an oval track. Laps and positions are tracked; the winner crossing the line starts a 20 s
+  window for the rest to finish.
+- **Manhunt**: one random cart is IT. Whoever IT touches turns IT (changes colour and freezes for 2 s). IT wins when everyone is caught;
+  anyone still free when the clock runs out wins.
+- **Power-ups** (? boxes, on/off per game): **BOOST** (3 s faster), **ZAP** (a shot: pops a balloon in Balloon Bash, spins a cart out
+  otherwise) and **OIL** (dropped behind you; whoever drives over it gets reversed steering for 4 s, then the slick is gone).
+  Use with **A or X** (keyboard 1: Space or X, keyboard 2: Right Shift or \, touch: A).
+- Code: `src/minigames.js` (rules, power-ups, CPU, online state; tuning in `MINI`), `src/scenes_mini.js` (menus and drawing).
+- Also: online players get 3x longer before being dropped as "lost" in a match's first 15 s (slow devices building the 3D arena).
+
 ## v8.1: friends window, party leader, controller everywhere, password reset, admin page
 - **Friends and party window**: the 👥 button in the top-left corner of every screen (or **Select / View** on a gamepad, or the **`** key)
   opens one window with your account, Add a friend, Leaderboard, your party, room, invites and friends list. An offline match pauses while
@@ -34,6 +52,8 @@ Phaser loads from a CDN; download `phaser.min.js` and change the first script ta
   directly. It now says why within seconds. Add a free TURN relay to fix such networks: `TURN_CREDENTIALS_URL` (DEPLOY.md).
 - **Smoother motion (v8.2)**: carts and the ball are drawn exactly between the fixed 240 Hz simulation steps (`Match.drawBetween`,
   `CONFIG.render.smooth`). Before, first and third person juddered, worst on 120 / 144 Hz monitors (frame-to-frame unevenness 41% -> 3%).
+- **The ball is never hidden by a name tag (v8.3)**: a tag fades almost away while the ball is under it or next to it, in the 2D view and every
+  3D camera (`CONFIG.render.tagFade`). The mouse pause button moved to the top bar so it no longer covers split-screen names.
 - **⚡ quick chat button** next to 💬 and 🎙 (it used to be hidden inside the chat window). Keys 1-9 and D-pad up in a match still work.
 - **Long menu text** shrinks to fit its box.
 - **Server errors fixed** (the Netlify Function now opens its storage fresh on each call), quieter background traffic.

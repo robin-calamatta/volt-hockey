@@ -8,6 +8,7 @@ class OnlineMenuScene extends ListMenuScene {
     const ok = PeerTransport.available(), blocked = () => this.note.setText(netErrorText({ type: 'unsupported' }));
     this.buildMenu('ONLINE', [
       { label: () => 'Create room', select: () => (ok ? this.scene.start('Room', { role: 'host' }) : blocked()) },
+      { label: () => 'Create a minigame room', hint: 'Balloon Bash, Race or Manhunt online (or switch any room with its Game row)', select: () => this.scene.start('Minigames') },
       { label: () => 'Browse public rooms', select: () => (ok ? this.scene.start('Browse') : blocked()) },
       { label: () => 'Join with a code', select: () => (ok ? this.scene.start('JoinCode') : blocked()) },
       { label: () => 'Back', select: () => this.scene.start('Main') }
@@ -173,6 +174,10 @@ class RoomScene extends ListMenuScene {
     const names = Object.keys(CONFIG.difficulties), me = () => this.session.roster.find(r => r.id === this.session.myId);
     const flip = () => { const side = me() ? 1 - me().side : 0; if (host) this.session.setSide(1, side); else this.session.setSide(side); };
     const cfg = () => this.session.cfg, teamName = i => TEAMS[i].name;
+    const GAMES = [null, 'balloons', 'race', 'hunt'], cycleGame = d => {           // hockey or a minigame (its options come from the host's Minigames settings)
+      const i = GAMES.indexOf(cfg().mini ? cfg().mini.kind : null), k = GAMES[(i + d + GAMES.length) % GAMES.length];
+      this.session.setConfig(k ? { mini: miniCfg(k), practice: true } : { mini: null, practice: false });
+    };
     const rename = n => { if (host) this.session.setName(this.session.myId, n); else this.session.setName(n); };
     const yourName = nameItem(rename);
     const yourSide = { label: () => `Your side   ◀ ${me() && me().side ? 'Right' : 'Left'} ▶`, change: flip, select: flip };
@@ -194,6 +199,7 @@ class RoomScene extends ListMenuScene {
       yourName, ...(S.cfg && S.cfg.season ? [] : [yourSide]), yourLock, ...guestRows, ...moveRows,
       { label: () => `Room   ◀ ${this.session.visibility === 'public' ? 'PUBLIC (listed)' : 'Private (code only)'} ▶`, change: () => this.toggleVisibility(), select: () => this.toggleVisibility() },
       { label: () => `Lobby name   ◀ ${this.session.lobbyName} ▶`, change: d => this.cycleName(d), select: () => this.typeName() },
+      { label: () => `Game   ◀ ${miniLabel(cfg().mini)} ▶`, change: d => cycleGame(d), select: () => cycleGame(1) },
       { label: () => `Teams and rules ▸   (${TEAMS[cfg().teamA].name} v ${TEAMS[cfg().teamB].name}, ${cfg().practice ? 'practice' : cfg().difficulty})`, select: page(true) },
       { label: () => 'START MATCH', select: () => this.startHost() },
       { label: () => 'Close room', select: () => this.leave() }
@@ -207,7 +213,7 @@ class RoomScene extends ListMenuScene {
       { label: () => `CPU skill   ◀ ${cfg().difficulty} ▶`, change: d => this.session.setConfig({ difficulty: names[(names.indexOf(cfg().difficulty) + d + names.length) % names.length] }) },
       { label: () => `Practice (no clock)   ◀ ${cfg().practice ? 'On' : 'Off'} ▶`, change: () => this.session.setConfig({ practice: !cfg().practice }), select: () => this.session.setConfig({ practice: !cfg().practice }) },
       { label: () => '◂ Back to the room', select: page(false) }
-    ] : [yourName, yourSide, yourLock, ...guestRows, { label: () => 'Teams, carts per side, CPU skill and the rules are set by the host' }, { label: () => 'Leave room', select: () => this.leave() }];
+    ] : [yourName, yourSide, yourLock, ...guestRows, { label: () => `Game: ${miniLabel(cfg() && cfg().mini)}` }, { label: () => 'Teams, carts per side, CPU skill and the rules are set by the host' }, { label: () => 'Leave room', select: () => this.leave() }];
     this.buildMenu('', items.map(it => ({ ...it, select: it.select && (() => !this.opening && it.select()), change: it.change && (d => !this.opening && it.change(d)) })), 120, { x: 330, size: 32 });
     this.onBack = host && this.rules ? page(false) : () => this.leave(); this.cursor = Math.min(this.cursorAt, this.items.length - 1);
     this.codeText = this.add.text(CX, 45, '', { ...STYLE.title, fontSize: '48px' }).setOrigin(0.5);
@@ -236,7 +242,7 @@ class RoomScene extends ListMenuScene {
   beginClient(msg) {
     const s = this.session; Settings.applyRules(msg.rules || {});
     const players = msg.players.map(p => ({ id: p.id, name: p.name, side: p.side, tag: p.tag, speedLevel: Settings.speedLevel, chair: null, spinQueued: 0 }));
-    const match = new Match({ teamA: msg.cfg.teamA, teamB: msg.cfg.teamB, players, difficulty: msg.cfg.difficulty, sizes: msg.cfg.sizes, practice: msg.cfg.practice, remote: true, periodSeconds: msg.cfg.season ? msg.cfg.season.periodSeconds : undefined });
+    const match = makeMatch({ mini: msg.cfg.mini || null, teamA: msg.cfg.teamA, teamB: msg.cfg.teamB, players, difficulty: msg.cfg.difficulty, sizes: msg.cfg.sizes, practice: msg.cfg.practice, remote: true, periodSeconds: msg.cfg.season ? msg.cfg.season.periodSeconds : undefined });
     this.scene.start('Game', { online: { role: 'client', session: s, match, players, sim: new ClientSim(s, match, players) } });
   }
   exit(message) {                                             // close or leave the room and go back to the Online menu (a party leader's own game: back where it was started)

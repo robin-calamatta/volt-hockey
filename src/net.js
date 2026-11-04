@@ -288,7 +288,7 @@ class HostSession {
       remote: !(r.host || r.own === 1), src: r.host ? localSource : r.own === 1 ? this.guestSrc.get(r.id) : { ax: 0, ay: 0, pressed: {} } }));
     for (const e of this.entries.values()) e.players = new Map(players.filter(p => p.id === e.id || (this.roster.find(r => r.id === p.id) || {}).own === e.id).map(p => [p.id, p]));
     const se = this.cfg.season;                                    // a party season game: the season's length and each team's own skill
-    this.match = new Match({ teamA: this.cfg.teamA, teamB: this.cfg.teamB, players, difficulty: this.cfg.difficulty, sizes: this.cfg.sizes, practice: this.cfg.practice, periodSeconds: se ? se.periodSeconds : undefined, diffBySide: se ? se.levels : undefined });
+    this.match = makeMatch({ mini: this.cfg.mini || null, teamA: this.cfg.teamA, teamB: this.cfg.teamB, players, difficulty: this.cfg.difficulty, sizes: this.cfg.sizes, practice: this.cfg.practice, periodSeconds: se ? se.periodSeconds : undefined, diffBySide: se ? se.levels : undefined });
     this.match.sfxQueue = []; this.match.callQueue = []; this.state = 'playing'; this.snapAcc = 0; this.relist();
     this.broadcast({ t: 'start', cfg: this.cfg, rules: Settings.rules(), players: players.map(p => ({ id: p.id, name: p.name, side: p.side, tag: p.tag })) });
     return this.match;
@@ -306,6 +306,7 @@ class HostSession {
     for (const ev of Array.isArray(events) ? events.slice(0, 8) : []) {
       if (ev === 'cw') p.spinQueued = 1; else if (ev === 'ccw') p.spinQueued = -1; else if (ev === 'hcw') p.spinQueued = 0.5; else if (ev === 'hccw') p.spinQueued = -0.5;
       else if (ev === 'x') this.match.togglePress(p.side);
+      else if (ev === 'use' && this.match.useBy) this.match.useBy(p);
       else if (ev === 'up') p.speedLevel = Math.min(Settings.speedCap, p.speedLevel + 1);
       else if (ev === 'down') p.speedLevel = Math.max(1, p.speedLevel - 1);
       else if (ev === 'sw') this.match.switchChair(p);
@@ -313,8 +314,9 @@ class HostSession {
   }
   tick(dt) {                                                      // call every frame during a match
     if (this.state !== 'playing' || !this.match) return;
-    const now = performance.now();
-    for (const e of [...this.entries.values()]) if (e.id && now - e.lastSeen > CONFIG.online.silenceTimeoutMs) { e.conn.send({ t: 'bye', reason: 'lost' }); this.drop(e); }
+    const now = performance.now(); if (this.matchFrom === undefined || this.matchOf !== this.match) { this.matchOf = this.match; this.matchFrom = now; }
+    const quiet = CONFIG.online.silenceTimeoutMs * (now - this.matchFrom < 15000 ? 3 : 1);     // the first seconds of a match: a slow device may still be building the 3D arena
+    for (const e of [...this.entries.values()]) if (e.id && now - e.lastSeen > quiet) { e.conn.send({ t: 'bye', reason: 'lost' }); this.drop(e); }
     const ru = JSON.stringify(Settings.rules());                  // the host changed a rule in the pause menu: tell everyone straight away
     if (ru !== this.lastRules) { this.lastRules = ru; this.broadcast({ t: 'rules', rules: Settings.rules() }); }
     this.snapAcc += dt; const every = 1 / CONFIG.online.snapshotHz;
@@ -325,7 +327,7 @@ class HostSession {
     return { t: 'snap', n: ++this.tickNo, st: STATE_CODE[m.state], tm: r3(m.timer), ck: r3(m.clock), ot: m.overtime ? 1 : 0, pe: m.period, sc: m.score.slice(), sh: m.shots.slice(), pr: m.press.map(v => v ? 1 : 0),
       bn: m.bannerLeft > 0 ? m.banner : '', nt: m.noticeLeft > 0 ? m.notice : '',
       c: m.chairs.map(c => [r3(c.x), r3(c.y), r3(c.heading), r3(c.vx), r3(c.vy), r3(Math.max(0, c.binLeft)), c.player ? c.player.id : 0]),
-      b: [r3(b.x), r3(b.y), r3(b.vx), r3(b.vy)], lv: m.players.map(p => [p.id, p.speedLevel]), sf: m.sfxQueue.splice(0), cm: m.callQueue.splice(0) };
+      b: [r3(b.x), r3(b.y), r3(b.vx), r3(b.vy)], lv: m.players.map(p => [p.id, p.speedLevel]), sf: m.sfxQueue.splice(0), cm: m.callQueue.splice(0), mg: m.mini ? m.miniSnap() : undefined };
   }
   sendSnapshots() { const snap = this.snapshot(); for (const e of this.entries.values()) if (e.id) e.conn.send({ ...snap, a: e.seq }); }
   backToLobby() { this.state = 'lobby'; this.match = null; for (const e of this.entries.values()) e.players = null; this.broadcast({ t: 'lobby' }); this.sendRoster(); }
@@ -416,6 +418,7 @@ class ClientSim {
     m.banner = s.bn; m.bannerLeft = s.bn ? 1 : 0; m.notice = s.nt; m.noticeLeft = s.nt ? 1 : 0;
     for (const [id, lv] of s.lv) { const p = this.byId.get(id); if (p && !this.localIds.has(id)) p.speedLevel = lv; }
     if (s.cm) for (const t of s.cm) m.hear(t);
+    if (s.mg && m.miniApply) m.miniApply(s.mg);
     for (const [name, pid] of s.sf) if (!this.localIds.has(pid)) Sound.play(name);          // your own spin screech already played locally
     for (const L of this.locals) L.predIndex = s.c.findIndex(row => row[6] === L.id);
     this.snap = { s };
@@ -426,7 +429,7 @@ class ClientSim {
       const found = inputs.find(x => x.id === L.id), input = found ? found.input : { ax: 0, ay: 0, pressed: {} }, p = input.pressed || {}; let spin = 0;
       if (p.halfCW) { L.pending.push('hcw'); spin = 0.5; } if (p.halfCCW) { L.pending.push('hccw'); spin = -0.5; }
       if (p.spinCW) { L.pending.push('cw'); spin = 1; } if (p.spinCCW) { L.pending.push('ccw'); spin = -1; }
-      if (p.x) L.pending.push('x');
+      if (this.m.mini) { if (p.a || p.x) L.pending.push('use'); } else if (p.x) L.pending.push('x');
       if (spin) { Sound.play('screech'); L.spins.push({ t: this.clock, dir: Math.sign(spin), amt: Math.abs(spin) }); if (L.spins.length > 8) L.spins.shift(); }
       if (p.speedUp && L.me.speedLevel < Settings.speedCap) { L.me.speedLevel++; L.pending.push('up'); }
       if (p.speedDown && L.me.speedLevel > 1) { L.me.speedLevel--; L.pending.push('down'); }
@@ -468,7 +471,7 @@ class ClientSim {
             acc -= h;
             const live = m.chairs.filter(c => c.binLeft <= 0);
             for (const c of live) {
-              if (mine.has(c)) { const f = lists[mine.get(c)][i]; c.update(h, { x: f.ax, y: f.ay, spin: first ? f.spin : 0, speed: f.speed }, Settings.turnSpeed); }
+              if (mine.has(c)) { const f = lists[mine.get(c)][i], cmd = { x: f.ax, y: f.ay, spin: first ? f.spin : 0, speed: f.speed }; c.update(h, m.miniCmd ? m.miniCmd(c, cmd) : cmd, Settings.turnSpeed); }   // (minigames: the same oil / boost / zap effects as the host)
               else { c.x += c.vx * h; c.y += c.vy * h; }                // everyone else carries on at their last velocity
             }
             first = false;

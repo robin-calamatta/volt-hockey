@@ -67,7 +67,7 @@ class Chair {
       const reverse = Math.abs(diff) > K.reverseAngle;       // stick pointing behind the chair = drive backwards
       if (reverse) diff = normalizeAngle(diff + Math.PI);
       if (canSteer) this.heading += clamp(diff, -turnRate * dt, turnRate * dt);
-      targetSpeed = mag * K.maxSpeed * speedScale * (reverse ? -1 : 1) * Math.max(K.minForwardFactor, Math.cos(diff));
+      targetSpeed = mag * K.maxSpeed * (this.speedMul || 1) * speedScale * (reverse ? -1 : 1) * Math.max(K.minForwardFactor, Math.cos(diff));   // speedMul: a minigame boost
     }
     const hx = Math.cos(this.heading), hy = Math.sin(this.heading);
     let forward = this.vx * hx + this.vy * hy;
@@ -76,6 +76,6 @@ class Chair {
     forward += clamp(targetSpeed - forward, -rate * dt, rate * dt);
     this.vx = hx * forward + sideX; this.vy = hy * forward + sideY;
     const speed = Math.hypot(this.vx, this.vy);
-    if (speed > K.maxSpeed) { this.vx *= K.maxSpeed / speed; this.vy *= K.maxSpeed / speed; }
+    const top = K.maxSpeed * (this.speedMul || 1); if (speed > top) { this.vx *= top / speed; this.vy *= top / speed; }
   }
 }

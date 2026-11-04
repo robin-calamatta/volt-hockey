@@ -12,10 +12,10 @@ const STYLE = {
 };
 // The controls guide (Settings > Controls and screen > Controls guide). Edit freely: one block per device.
 const CONTROLS_GUIDE = [
-  ['GAMEPAD', ['Left stick   drive  (1st / 3rd person: up = go, ◀ ▶ = turn)', 'Right stick   look around (springs back)', 'L3 (hold)   push to talk      D-pad ▲   quick chat', 'D-pad ▼   camera      Select (View)   friends and party', 'RT / LT   spin clockwise / counter-clockwise', 'RB / LB   half spin (half a trigger)', 'D-pad ◀ ▶   speed down / up', 'X   full press on / off (goalie joins the attack)', 'Y   switch cart', 'Start   pause      A / B   select / back']],
-  ['KEYBOARD 1', ['WASD   drive', 'T   camera view', 'Tab chat   1-9 quick chat   G (hold) talk   ` friends', 'E / Q   spin', 'R / Z   half spin', 'X   full press on / off', 'V / C   speed up / down', 'F   switch cart', 'Esc   pause', 'Space / Backspace   select / back']],
-  ['KEYBOARD 2', ['Arrows   drive', 'P   camera view', 'L (hold)   push to talk', '. / ,   spin', '] / [   half spin', '\\   full press on / off', "' / ;   speed up / down", '/   switch cart', 'Right Shift / Right Ctrl   select / back']],
-  ['TOUCH', ['Stick   drive', 'VIEW   camera view', '💬   chat      🎙   talk (hold) / mic on-off (tap)', 'Spin buttons   spin', 'Small spin buttons   half spin', 'PRESS   full press on / off', '+ / -   speed up / down', 'Cart button   switch cart', 'II   pause', 'Settings > Touch and screen   move the buttons']]
+  ['GAMEPAD', ['Left stick   drive  (1st / 3rd person: up = go, ◀ ▶ = turn)', 'Right stick   look around (springs back)', 'L3 (hold)   push to talk      D-pad ▲   quick chat', 'D-pad ▼   camera      Select (View)   friends and party', 'RT / LT   spin clockwise / counter-clockwise', 'RB / LB   half spin (half a trigger)', 'D-pad ◀ ▶   speed down / up', 'X   full press on / off  (minigames: A or X uses a power-up)', 'Y   switch cart', 'Start   pause      A / B   select / back']],
+  ['KEYBOARD 1', ['WASD   drive', 'T   camera view', 'Tab chat   1-9 quick chat   G (hold) talk   ` friends', 'E / Q   spin', 'R / Z   half spin', 'X   full press  (minigames: Space or X = power-up)', 'V / C   speed up / down', 'F   switch cart', 'Esc   pause', 'Space / Backspace   select / back']],
+  ['KEYBOARD 2', ['Arrows   drive', 'P   camera view', 'L (hold)   push to talk', '. / ,   spin', '] / [   half spin', '\\   full press  (minigames: Right Shift or \\ = power-up)', "' / ;   speed up / down", '/   switch cart', 'Right Shift / Right Ctrl   select / back']],
+  ['TOUCH', ['Stick   drive', 'VIEW   camera view', '💬   chat      🎙   talk (hold) / mic on-off (tap)', 'Spin buttons   spin', 'Small spin buttons   half spin', 'PRESS   full press  (minigames: A = power-up)', '+ / -   speed up / down', 'Cart button   switch cart', 'II   pause', 'Settings > Touch and screen   move the buttons']]
 ];
 const pct = v => Math.round(v * 100) + '%', times = v => v.toFixed(1) + 'x';
 const teamColorHex = i => '#' + TEAMS[i].color.toString(16).padStart(6, '0');
@@ -265,6 +265,7 @@ class MainMenuScene extends ListMenuScene {
       { label: () => 'Play' + leaderPicks(), hint: 'A match against the CPU or friends on this screen (in a party: your whole party)', select: () => memberWaits() || this.scene.start('Setup', { practice: false }) },
       { label: () => 'Season' + leaderPicks(), hint: 'A full season, playoffs and the Volt Hockey World Cup (in a party: your party plays for your team)', select: () => memberWaits() || this.scene.start('SeasonMenu') },
       { label: () => 'Practice' + leaderPicks(), hint: 'Any team sizes, no clock', select: () => memberWaits() || this.scene.start('Setup', { practice: true }) },
+      { label: () => 'Minigames' + leaderPicks(), hint: 'Balloon Bash, Race and Manhunt: power-ups, CPUs, split screen and online', select: () => memberWaits() || this.scene.start('Minigames') },
       { label: () => 'Leaderboard', hint: 'The best players everywhere: World Cups, wins, goals and win %', select: () => this.scene.start('Leaderboard') },
       { label: () => 'Online' + leaderPicks(), hint: 'Host or join a room, public or private', select: () => memberWaits() || this.scene.start('OnlineMenu') },
       { label: () => 'Settings', hint: 'Camera, sound, rules, CPU, controls and your name', select: () => this.scene.start('Settings') }
@@ -351,7 +352,7 @@ class SetupScene extends ListMenuScene {
 /* Lobby: any device presses A to join, D-pad left/right picks a side, Start begins. B leaves (or goes back). */
 class LobbyScene extends Phaser.Scene {
   constructor() { super('Lobby'); }
-  init(data) { this.sizes = (data && data.sizes) || [CONFIG.match.chairsPerTeam, CONFIG.match.chairsPerTeam]; this.practice = !!(data && data.practice); this.season = (data && data.season) || null; this.teams = this.season ? this.season.teams : [Settings.teamA, Settings.teamB]; }
+  init(data) { this.mini = (data && data.mini) || null; this.sizes = (data && data.sizes) || [CONFIG.match.chairsPerTeam, CONFIG.match.chairsPerTeam]; this.practice = !!(data && data.practice); this.season = (data && data.season) || null; this.teams = this.season ? this.season.teams : [Settings.teamA, Settings.teamB]; }
   create() {
     this.players = []; this.ready = 0;
     this.add.text(CX, 90, 'CHOOSE PLAYERS', { ...STYLE.title, fontSize: '72px' }).setOrigin(0.5);
@@ -364,7 +365,7 @@ class LobbyScene extends Phaser.Scene {
       const src = Controls.sources.touch; if (!src || this.playerOf(src) || this.openSide() === null) return;
       this.players.push({ src, side: this.openSide(), chair: null, spinQueued: 0, speedLevel: Settings.speedLevel, name: this.firstName() });
     });
-    tapButton(this, 1130, 676, 260, 'Kick off', () => { Controls.owner = null; this.scene.start('Game', { players: this.players, sizes: this.sizes, practice: this.practice, season: this.season }); });
+    tapButton(this, 1130, 676, 260, 'Kick off', () => { Controls.owner = null; this.scene.start('Game', { players: this.players, sizes: this.sizes, practice: this.practice, season: this.season, mini: this.mini }); });
     this.colA = this.add.text(300, 270, '', STYLE.row).setOrigin(0.5, 0); this.colB = this.add.text(980, 270, '', STYLE.row).setOrigin(0.5, 0);
     this.idle = this.add.text(CX, 220, '', { ...STYLE.row, fontSize: '28px', align: 'center', wordWrap: { width: 1180 } }).setOrigin(0.5, 0);
     this.add.image(300, 160, 'logo-' + TEAMS[this.teams[0]].id).setDisplaySize(90, 90);
@@ -392,7 +393,7 @@ class LobbyScene extends Phaser.Scene {
       if (!p) {
         if (src.pressed.a && this.openSide() !== null) {
           this.players.push({ src, side: this.openSide(), chair: null, spinQueued: 0, speedLevel: Settings.speedLevel, name: this.firstName() }); Sound.play('select');
-        } else if (src.pressed.start && this.ready > 12 && this.players.length === 0) { Sound.play('select'); Controls.owner = null; return this.scene.start('Game', { players: [], sizes: this.sizes, practice: this.practice, season: this.season }); }   // nobody joined: watch CPU v CPU, people can jump in with Start
+        } else if (src.pressed.start && this.ready > 12 && this.players.length === 0) { Sound.play('select'); Controls.owner = null; return this.scene.start('Game', { players: [], sizes: this.sizes, practice: this.practice, season: this.season, mini: this.mini }); }   // nobody joined: watch CPU v CPU, people can jump in with Start
         else if (src.pressed.b && this.players.length === 0) { Sound.play('back'); return this.scene.start(this.season ? 'SeasonHub' : 'Setup', { practice: this.practice }); }
         continue;
       }
@@ -402,7 +403,7 @@ class LobbyScene extends Phaser.Scene {
       if (src.pressed.x) { p.locked = !p.locked; Sound.play('blip'); }                                                                                                    // X: lock to one cart for the whole game
       if (src.pressed.y) Settings.askName(p.name, t => this.rename(p, t), src);                                                                                         // Y: type your own
       if (src.pressed.b) { this.players = this.players.filter(q => q !== p); Sound.play('back'); }
-      else if (src.pressed.start) { Sound.play('select'); Controls.owner = null; return this.scene.start('Game', { players: this.players, sizes: this.sizes, practice: this.practice, season: this.season }); }
+      else if (src.pressed.start) { Sound.play('select'); Controls.owner = null; return this.scene.start('Game', { players: this.players, sizes: this.sizes, practice: this.practice, season: this.season, mini: this.mini }); }
     }
     const names = side => this.players.map((p, i) => ({ p, i })).filter(o => o.p.side === side).map(o => `${o.p.name}  (${o.p.src.label})${o.p.locked ? '   🔒 ONE CART' : ''}`).join('\n');
     this.colA.setText(names(0)).setColor(teamColorHex(this.teams[0])); this.colB.setText(names(1)).setColor(teamColorHex(this.teams[1]));
@@ -419,7 +420,7 @@ class GameScene extends Phaser.Scene {
     if (this.online) { this.match = this.online.match; this.setup = { players: this.online.players }; }
     else {
       const se = this.setup.season || null;                                                   // Season mode: these two teams, each at its own skill, with the season's game length
-      this.match = new Match({ teamA: se ? se.teams[0] : Settings.teamA, teamB: se ? se.teams[1] : Settings.teamB, players: this.setup.players, difficulty: se ? se.difficulty : Settings.difficulty, sizes: this.setup.sizes, practice: this.setup.practice,
+      this.match = makeMatch({ mini: this.setup.mini || null, teamA: se ? se.teams[0] : Settings.teamA, teamB: se ? se.teams[1] : Settings.teamB, players: this.setup.players, difficulty: se ? se.difficulty : Settings.difficulty, sizes: this.setup.sizes, practice: this.setup.practice,
         periodSeconds: se ? se.periodSeconds : undefined, diffBySide: se ? se.levels : undefined });
       this.setup.players.forEach((p, i) => { p.tag = 'P' + (i + 1); });
     }
@@ -446,7 +447,7 @@ class GameScene extends Phaser.Scene {
     this.noticeText = this.add.text(this.courtCX, this.viewTop + 14, '', { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: '#ffe27a', align: 'center' }).setOrigin(0.5, 0).setStroke('#0d151b', 6).setAlpha(0.92).setDepth(30);   // fouls and other events: over the top of the court, smallish so play stays visible
     this.setup3d();                                          // first / third person and broadcast cameras (scenes_3d.js)
     if (!this.demo) {                                          // a pause button for the mouse (the touch controller has its own)
-      this.pauseBtn = tapButton(this, 58, 86, 92, 'II', () => this.pauseFromTap());
+      this.pauseBtn = tapButton(this, 155, 30, 62, 'II', () => this.pauseFromTap());   // between the 👥 button and the scoreboard (clear of split-screen labels)
       for (const o of [this.pauseBtn.bg, this.pauseBtn.t, this.pauseBtn.hit]) o.setDepth(60).setScrollFactor(0);
       this.pauseBtn.bg.setAlpha(0.8);
     }
@@ -456,6 +457,13 @@ class GameScene extends Phaser.Scene {
       if (o.role === 'client') { o.session.onClosed = reason => this.leaveOnline(netErrorText({ type: reason })); o.session.onLobby = () => this.scene.start('Room', { role: 'client', session: o.session }); }
       else { o.idle = { ax: 0, ay: 0, pressed: {} }; o.session.onError = () => {}; }
     }
+  }
+  /* A name tag fades almost away while the ball is under it or right next to it, so the ball is never hidden; it comes back as the ball moves on. */
+  fadeTagNearBall(tag, key, bx, by, br) {
+    const F = CONFIG.render.tagFade, s = tag.scaleX || 1, hw = (tag.width * s) / 2 + br + F.margin, hh = (tag.height * s) / 2 + br + F.margin;
+    const near = Math.abs(bx - tag.x) < hw && Math.abs(by - tag.y) < hh, want = near ? F.alpha : 1;
+    this.tagAlpha = this.tagAlpha || new Map(); const a0 = this.tagAlpha.has(key) ? this.tagAlpha.get(key) : 1, a = a0 + (want - a0) * (1 - Math.exp(-F.speed * Math.min(0.1, this.game.loop.delta / 1000)));   // eased over time, the same on any frame rate
+    this.tagAlpha.set(key, a); tag.setAlpha(a);
   }
   pauseFromTap() {
     if (!this.match || this.match.state === 'over' || this.scene.isActive('Pause') || this.scene.isActive('JoinMenu')) return;
@@ -479,7 +487,7 @@ class GameScene extends Phaser.Scene {
         if (!me) continue; const input = menuOpen ? idle : src; me.src = menuOpen ? o.idle : src;
         if (input.pressed.halfCW) me.spinQueued = 0.5; if (input.pressed.halfCCW) me.spinQueued = -0.5;
         if (input.pressed.spinCW) me.spinQueued = 1; if (input.pressed.spinCCW) me.spinQueued = -1;
-        if (input.pressed.x) m.togglePress(me.side);
+        if (m.mini && (input.pressed.a || input.pressed.x)) m.useBy(me); else if (input.pressed.x) m.togglePress(me.side);
         if (input.pressed.y) m.switchChair(me);
         if (input.pressed.speedUp && me.speedLevel < Settings.speedCap) { me.speedLevel++; Sound.play('blip'); }
         if (input.pressed.speedDown && me.speedLevel > 1) { me.speedLevel--; Sound.play('blip'); }
@@ -492,6 +500,7 @@ class GameScene extends Phaser.Scene {
       if (m.state === 'over' && this.resultReady() && (Controls.menu().a || tapA) && !menuOpen) { o.session.backToLobby(); this.scene.start('Room', { role: 'host', session: o.session }); return; }
     } else {
       this.pre3d(dt); o.sim.frame(dt, [{ id: o.session.myId, input: menuOpen ? idle : Controls.mine }, ...guests.map(([id, src]) => ({ id, input: menuOpen ? idle : src }))]);
+      if (m.mini) { const me = o.sim.locals[0] && o.sim.locals[0].me; if (me && me.chair) Object.assign(m.ball, { x: me.chair.x, y: me.chair.y }); }   // minigames: the cameras follow your own cart
       if (o.session.silent()) o.session.finish('lost');
       this.pingText.setText(`ping ${Math.round(o.session.rtt)} ms   room ${o.session.code}`);
     }
@@ -725,7 +734,7 @@ class GameScene extends Phaser.Scene {
     for (const p of this.setup.players) {
       if (p.src.pressed.halfCW) p.spinQueued = 0.5; if (p.src.pressed.halfCCW) p.spinQueued = -0.5;
       if (p.src.pressed.spinCW) p.spinQueued = 1; if (p.src.pressed.spinCCW) p.spinQueued = -1;
-      if (p.src.pressed.x) m.togglePress(p.side);
+      if (m.mini && (p.src.pressed.a || p.src.pressed.x)) m.useBy(p); else if (p.src.pressed.x) m.togglePress(p.side);
       if (p.src.pressed.y) m.switchChair(p);
       if (p.src.pressed.speedUp && p.speedLevel < Settings.speedCap) { p.speedLevel++; Sound.play('blip'); }   // RB
       if (p.src.pressed.speedDown && p.speedLevel > 1) { p.speedLevel--; Sound.play('blip'); }                      // LB
@@ -738,7 +747,7 @@ class GameScene extends Phaser.Scene {
     m.update(Math.min(delta / 1000, 0.05));
     this.render();
     if (m.state === 'over') {
-      if (!this.recorded) { this.recorded = true; const sides = [...new Set(this.setup.players.map(p => p.side))]; if (sides.length) Settings.record(m, sides); }
+      if (!this.recorded && !m.mini) { this.recorded = true; const sides = [...new Set(this.setup.players.map(p => p.side))]; if (sides.length) Settings.record(m, sides); }
       const e = this.resultReady() ? { ...Controls.menu() } : {}, se = this.setup.season;
       if (this.resultTap) { if (this.resultReady()) e[this.resultTap] = true; this.resultTap = null; }
       if (se) {                                                                                      // Season: file the result and go back to the season screen
@@ -887,16 +896,21 @@ class GameScene extends Phaser.Scene {
     if (!this.flat) { if (this.crowd) this.crowd.update(Math.min(dt3, 0.05)); this.render3d(dt3); }        // the 3D view (first / third person, broadcast)
     else {                                                                 // the classic 2D view
       g.clear(); this.updateCamera(dt3); this.drawArrows();
+      const bs = this.toScreen(m.ball.x, m.ball.y), bz = this.tilted ? this.zoom * this.s0 * (bs.k || 1) : this.zoom, bpx = Math.max(B.radius * (B.drawScale || 1) * bz, B.minDrawRadiusPx || 0);
       m.chairs.forEach((c, i) => {
         const tag = this.tags[i]; tag.setVisible(!c.benched);
         if (c.benched) return;
         this.drawChair(g, c, TEAMS[m.teams[c.side]].color, c.player ? c.player.speedLevel : 0);
-        const sp = this.toScreen(c.x, c.y), k = sp.k || 1, z = this.tilted ? this.zoom * this.s0 * k : this.zoom; const label = c.player ? (c.player.name || c.player.tag) : (this.demo && c.side === 0 && c.index === 1 ? 'YOU' : ''); tag.setText(label).setScale(Math.max(0.55, Math.min(1.2, k))).setPosition(sp.x, sp.y - 0.75 * z).setVisible(!!label && this.inView(sp, 10));
+        const sp = this.toScreen(c.x, c.y), k = sp.k || 1, z = this.tilted ? this.zoom * this.s0 * k : this.zoom; const label = m.mini ? this.miniTag(c) : c.player ? (c.player.name || c.player.tag) : (this.demo && c.side === 0 && c.index === 1 ? 'YOU' : ''); tag.setText(label).setScale(Math.max(0.55, Math.min(1.2, k))).setPosition(sp.x, sp.y - 0.75 * z).setVisible(!!label && this.inView(sp, 10));
+        if (label && !m.noBall) this.fadeTagNearBall(tag, 'flat' + i, bs.x, bs.y, bpx);
       });
       const r = Math.max(B.radius * (B.drawScale || 1), B.minDrawRadiusPx / (this.tilted ? this.zoom * this.s0 : this.zoom));
       const L = CONFIG.look;
+      if (m.mini) this.drawMini2D(g);                                        // minigames: the track, balloons, boxes, shots, oil
+      if (!m.noBall) {
       g.fillStyle(0x000000, L.shadowAlpha).fillCircle(m.ball.x + L.ballShadowDx + r * 0.3, m.ball.y + L.ballShadowDy + r * 0.3, r);       // ball shadow
       g.fillStyle(0xffffff).fillCircle(m.ball.x, m.ball.y, r); this.drawBallRoll(g, m.ball, r); g.fillStyle(0xffffff, L.ballHighlight).fillCircle(m.ball.x - r * 0.3, m.ball.y - r * 0.3, r * 0.45); g.lineStyle(0.03, 0x111111).strokeCircle(m.ball.x, m.ball.y, r);
+      }
       if (this.crowd) {                                                    // the stands: reactions every frame, the fans themselves redrawn ~30 times a second
         const dtc = Math.min(this.game.loop.delta / 1000, 0.05), cr = this.crowd; cr.update(dtc); cr.acc += dtc;
         if (cr.acc >= 1 / CONFIG.arena.hz && this.camView) { cr.acc = 0; cr.drawFans(this.fansG, this.camView, this.rot); }
@@ -905,14 +919,16 @@ class GameScene extends Phaser.Scene {
       if (this.tilted) { this.dt.clear(); this.dt.draw(this.world); }        // the court (floor, carts, ball) is now drawn: photograph it onto the tilted plane
     }
     const t = Math.max(0, Math.ceil(m.clock));
+    if (m.mini) this.updateMiniHud(m); else {
     this.clockText.setText(m.practice ? 'PRACTICE' : m.overtime ? 'GOLDEN GOAL' : `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`).setColor('#f2c200');
     this.nameA.setText(TEAMS[m.teams[0]].name.toUpperCase() + (m.press[0] ? '  ⚡PRESS' : '')).setColor(teamColorHex(m.teams[0])); this.nameB.setText((m.press[1] ? 'PRESS⚡  ' : '') + TEAMS[m.teams[1]].name.toUpperCase()).setColor(teamColorHex(m.teams[1]));
     this.scoreA.setText(String(m.score[0])).setColor('#ffffff'); this.scoreB.setText(String(m.score[1])).setColor('#ffffff');
     [0, 1].forEach(s => { if (m.score[s] > this.lastScore[s]) this.celebrate(s); });
     this.lastScore = m.score.slice();
-    this.noticeText.setText(m.noticeLeft > 0 ? m.notice : '');
     this.updateStrip(m);
-    if (m.state === 'over') { this.banner.setText(''); if (!this.demo) { this.showResult(); if (this.resultHint && this.resultHint.active) this.resultHint.setAlpha(this.resultReady() ? 0.72 + 0.28 * Math.sin(this.time.now / 220) : 0); } }
+    }
+    this.noticeText.setText(m.noticeLeft > 0 ? m.notice : '');
+    if (m.state === 'over') { this.banner.setText(''); if (!this.demo) { if (m.mini) this.showMiniResult(); else this.showResult(); if (this.resultHint && this.resultHint.active) this.resultHint.setAlpha(this.resultReady() ? 0.72 + 0.28 * Math.sin(this.time.now / 220) : 0); } }
     else if (m.state === 'countdown') this.banner.setText(String(Math.ceil(m.timer))).setFontSize(110);
     else this.banner.setText(m.bannerLeft > 0 ? m.banner : '').setFontSize(56);
   }
@@ -1007,9 +1023,9 @@ class PauseScene extends ListMenuScene {
     this.buildMenu('PAUSED', online ? onlineItems : [
       { label: () => 'Resume', select: resume },
       camItem,
-      ...(this.gameScene.setup.season ? [] : this.gameScene.setup.players).map(p => ({
+      ...(this.gameScene.setup.season || m.mini ? [] : this.gameScene.setup.players).map(p => ({
         label: () => `${p.name || p.tag}  ${p.src.label}:   ◀ ${TEAMS[m.teams[p.side]].name} ▶`, change: switchTeam(p), select: switchTeam(p) })),
-      ...(m.practice ? [{ label: () => 'Reset score and kickoff', select: () => { m.score = [0, 0]; m.kickoff(); resume(); } }] : []),
+      ...(m.practice && !m.mini ? [{ label: () => 'Reset score and kickoff', select: () => { m.score = [0, 0]; m.kickoff(); resume(); } }] : []),
       ...(Sound.playlist ? [{ label: () => 'Next song', select: () => Sound.nextTrack() }] : []),
       toSettings, social,
       ...(this.gameScene.setup.players.some(p => p.src === Controls.owner) ? [{ label: () => 'Leave the match (a CPU takes your cart)', select: () => { const me = this.gameScene.setup.players.find(p => p.src === Controls.owner); m.removePlayer(me); this.gameScene.setup.players = this.gameScene.setup.players.filter(p => p !== me); resume(); } }] : []),

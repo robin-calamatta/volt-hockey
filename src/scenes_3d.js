@@ -112,17 +112,19 @@ Object.assign(GameScene.prototype, {
     for (const vp of this.vps) {
       const R = vp.rect, top = R.y === 0 ? CONFIG.view.hudHeight : 0, inset = 34;
       // name tags over carts (people) and small markers over CPU teammates
+      const bq = this.v3.project(vp, m.ball.x, CONFIG.ball.radius, m.ball.y), bk = bq.behind ? 0 : Math.max(4, 26 / Math.max(0.5, bq.dist));   // the ball on screen (rough radius in pixels)
       for (const c of m.chairs) {
         if (c.benched || (c === vp.chair && vp.mode !== 'broadcast')) continue;
-        const mine = vp.p && c.side === vp.p.side, label = c.player ? (c.player.name || c.player.tag) : (mine && vp.mode !== 'broadcast' ? '▼' : '');
+        const mine = vp.p && c.side === vp.p.side, label = m.mini ? this.miniTag(c, vp) : c.player ? (c.player.name || c.player.tag) : (mine && vp.mode !== 'broadcast' ? '▼' : '');
         if (!label) continue; const q = this.v3.project(vp, c.x, T.height, c.y);
         if (q.behind || q.x < R.x + 10 || q.x > R.x + R.w - 10 || q.y < R.y + top || q.y > R.y + R.h - 10) continue;
         const k = Math.max(T.minScale, Math.min(T.maxScale, T.near / Math.max(0.5, q.dist)));
-        this.pooled(this.tagPool, nt++, tagStyle).setText(label).setColor(teamColorHex(m.teams[c.side])).setScale(k).setPosition(q.x, q.y).setVisible(true);
+        const tag = this.pooled(this.tagPool, nt++, tagStyle).setText(label).setColor(teamColorHex(m.teams[c.side])).setScale(k).setPosition(q.x, q.y).setVisible(true);
+        if (!bq.behind && !m.noBall) this.fadeTagNearBall(tag, vp.key + ':' + m.chairs.indexOf(c), bq.x, bq.y, bk);
       }
       // the ball: an arrow at the edge of the view when it is off screen (or behind you)
       const b = m.ball, q = this.v3.project(vp, b.x, 0.05, b.y), cx = R.x + R.w / 2, cy = (R.y + top + R.y + R.h) / 2;
-      const seen = !q.behind && q.x > R.x + inset && q.x < R.x + R.w - inset && q.y > R.y + top + inset && q.y < R.y + R.h - 4;   // (the bottom edge counts: in first person the ball in your cup sits right there)
+      const seen = m.noBall || !q.behind && q.x > R.x + inset && q.x < R.x + R.w - inset && q.y > R.y + top + inset && q.y < R.y + R.h - 4;   // (the bottom edge counts: in first person the ball in your cup sits right there)
       if (!seen) {
         let dx = q.behind ? q.cx : q.x - cx, dy = q.behind ? Math.abs(q.dist) + Math.abs(q.cy) + 0.5 : q.y - cy; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
         const hw = R.w / 2 - inset, hh = (R.y + R.h - (R.y + top)) / 2 - inset, t = Math.min(hw / Math.abs(dx || 1e-6), hh / Math.abs(dy || 1e-6)), ax = cx + dx * t, ay = cy + dy * t, S = 18, nx = -dy, ny = dx;
@@ -138,7 +140,8 @@ Object.assign(GameScene.prototype, {
         this.pooled(this.vpText, nv++, { ...vpStyle, fontSize: '17px' }).setText('SPEED').setOrigin(0, 0.5).setPosition(x0, y0 - 8).setColor('#9fb2bf').setVisible(true);
       }
       if (split && vp.p) this.pooled(this.vpText, nv++, vpStyle).setOrigin(0, 0.5).setText(vp.p.name || vp.p.tag || '').setColor(teamColorHex(m.teams[vp.p.side])).setPosition(R.x + 14, R.y + top + 18).setVisible(true);
-      if (vp.benched) this.pooled(this.vpText, nv++, vpStyle).setOrigin(0.5).setText(`SIN BIN   back in ${Math.max(0, Math.ceil(vp.benchChair.binLeft))}s`).setColor('#ff7a59').setPosition(cx, R.y + R.h * 0.72).setVisible(true);
+      if (m.mini && vp.p && vp.chair && !split) { /* one view: the item line is drawn by the game screen */ } else if (m.mini && vp.p && vp.chair && m.state === 'play') { const l = this.itemLine(vp.p); if (l) this.pooled(this.vpText, nv++, { ...vpStyle, fontSize: '22px' }).setOrigin(0.5).setText(l).setColor('#ffe27a').setPosition(cx, R.y + R.h - 30).setVisible(true); }
+      if (vp.benched) this.pooled(this.vpText, nv++, vpStyle).setOrigin(0.5).setText(m.mini ? 'OUT: watching from the bench' : `SIN BIN   back in ${Math.max(0, Math.ceil(vp.benchChair.binLeft))}s`).setColor('#ff7a59').setPosition(cx, R.y + R.h * 0.72).setVisible(true);
       const toast = vp.p && this.toasts.get(vp.p);
       if (toast && this.time.now < toast.until) this.pooled(this.vpText, nv++, { ...vpStyle, fontSize: '30px' }).setOrigin(0.5).setText(toast.text).setColor('#ffe27a').setAlpha(Math.min(1, (toast.until - this.time.now) / 300)).setPosition(cx, R.y + R.h * 0.62).setVisible(true);
     }
@@ -161,6 +164,8 @@ Object.assign(GameScene.prototype, {
       g.fillStyle(col, 1).fillCircle(x, y, 3.6).lineStyle(mine.has(c) ? 2 : 1, mine.has(c) ? 0xffffff : 0x0d151b, 1).strokeCircle(x, y, mine.has(c) ? 5 : 3.6);
       g.lineStyle(2, mine.has(c) ? 0xffffff : col, 1).lineBetween(x, y, x + hx * 7, y + hy * 7);
     }
-    const [bx, by] = P(m.ball.x, m.ball.y); g.fillStyle(0xffffff, 1).fillCircle(bx, by, 2.6).lineStyle(1, 0x0d151b, 1).strokeCircle(bx, by, 2.6);
+    if (m.island) { const I = m.island; g.fillStyle(0x3a8f4a, 1).fillRoundedRect(...P(I.a - I.r, I.cy - I.r), (I.b - I.a + 2 * I.r) * s, 2 * I.r * s, I.r * s); }
+    if (m.boxes) for (const b of m.boxes) g.fillStyle(0xffd23f, 1).fillRect(...P(b.x - 0.3, b.y - 0.3), 0.6 * s + 1, 0.6 * s + 1);
+    if (!m.noBall) { const [bx, by] = P(m.ball.x, m.ball.y); g.fillStyle(0xffffff, 1).fillCircle(bx, by, 2.6).lineStyle(1, 0x0d151b, 1).strokeCircle(bx, by, 2.6); }
   }
 });

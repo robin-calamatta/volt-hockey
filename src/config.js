@@ -99,7 +99,7 @@ const CONFIG = {
   speedLevels: [0.2, 0.4, 0.6, 0.8, 1],
   // Faux-3D look: a light from the upper left throws shadows to the lower right. All in metres on the court.
   look:    { shadowDx: 0.16, shadowDy: 0.2, shadowAlpha: 0.35, ballShadowDx: 0.05, ballShadowDy: 0.07, bodyLift: 0.09, sideShade: 0x0b0f12, boardRim: 0xa07a4a, boardRimWidth: 0.12, innerShadowSteps: 6, innerShadowWidth: 0.7, innerShadowAlpha: 0.07, ballHighlight: 0.35 },
-  render:  { smooth: true, ringWidth: 0.07, ringOffset: 0.1, ringGapRadians: 0.18, ringDimAlpha: 0.22 },
+  render:  { smooth: true, tagFade: { alpha: 0.12, margin: 10, speed: 14 }, ringWidth: 0.07, ringOffset: 0.1, ringGapRadians: 0.18, ringDimAlpha: 0.22 },
   /* The 3D view (src/view3d.js, Three.js). Heights in metres above the floor; angles in degrees; follow rates per second (higher = snappier).
      The camera button (View / R3, T, P, or the eye on the touch pad) steps through `cycle`; '2d' is the original flat view and is only offered to a lone player. */
   view3d: {
