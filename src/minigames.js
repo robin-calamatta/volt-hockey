@@ -10,7 +10,7 @@
 const MINI = {
   names: { balloons: 'Balloon Bash', race: 'Race', hunt: 'Manhunt' },
   hints: { balloons: 'Pop the balloons on everyone else\'s back with the front of your cart. Last one with balloons wins.', race: 'Laps of an oval track built on the court. First across the line wins.', hunt: 'One cart is IT. Get caught and you are IT too. Survive the clock to win.' },
-  items: { boost: { label: 'BOOST', icon: '🚀' }, zap: { label: 'ZAP', icon: '⚡' }, oil: { label: 'OIL', icon: '🛢' } },
+  items: { boost: { label: 'BOOST', icon: '🚀' }, zap: { label: 'ZAP', icon: '⚡' }, oil: { label: 'OIL', icon: '🛢' }, wave: { label: 'SHOCKWAVE', icon: '💥' } },
   item: { boostSeconds: 3, boostMul: 1.55, zapSpeed: 13, zapLife: 1.4, zapRadius: 0.2, stunSeconds: 1.2, oilRadius: 0.75, oilLife: 14, oilGrace: 1.2, reverseSeconds: 4,
           boxEvery: [3.5, 7], boxMax: 4, boxRadius: 0.5, boxFirst: 2 },
   balloons: { safeSeconds: 2, reach: 0.5, minClosing: 0.25, front: 0.62, rear: -0.55 },
@@ -255,7 +255,7 @@ class MiniMatch extends Match {
     if ((this.boxIn -= h) <= 0) { this.boxIn = I.boxEvery[0] + Math.random() * (I.boxEvery[1] - I.boxEvery[0]); if (this.boxes.length < I.boxMax) { const p = this.boxSpot(); if (p) this.boxes.push({ id: ++this.idN, ...p }); } }
     for (const c of live) {                                             // drive over a box: a random item (if your hands are free)
       if (c.item) continue; const k = this.boxes.findIndex(b => Math.hypot(b.x - c.x, b.y - c.y) < I.boxRadius + CONFIG.chair.radius);
-      if (k >= 0) { this.boxes.splice(k, 1); c.item = ['boost', 'zap', 'oil'][Math.floor(Math.random() * 3)]; if (c.player) this.sfx('select', c.player.id || 0); }
+      if (k >= 0) { this.boxes.splice(k, 1); const L = (typeof modeOf === 'function' && modeOf(this) && modeOf(this).items) || ['boost', 'zap', 'oil']; c.item = L[Math.floor(Math.random() * L.length)]; if (c.player) this.sfx('select', c.player.id || 0); }
     }
     for (const z of this.zaps) {                                        // shots fly straight until they hit a cart, a wall or run out
       z.x += z.vx * h; z.y += z.vy * h; z.life -= h;
@@ -282,6 +282,11 @@ class MiniMatch extends Match {
     const I = MINI.item, it = c.item; if (!it || c.out || this.state !== 'play') return; c.item = '';
     if (it === 'boost') { c.boostLeft = I.boostSeconds; this.sfx('screech'); }
     else if (it === 'zap') { const f = c.toWorld(0.8, 0), hx = Math.cos(c.heading), hy = Math.sin(c.heading); this.zaps.push({ id: ++this.idN, x: f.x, y: f.y, vx: hx * I.zapSpeed + c.vx * 0.5, vy: hy * I.zapSpeed + c.vy * 0.5, life: I.zapLife, from: c }); this.sfx('whistle'); }
+    else if (it === 'wave') {                                           // SHOCKWAVE: throws every cart near you away (and dazes them a moment)
+      for (const o of this.chairs) { if (o === c || o.out) continue; const dx = o.x - c.x, dy = o.y - c.y, d = Math.hypot(dx, dy); if (d < 3.6 && d > 0) { const k = 3 + 6 * (1 - d / 3.6); o.vx += dx / d * k; o.vy += dy / d * k; o.stunLeft = Math.max(o.stunLeft, 0.5); } }
+      if (this.gs) { this.gs.objs = this.gs.objs || []; this.gs.objs.push({ t: 'boom', id: this.gs.nid = (this.gs.nid || 0) + 1, x: Math.round(c.x * 100) / 100, y: Math.round(c.y * 100) / 100, life: 0.7, wave: 1 }); }
+      this.sfx('goal'); this.notice = `${this.name(c).toUpperCase()}: SHOCKWAVE!`; this.noticeLeft = 1.2;
+    }
     else if (it === 'oil') { const b = c.toWorld(-1.05, 0); this.slicks.push({ id: ++this.idN, x: b.x, y: b.y, life: I.oilLife, grace: I.oilGrace, from: c }); this.sfx('bump'); }
   }
   zapped(c, by) {

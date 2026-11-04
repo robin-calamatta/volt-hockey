@@ -44,7 +44,14 @@ const MG = {
     m.finishGame(live[0] ? `${MG.up(m.name(live[0]))} WINS!` : 'NOBODY WINS', rows); return true;
   },
   peopleLine: (m, f) => MG.people(m).slice(0, 4).map(c => `${MG.pname(c)} ${f(c)}`).join('   '),
-  r2: v => Math.round(v * 100) / 100
+  r2: v => Math.round(v * 100) / 100,
+  autoItem(c, m) {                                                     // when the CPU fires its power-up
+    const foes = MG.live(m).filter(o => o !== c && (m.mini.mode !== 'teams' || o.side !== c.side)), it = c.item;
+    if (it === 'wave' && foes.filter(o => MH.dist(c, o) < 2.8).length >= (m.kind === 'hill' ? 1 : 2)) c.wantUse = true;
+    else if (it === 'zap' && foes.some(o => MH.dist(c, o) < 8 && MH.ahead(c, o, 0.97))) c.wantUse = true;
+    else if (it === 'oil' && foes.some(o => MH.dist(c, o) < 4 && !MH.ahead(c, o, 0))) c.wantUse = true;
+    else if (it === 'boost' && Math.random() < 0.03) c.wantUse = true;
+  }
 };
 const R_CART = () => CONFIG.chair.radius;
 const minOpt = (values, def, label = 'Round length', key = 'minutes') => ({ key, label, values, def, fmt: v => v + ' min' });
@@ -87,12 +94,13 @@ MODES.bomb = {
 
 /* =============================== KING OF THE HILL =============================== */
 MODES.hill = {
-  init(m) { m.gs.zone = { x: m.width / 2, y: m.centerY, r: 2.3 }; m.gs.move = 20; m.gs.king = -1; for (const c of m.chairs) c.gs.pts = 0; },
+  items: ['zap', 'wave', 'boost', 'wave', 'oil'],
+  init(m) { m.gs.zone = { x: m.width / 2, y: m.centerY, r: 3 }; m.gs.move = 15; m.gs.king = -1; for (const c of m.chairs) c.gs.pts = 0; },
   step(m, h) {
     const g = m.gs, Z = g.zone;
     if ((g.move -= h) <= 0) {
-      let p; for (let t = 0; t < 30; t++) { p = { x: 3.5 + Math.random() * (m.width - 7), y: 3 + Math.random() * (m.height - 6) }; if (Math.hypot(p.x - Z.x, p.y - Z.y) > 8) break; }
-      Object.assign(Z, { x: MG.r2(p.x), y: MG.r2(p.y) }); g.move = 20; MG.notice(m, 'THE HILL MOVES!', 1.6); m.sfx('whistle');
+      let p; for (let t = 0; t < 30; t++) { p = { x: 4.5 + Math.random() * (m.width - 9), y: 4 + Math.random() * (m.height - 8) }; if (Math.hypot(p.x - Z.x, p.y - Z.y) > 12) break; }
+      Object.assign(Z, { x: MG.r2(p.x), y: MG.r2(p.y) }); g.move = 15; MG.notice(m, 'THE HILL MOVES!', 1.6); m.sfx('whistle');
     }
     const inside = MG.live(m).filter(c => Math.hypot(c.x - Z.x, c.y - Z.y) < Z.r).sort((a, b) => Math.hypot(a.x - Z.x, a.y - Z.y) - Math.hypot(b.x - Z.x, b.y - Z.y));
     if (!inside.length) { g.king = -1; g.busy = 0; return; }
@@ -149,38 +157,64 @@ MODES.sumo = {
 
 /* =============================== FLOOR IS LAVA =============================== */
 MODES.lava = {
-  init(m) { const g = m.gs; g.cols = 14; g.rows = 7; g.t = '0'.repeat(g.cols * g.rows); g.el = 0; g.next = 2.5; m.lavaT = new Array(g.cols * g.rows).fill(0); },
+  init(m) { const g = m.gs; g.cols = 14; g.rows = 7; g.t = '0'.repeat(g.cols * g.rows); g.el = 0; g.next = 2.5; g.snakeIn = 8; m.lavaT = new Array(g.cols * g.rows).fill(0); },
   tileAt(m, x, y) { const g = m.gs, i = Math.floor(x / (m.width / g.cols)), j = Math.floor(y / (m.height / g.rows)); return i < 0 || j < 0 || i >= g.cols || j >= g.rows ? -1 : j * g.cols + i; },
   center(m, k) { const g = m.gs, w = m.width / g.cols, hh = m.height / g.rows; return { x: (k % g.cols + 0.5) * w, y: (Math.floor(k / g.cols) + 0.5) * hh }; },
   step(m, h) {
     const g = m.gs, T = g.t.split(''), N = T.length; g.el += h; if (!m.lavaT) m.lavaT = new Array(N).fill(0);
-    for (let k = 0; k < N; k++) { if (T[k] === '0') continue; m.lavaT[k] -= h; if (m.lavaT[k] > 0) continue; if (T[k] === '1') { T[k] = '2'; m.lavaT[k] = Math.min(14, 5 + g.el * 0.06); } else T[k] = '0'; }
+    for (let k = 0; k < N; k++) { if (T[k] === '0') continue; m.lavaT[k] -= h; if (m.lavaT[k] > 0) continue; if (T[k] === '1') { T[k] = '2'; m.lavaT[k] = Math.min(10, 3 + g.el * 0.04); } else T[k] = '0'; }
     if ((g.next -= h) <= 0) {                                            // more and more of the floor turns to lava as the game goes on
-      g.next = Math.max(1.1, 3 - g.el * 0.015); const safe = []; for (let k = 0; k < N; k++) if (T[k] === '0') safe.push(k);
-      const want = Math.min(Math.floor(safe.length - N * 0.3), 2 + Math.floor(g.el / 15));
+      g.next = Math.max(1.2, 3 - g.el * 0.015); const safe = []; for (let k = 0; k < N; k++) if (T[k] === '0') safe.push(k);
+      const want = Math.min(Math.floor(safe.length - N * 0.5), 2 + Math.floor(g.el / 20));
       for (let n = 0; n < want; n++) { const k = safe.splice(Math.floor(Math.random() * safe.length), 1)[0]; T[k] = '1'; m.lavaT[k] = 1.7; }
     }
+    this.snake(m, h, T);
     g.t = T.join('');
     for (const o of MG.all(m, 'boom')) { o.life -= h; if (o.life <= 0) MG.remove(m, o); }
-    for (const c of MG.live(m)) { const k = this.tileAt(m, c.x, c.y); if (k >= 0 && T[k] === '2') { MH.out(m, c); MG.add(m, { t: 'boom', x: MG.r2(c.x), y: MG.r2(c.y), life: 0.6, lava: 1 }); m.sfx('foul'); MG.notice(m, `${MG.up(m.name(c))} IS TOAST`, 1.5); if (Math.random() < 0.5) m.line(`${m.name(c)} touched the lava!`); } }
+    const S = g.sn;
+    for (const c of MG.live(m)) {
+      const k = this.tileAt(m, c.x, c.y), bitten = S && S.p.some(([x, y], i) => Math.hypot(c.x - x, c.y - y) < (i === 0 ? 0.95 : 0.75));
+      if ((k >= 0 && T[k] === '2') || bitten) { MH.out(m, c); MG.add(m, { t: 'boom', x: MG.r2(c.x), y: MG.r2(c.y), life: 0.6, lava: 1 }); m.sfx('foul'); MG.notice(m, bitten ? `THE LAVA SNAKE GOT ${MG.up(m.name(c))}` : `${MG.up(m.name(c))} IS TOAST`, 1.5); if (Math.random() < 0.5) m.line(bitten ? `The snake gets ${m.name(c)}!` : `${m.name(c)} touched the lava!`); }
+    }
     MG.lastStanding(m, () => 'melted');
+  },
+  snake(m, h, T) {                                                      // a snake of lava that wakes up after a few seconds and hunts the nearest cart, melting the floor behind it
+    const g = m.gs; if ((g.snakeIn -= h) > 0) return;
+    if (!g.sn) { const x = m.width / 2, y = -0.5; g.sn = { a: Math.PI / 2, p: Array.from({ length: 8 }, (_, i) => [x, y - i * 0.7]) }; MG.notice(m, 'THE LAVA SNAKE IS AWAKE!', 2); m.sfx('whistle'); m.line('Look out, here comes the lava snake!'); }
+    const S = g.sn, H = S.p[0], live = MG.live(m), tgt = live.slice().sort((a, b) => Math.hypot(a.x - H[0], a.y - H[1]) - Math.hypot(b.x - H[0], b.y - H[1]))[0];
+    const want = tgt ? Math.atan2(tgt.y - H[1], tgt.x - H[0]) : S.a, turn = 1.1 + Math.min(1.1, g.el * 0.008), sp = Math.min(4.2, 1.8 + g.el * 0.015);
+    const da = normalizeAngle(want - S.a); S.a += Math.max(-turn * h, Math.min(turn * h, da));
+    let nx = H[0] + Math.cos(S.a) * sp * h, ny = H[1] + Math.sin(S.a) * sp * h;
+    if (nx < 0.4 || nx > m.width - 0.4) S.a = Math.PI - S.a; if (ny < 0.4 && g.snakeIn < -2 || ny > m.height - 0.4) S.a = -S.a;
+    nx = Math.max(0.3, Math.min(m.width - 0.3, nx)); ny = Math.max(-1, Math.min(m.height - 0.3, ny));
+    S.p[0] = [nx, ny];
+    for (let i = 1; i < S.p.length; i++) { const a = S.p[i - 1], b = S.p[i], dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 1; if (d > 0.7) S.p[i] = [a[0] + dx / d * 0.7, a[1] + dy / d * 0.7]; }
+    const want2 = 8 + Math.floor(g.el / 15); if (S.p.length < Math.min(16, want2)) S.p.push(S.p[S.p.length - 1].slice());
+    const k = this.tileAt(m, nx, ny); if (k >= 0 && T[k] === '0') { T[k] = '2'; m.lavaT[k] = 1.6; }   // its trail is lava for a moment
   },
   timeUp(m) { const live = MG.live(m); m.finishGame(live.length === 1 ? `${MG.up(m.name(live[0]))} WINS!` : live.length ? `${live.length} SURVIVORS WIN!` : 'NOBODY WINS', [...live.map(c => ({ c, text: 'survived' })), ...m.order.slice().reverse().map(c => ({ c, text: 'melted' }))], -1, 'Time up: everyone still standing wins'); },
   ai(c, m) {
-    const T = m.gs.t, here = this.tileAt(m, c.x, c.y), ahead = this.tileAt(m, c.x + Math.cos(c.heading) * 1.2, c.y + Math.sin(c.heading) * 1.2);
-    const bad = k => k < 0 || T[k] !== '0';
-    if (!c.safeK || bad(c.safeK) || bad(here) || bad(ahead)) {           // pick the nearest tile that is safe, with safe neighbours
-      let best = -1, bd = Infinity; for (let k = 0; k < T.length; k++) { if (T[k] !== '0') continue; const p = this.center(m, k); let d = Math.hypot(p.x - c.x, p.y - c.y); for (const nb of [k - 1, k + 1, k - m.gs.cols, k + m.gs.cols]) if (nb >= 0 && nb < T.length && T[nb] !== '0') d += 1.5; if (d < bd) { bd = d; best = k; } }
-      c.safeK = best;
+    const T = m.gs.t, S = m.gs.sn, here = this.tileAt(m, c.x, c.y), ahead = this.tileAt(m, c.x + Math.cos(c.heading) * 1.2, c.y + Math.sin(c.heading) * 1.2);
+    const bad = k => k < 0 || T[k] !== '0', snakeD = (x, y) => S ? Math.min(...S.p.map(([a, b]) => Math.hypot(a - x, b - y))) : 99;
+    const clear = (x1, y1) => { const n = Math.ceil(Math.hypot(x1 - c.x, y1 - c.y) / 0.35); for (let i = 1; i <= n; i++) { const k = this.tileAt(m, c.x + (x1 - c.x) * i / n, c.y + (y1 - c.y) * i / n); if (k < 0 || T[k] === '2' || (T[k] === '1' && i > n / 2)) return false; } return true; };
+    if (S && snakeD(c.x, c.y) < 6) {                                    // run from the snake, in the direction with no lava on the way
+      let best = null, bs = -Infinity; for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, x = c.x + Math.cos(a) * 2.2, y = c.y + Math.sin(a) * 2.2; if (!clear(x, y)) continue; const sc = snakeD(x, y) - Math.abs(normalizeAngle(a - c.heading)) * 0.4; if (sc > bs) { bs = sc; best = a; } }
+      if (best !== null) { c.safeK = null; return { x: Math.cos(best), y: Math.sin(best), speed: 1 }; }
+    }
+    if (!c.safeK || bad(c.safeK) || bad(here) || bad(ahead) || snakeD(...Object.values(this.center(m, c.safeK))) < 3 || (c.reachedAt && m.simTime - c.reachedAt > 2 + (c.k % 3))) {   // pick a safe tile (and a new one every few seconds)
+      let best = -1, bd = Infinity; for (let k = 0; k < T.length; k++) { if (T[k] !== '0' || k === here) continue; const p = this.center(m, k); if (!clear(p.x, p.y)) continue; let d = Math.hypot(p.x - c.x, p.y - c.y) + Math.random() * 3; for (const nb of [k - 1, k + 1, k - m.gs.cols, k + m.gs.cols]) if (nb >= 0 && nb < T.length && T[nb] !== '0') d += 1.5; d += Math.max(0, 6 - snakeD(p.x, p.y)) * 2; if (d < bd) { bd = d; best = k; } }
+      c.safeK = best; c.reachedAt = 0;
     }
     if (c.safeK < 0) return MG.wander(c, m); const p = this.center(m, c.safeK), d = Math.hypot(p.x - c.x, p.y - c.y);
-    return d < 0.5 ? { x: 0, y: 0, speed: 0 } : MH.to(c, p.x, p.y, d < 1.5 ? 0.5 : 1);
+    if (d < 0.6 && !c.reachedAt) c.reachedAt = m.simTime;
+    return MH.to(c, p.x, p.y, d < 1.5 ? 0.45 : 0.9);
   },
-  hud(m) { return { a: 'FLOOR IS LAVA', b: `${MG.live(m).length} LEFT`, mid: 'Orange melts.  Red is lava!', left: MG.peopleLine(m, c => c.out ? 'TOAST' : 'safe') }; },
+  hud(m) { return { a: 'FLOOR IS LAVA', b: `${MG.live(m).length} LEFT`, mid: m.gs.sn ? 'Run from the lava snake!' : 'Orange melts.  Red is lava!', left: MG.peopleLine(m, c => c.out ? 'TOAST' : 'safe') }; },
   startLine: () => 'The floor is lava!'
 };
 
 /* =============================== GOAL GAMES: MULTIBALL MADNESS and GIANT BALL =============================== */
+const BEACH = { gravity: 6.5, bounce: 0.78, reach: 1.0, goalZ: 1.9 };
 const goalGame = (big) => ({
   teams: true,
   init(m) {
@@ -190,8 +224,8 @@ const goalGame = (big) => ({
   },
   spawn(m, i, n, ball) {
     const x = m.width / 2, y = n > 1 ? m.centerY + (i - (n - 1) / 2) * Math.min(2.4, (m.height - 3) / n) : m.centerY;
-    const b = ball || MG.add(m, { t: big ? 'bigball' : 'ball', r: big ? 1.15 : 0.2, mass: big ? 240 : 0.5, x, y, vx: 0, vy: 0, wait: 0, last: -1 });
-    Object.assign(b, { x, y, vx: big ? 0 : (Math.random() - 0.5) * 2, vy: big ? 0 : (Math.random() - 0.5) * 2, wait: 0 }); return b;
+    const b = ball || MG.add(m, { t: big ? 'bigball' : 'ball', r: big ? 1.1 : 0.2, mass: big ? 70 : 0.5, x, y, vx: 0, vy: 0, wait: 0, last: -1, z: 0, vz: 0 });
+    Object.assign(b, { x, y, vx: big ? 0 : (Math.random() - 0.5) * 2, vy: big ? 0 : (Math.random() - 0.5) * 2, wait: 0, z: big ? 3.5 : 0, vz: 0 }); return b;
   },
   boxes(m) { const g = m.gs, cy = m.centerY; return [{ x0: -1, y0: cy - g.gw, x1: g.gl, y1: cy + g.gw, side: 0 }, { x0: m.width - g.gl, y0: cy - g.gw, x1: m.width + 1, y1: cy + g.gw, side: 1 }]; },
   kickoff(m) { const live = m.chairs; live.forEach(c => { const mates = live.filter(k => k.side === c.side), j = mates.indexOf(c), x = c.side ? m.width - 4.5 : 4.5, y = m.centerY + (j - (mates.length - 1) / 2) * 2.2; Object.assign(c, { x, y, px: x, py: y, heading: c.side ? Math.PI : 0, ph: c.side ? Math.PI : 0 }); }); for (const [i, b] of MG.all(m, big ? 'bigball' : 'ball').entries()) this.spawn(m, i, MG.all(m, big ? 'bigball' : 'ball').length, b); },
@@ -202,19 +236,25 @@ const goalGame = (big) => ({
     for (const b of balls) {
       if (b.wait > 0) { b.wait -= h; if (b.wait <= 0) this.spawn(m, balls.indexOf(b), balls.length, b); continue; }
       let who;
-      if (big) {                                                          // the giant ball is heavy: carts push it (and it pushes back)
-        for (const c of live) { const d = Math.hypot(b.x - c.x, b.y - c.y); if (d < b.r + R_CART() + 0.05) who = c; Physics.circles(b, b.r, b.mass, c, R_CART(), K.mass * (c.massMul || 1), 0.25); }
-        const sp = Math.hypot(b.vx, b.vy); if (sp > 0) { const k = Math.max(0, sp - 0.55 * h) / sp; b.vx *= k; b.vy *= k; } b.x += b.vx * h; b.y += b.vy * h;
-        const r = b.r; if (b.y < r) { b.y = r; b.vy = Math.abs(b.vy) * 0.5; } if (b.y > m.height - r) { b.y = m.height - r; b.vy = -Math.abs(b.vy) * 0.5; } if (b.x < r) { b.x = r; b.vx = Math.abs(b.vx) * 0.5; } if (b.x > m.width - r) { b.x = m.width - r; b.vx = -Math.abs(b.vx) * 0.5; }
+      if (big) {                                                          // the giant ball is a beach ball: light, floaty, bouncy. Carts hit it when it is low enough to reach
+        b.vz -= BEACH.gravity * h; b.z += b.vz * h;
+        if (b.z <= 0) { b.z = 0; if (b.vz < -0.8) b.vz = -b.vz * BEACH.bounce; else b.vz = 0; }
+        if (b.z < BEACH.reach) for (const c of live) {
+          const d = Math.hypot(b.x - c.x, b.y - c.y); if (d >= b.r + R_CART() + 0.05) continue; who = c;
+          const before = Math.hypot(b.vx, b.vy), closing = Physics.circles(b, b.r, b.mass, c, R_CART(), K.mass * (c.massMul || 1), 0.6);
+          if (closing > 0.3 && !(b.popAt > m.simTime)) { b.vz = Math.max(b.vz, 1.4 + closing * (c.spinLeft > 0 ? 1.3 : 0.55)); b.popAt = m.simTime + 0.25; if (closing > 1.5) m.sfx('bump'); }   // a hit pops it up into the air
+        }
+        const air = b.z > 0.05, sp = Math.hypot(b.vx, b.vy); if (sp > 0) { const k = Math.max(0, sp - (air ? 0.25 : 0.7) * h) / sp; b.vx *= k; b.vy *= k; } b.x += b.vx * h; b.y += b.vy * h;
+        const r = b.r, e = 0.7; if (b.y < r) { b.y = r; b.vy = Math.abs(b.vy) * e; } if (b.y > m.height - r) { b.y = m.height - r; b.vy = -Math.abs(b.vy) * e; } if (b.x < r) { b.x = r; b.vx = Math.abs(b.vx) * e; } if (b.x > m.width - r) { b.x = m.width - r; b.vx = -Math.abs(b.vx) * e; }
+
       } else who = MH.ballPhys(m, b, h, live, { bounce: 0.45, friction: 0.9, wallBounce: 0.7 });
       for (const o of balls) if (o !== b && !(o.wait > 0) && b.id < o.id) Physics.circles(b, b.r, b.mass, o, o.r, o.mass, 0.8);
       if (who) b.last = who.k;
       for (const bx of boxes) {                                           // the goal line: the ball's centre over it, between the posts
-        const inMouth = Math.abs(b.y - cy) < g.gw - (big ? 0 : b.r);
+        const inMouth = Math.abs(b.y - cy) < g.gw - (big ? 0 : b.r) && !(big && b.z > BEACH.goalZ);
         if (inMouth && ((bx.side === 0 && b.x < g.gl) || (bx.side === 1 && b.x > m.width - g.gl))) { this.goal(m, b, 1 - bx.side); break; }
         if (!inMouth) MG.rectPush(b, b.r, bx, 0.6);
       }
-      b.x = MG.r2(b.x); b.y = MG.r2(b.y);
     }
   },
   goal(m, b, side) {
@@ -240,7 +280,7 @@ MODES.multiball = goalGame(false);
 MODES.giant = goalGame(true);
 
 /* =============================== BOWLING =============================== */
-const BOWL = { foul: 0.33, headX: 5.2, pinR: 0.13, pinMass: 0.35, ballR: 0.26, ballMass: 3, gap: 0.62 };
+const BOWL = { foul: 0.33, headX: 5.2, pinR: 0.13, pinMass: 0.35, ballR: 0.26, ballMass: 3, gap: 0.62, laneHalf: 2.1, turn: 12 };
 MODES.bowling = {
   init(m) { const g = m.gs; g.turn = 0; g.frame = 1; g.roll = 1; g.phase = 'aim'; g.t = 0; g.last = ''; for (const c of m.chairs) { c.gs.score = 0; c.gs.strikes = 0; } this.setPins(m, true); },
   spot(m, i) { const row = [0, 1, 1, 2, 2, 2, 3, 3, 3, 3][i], j = [0, 0, 1, 0, 1, 2, 0, 1, 2, 3][i]; return { x: m.width - BOWL.headX + row * BOWL.gap * 0.87, y: m.centerY + (j - row / 2) * BOWL.gap }; },
@@ -250,6 +290,7 @@ MODES.bowling = {
     let b = MG.all(m, 'bball')[0]; if (!b) b = MG.add(m, { t: 'bball', r: BOWL.ballR, mass: BOWL.ballMass }); Object.assign(b, { x: m.width * BOWL.foul - 1.6, y: m.centerY, vx: 0, vy: 0 });
   },
   bowler: m => m.chairs[m.gs.turn % m.chairs.length],
+  rails: m => { const x0 = m.width * BOWL.foul, cy = m.centerY, w = BOWL.laneHalf; return [{ x0, y0: cy - w - 0.25, x1: m.width + 1, y1: cy - w }, { x0, y0: cy + w, x1: m.width + 1, y1: cy + w + 0.25 }]; },   // the bumper rails down each side of the lane
   kickoff(m) { this.place(m); },
   place(m) {                                                              // the bowler at the start of the lane; everyone else watches from the side
     const bw = this.bowler(m); let n = 0;
@@ -263,19 +304,18 @@ MODES.bowling = {
   step(m, h) {
     const g = m.gs, bw = this.bowler(m), b = MG.all(m, 'bball')[0], pins = MG.all(m, 'pin'); g.t += h;
     if (g.phase === 'next') { if (g.t > 1.8) this.advance(m); return; }
-    const who = MH.ballPhys(m, b, h, g.phase === 'aim' ? [bw] : [], { bounce: 0.35, friction: 0.22, wallBounce: 0.4 });
+    const who = MH.ballPhys(m, b, h, g.phase === 'aim' ? [bw] : [], { bounce: 0.35, friction: 0.22, wallBounce: 0.4 }), rails = this.rails(m);
+    for (const rl of rails) { MG.rectPush(b, b.r, rl, 0.85); MG.rectPush(bw, R_CART(), rl, 0.3); }
     for (const p of pins) {
-      MH.ballPhys(m, p, h, [], { friction: 2.2, wallBounce: 0.3 });
+      MH.ballPhys(m, p, h, [], { friction: 2.2, wallBounce: 0.3 }); for (const rl of rails) MG.rectPush(p, p.r, rl, 0.5);
       Physics.circles(b, b.r, b.mass, p, p.r, p.mass, 0.7);
       for (const q of pins) if (q.id > p.id) Physics.circles(p, p.r, p.mass, q, q.r, q.mass, 0.6);
       const s = this.spot(m, p.i); if (!p.down && (Math.hypot(p.vx, p.vy) > 0.9 || Math.hypot(p.x - s.x, p.y - s.y) > 0.22)) p.down = 1;
-      p.x = MG.r2(p.x); p.y = MG.r2(p.y);
     }
-    b.x = MG.r2(b.x); b.y = MG.r2(b.y);
     if (g.phase === 'aim') {
       if (bw.x > m.width * BOWL.foul - R_CART()) { bw.vx = Math.min(bw.vx, 0); bw.x = m.width * BOWL.foul - R_CART(); }   // the foul line
       if (b.x > m.width * BOWL.foul && Math.hypot(b.vx, b.vy) > 0.4) { g.phase = 'roll'; g.t = 0; m.sfx('screech'); }
-      else if (g.t > 14 || (who && b.x > m.width * BOWL.foul - 0.2 && Math.hypot(b.vx, b.vy) < 0.4 && g.t > 10)) { g.phase = 'roll'; g.t = 0; }
+      else if (g.t > BOWL.turn) { g.phase = 'roll'; g.t = 0; MG.notice(m, `TIME! ${MG.up(m.name(bw))} TOOK TOO LONG`, 1.4); m.sfx('foul'); }
     } else if (g.phase === 'roll') {
       const moving = Math.hypot(b.vx, b.vy) > 0.06 || pins.some(p => Math.hypot(p.vx, p.vy) > 0.05);
       if ((!moving && g.t > 1.2) || g.t > 9) this.score(m);
@@ -303,7 +343,7 @@ MODES.bowling = {
     const b = MG.all(m, 'bball')[0], head = this.spot(m, 0), err = (c.gs.aimErr === undefined || m.gs.t < 0.1) ? (c.gs.aimErr = (Math.random() - 0.5) * (0.5 + 2.5 * ((m.difficulty || {}).reaction || 0.2))) : c.gs.aimErr;
     return MG.pushTo(c, b, head.x, head.y + err, { speed: c.gs.aimSp || (c.gs.aimSp = 0.75 + Math.random() * 0.25) });
   },
-  hud(m) { const bw = this.bowler(m); return { clock: `FRAME ${Math.min(m.gs.frame, m.mini.frames)} / ${m.mini.frames}`, a: 'BOWLING', b: `${MG.up(m.name(bw))}, BALL ${m.gs.roll}`, mid: m.gs.last || 'Push the ball at the pins', left: MG.peopleLine(m, c => c.gs.score) }; },
+  hud(m) { const bw = this.bowler(m); return { clock: m.gs.phase === 'aim' ? `${Math.max(0, Math.ceil(BOWL.turn - m.gs.t))}s` : `FRAME ${Math.min(m.gs.frame, m.mini.frames)} / ${m.mini.frames}`, a: 'BOWLING', b: `${MG.up(m.name(bw))}, BALL ${m.gs.roll}  •  FRAME ${Math.min(m.gs.frame, m.mini.frames)}/${m.mini.frames}`, mid: m.gs.last || 'Push the ball at the pins', left: MG.peopleLine(m, c => c.gs.score) }; },
   tag(c, m) { return c === this.bowler(m) ? '🎳 ' + (MG.pname(c) || m.name(c)) : (c.player ? MG.pname(c) : ''); },
   startLine: m => `${m.name(m.chairs[0])} to bowl.`
 };
@@ -315,15 +355,17 @@ const GOLF_HOLES = [
   { name: 'Pinball', tee: [25, 7.5], cup: [3, 7.5], blocks: [[13.4, 3.2, 14.6, 4.4], [13.4, 10.6, 14.6, 11.8], [8.4, 6.9, 9.6, 8.1], [18.4, 6.9, 19.6, 8.1], [5.5, 4.5, 6.2, 10.5]], via: [[14, 7.5], [9, 3.5], [9, 11.5], [4, 2.5], [4, 12.5]] },
   { name: 'The Snake', tee: [2.5, 2.5], cup: [25.5, 2.5], blocks: [[6.5, 0, 7.3, 11], [13.6, 4, 14.4, 15], [20.7, 0, 21.5, 11]], via: [[6.9, 13], [14, 2], [21.1, 13]] }
 ];
+const GOLF = { r: 0.12, roll: 0.85, cup: 0.2, sink: 2.4, power: 1.55, base: 1.0, spin: 8, reach: 0.42, cool: 0.9 };
 MODES.golf = {
   init(m) { m.gs.hole = 0; m.gs.ht = 0; for (const c of m.chairs) { c.gs.strokes = 0; c.gs.total = 0; } this.setHole(m); },
   H: m => { const s = m.width / 28, sy = m.height / 15, H = GOLF_HOLES[m.gs.hole % GOLF_HOLES.length]; return { name: H.name, tee: { x: H.tee[0] * s, y: H.tee[1] * sy }, cup: { x: H.cup[0] * s, y: H.cup[1] * sy }, blocks: H.blocks.map(b => ({ x0: b[0] * s, y0: b[1] * sy, x1: b[2] * s, y1: b[3] * sy })), via: H.via.map(v => ({ x: v[0] * s, y: v[1] * sy })) }; },
   setHole(m) {
     const H = this.H(m), g = m.gs; g.ht = 0; g.cup = H.cup; g.blocks = H.blocks; g.name = H.name;
     for (const o of MG.all(m, 'gball')) MG.remove(m, o);
-    m.chairs.forEach((c, i) => { c.gs.strokes = 0; c.gs.holed = 0; c.gs.touch = 0; c.gs.lastHit = -9; const n = m.chairs.length, off = (i - (n - 1) / 2) * 0.75, ux = H.cup.x > H.tee.x ? 1 : -1;
-      MG.add(m, { t: 'gball', k: c.k, x: H.tee.x + (ux > 0 ? 0.9 : -0.9), y: H.tee.y + off, vx: 0, vy: 0, r: 0.15, mass: 0.4 });
-      Object.assign(c, { x: H.tee.x - ux * 0.4, y: H.tee.y + off, vx: 0, vy: 0, heading: ux > 0 ? 0 : Math.PI }); c.px = c.x; c.py = c.y; c.ph = c.heading; });
+    const ux = H.cup.x > H.tee.x ? 1 : -1, n = m.chairs.length;
+    m.chairs.forEach((c, i) => { c.gs.strokes = 0; c.gs.holed = 0; c.gs.plan = null; const off = (i - (n - 1) / 2) * 1.0;
+      MG.add(m, { t: 'gball', k: c.k, x: H.tee.x + ux * 1.3, y: H.tee.y + off, vx: 0, vy: 0, r: GOLF.r, cd: 0 });
+      Object.assign(c, { x: H.tee.x - ux * 0.2, y: H.tee.y + off, vx: 0, vy: 0, heading: ux > 0 ? 0 : Math.PI }); c.px = c.x; c.py = c.y; c.ph = c.heading; c.gs.ghost = 1; });   // carts pass through each other: everyone plays their own ball
   },
   kickoff(m) { this.setHole(m); },
   step(m, h) {
@@ -331,13 +373,23 @@ MODES.golf = {
     if (g.wait > 0) { g.wait -= h; if (g.wait <= 0) { g.hole++; if (g.hole >= m.mini.holes) return this.end(m); this.setHole(m); m.line(`Hole ${g.hole + 1}: ${g.name}.`); } return; }
     for (const c of live) for (const b of g.blocks) MG.rectPush(c, R_CART(), b, K.boardBounce);
     for (const b of MG.all(m, 'gball')) {
-      const c = m.chairs[b.k], was = Math.hypot(b.vx, b.vy), who = MH.ballPhys(m, b, h, c && !c.gs.holed ? [c] : [], { bounce: 0.5, friction: 0.75, wallBounce: 0.75 });
-      for (const bl of g.blocks) MG.rectPush(b, b.r, bl, 0.75);
-      if (who) { if (m.simTime - c.gs.lastHit > 0.7) { c.gs.strokes++; c.gs.lastHit = m.simTime; } }        // every touch is a stroke (pushing it along counts again every 0.7 s)
-      const d = Math.hypot(b.x - g.cup.x, b.y - g.cup.y);
-      if (d < 0.24 && Math.hypot(b.vx, b.vy) < 4.5) { c.gs.holed = 1; c.gs.total += c.gs.strokes; MG.remove(m, b); m.sfx('goal'); MG.notice(m, `${MG.up(m.name(c))} SINKS IT IN ${c.gs.strokes}`, 1.6); if (c.gs.strokes === 1) m.line(`A hole in one for ${m.name(c)}!`); continue; }
-      else if (d < 0.6 && was > 0) { const k = 1.2 * h / d; b.vx += (g.cup.x - b.x) * k; b.vy += (g.cup.y - b.y) * k; }   // the cup's lip pulls a slow ball in
-      b.x = MG.r2(b.x); b.y = MG.r2(b.y);
+      const c = m.chairs[b.k]; b.cd = Math.max(0, b.cd - h);
+      if (c && !c.gs.holed && b.cd <= 0) {                               // the strike: the front of your cart (or a spin) hits your ball. Aim with your heading, power with your speed
+        const f = c.toWorld(0.62, 0), spin = c.spinLeft > 0, hx = Math.cos(c.heading), hy = Math.sin(c.heading), fwd = c.vx * hx + c.vy * hy;
+        if (Math.hypot(b.x - f.x, b.y - f.y) < GOLF.reach + (spin ? 0.35 : 0) && (spin || fwd > 0.25)) {
+          let v = spin ? GOLF.spin : GOLF.base + fwd * GOLF.power, ax = hx, ay = hy;
+          if (spin) { const dx = b.x - c.x, dy = b.y - c.y, d = Math.hypot(dx, dy) || 1, s = Math.sign(c.spinOmega || 1); ax = dx / d * 0.5 + (-dy / d * s) * 0.5; ay = dy / d * 0.5 + (dx / d * s) * 0.5; const l = Math.hypot(ax, ay) || 1; ax /= l; ay /= l; }   // a spin swats it off the side of the stick
+          b.vx = ax * v; b.vy = ay * v; b.cd = GOLF.cool; c.gs.strokes++; m.sfx(spin ? 'bump' : 'blip');
+        }
+      }
+      if (c) { const d = Math.hypot(b.x - c.x, b.y - c.y), R = R_CART() + b.r; if (d < R && d > 0 && b.cd <= 0) { b.x = c.x + (b.x - c.x) / d * R; b.y = c.y + (b.y - c.y) / d * R; } }   // the cart's body nudges it aside (no free dribbling)
+      const sp = Math.hypot(b.vx, b.vy); if (sp > 0) { const k = Math.max(0, sp - GOLF.roll * h - sp * 0.08 * h) / sp; b.vx *= k; b.vy *= k; }   // a golf ball on a green: steady rolling friction, a little drag
+      b.x += b.vx * h; b.y += b.vy * h;
+      const r = b.r, e = 0.6; if (b.x < r) { b.x = r; b.vx = Math.abs(b.vx) * e; } if (b.x > m.width - r) { b.x = m.width - r; b.vx = -Math.abs(b.vx) * e; } if (b.y < r) { b.y = r; b.vy = Math.abs(b.vy) * e; } if (b.y > m.height - r) { b.y = m.height - r; b.vy = -Math.abs(b.vy) * e; } m.roundCorners(b, r, e);
+      for (const bl of g.blocks) MG.rectPush(b, b.r, bl, 0.6);
+      const dc = Math.hypot(b.x - g.cup.x, b.y - g.cup.y), v = Math.hypot(b.vx, b.vy);
+      if (dc < GOLF.cup && v < GOLF.sink) { c.gs.holed = 1; c.gs.total += c.gs.strokes; MG.remove(m, b); m.sfx('goal'); MG.notice(m, `${MG.up(m.name(c))} SINKS IT IN ${c.gs.strokes}`, 1.6); if (c.gs.strokes === 1) m.line(`A hole in one for ${m.name(c)}!`); continue; }
+      if (dc < GOLF.cup && v >= GOLF.sink && !b.lip) { b.lip = 1; const k = 0.35; b.vx += (Math.random() - 0.5) * v * k; b.vy += (Math.random() - 0.5) * v * k; } else if (dc >= GOLF.cup) b.lip = 0;   // too fast: it lips out
     }
     if (m.chairs.every(c => c.gs.holed) || g.ht > m.mini.holeTime) {
       for (const c of m.chairs) if (!c.gs.holed) { c.gs.strokes += 3; c.gs.total += c.gs.strokes; c.gs.holed = 1; }
@@ -349,11 +401,25 @@ MODES.golf = {
   ai(c, m) {
     if (c.gs.holed || m.gs.wait > 0) return { x: 0, y: 0, speed: 0 };
     const b = MG.all(m, 'gball').find(o => o.k === c.k); if (!b) return { x: 0, y: 0, speed: 0 };
-    if (Math.hypot(b.vx, b.vy) > 0.5) return { x: 0, y: 0, speed: 0 };    // wait for it to stop
-    const g = m.gs, H = this.H(m); let tgt = g.cup;
-    if (!MG.clearPath(b.x, b.y, g.cup.x, g.cup.y, g.blocks)) { let best = null, bd = Infinity; for (const v of H.via) { if (!MG.clearPath(b.x, b.y, v.x, v.y, g.blocks)) continue; const d = Math.hypot(v.x - b.x, v.y - b.y) + Math.hypot(g.cup.x - v.x, g.cup.y - v.y) * (MG.clearPath(v.x, v.y, g.cup.x, g.cup.y, g.blocks) ? 1 : 1.6); if (d < bd) { bd = d; best = v; } } if (best) tgt = best; }
-    const dist = Math.hypot(tgt.x - b.x, tgt.y - b.y);
-    return MG.pushTo(c, b, tgt.x, tgt.y, { speed: tgt === g.cup ? Math.min(1, Math.max(0.3, dist / 7)) : 0.85 });
+    if (Math.hypot(b.vx, b.vy) > 0.15) { c.gs.plan = null; return { x: 0, y: 0, speed: 0 }; }   // wait for it to stop
+    const g = m.gs, H = this.H(m);
+    if (!c.gs.plan) {                                                     // line up: the target (the cup, or a way round the blocks), the power, and where to start the run-up
+      let tgt = g.cup;
+      if (!MG.clearPath(b.x, b.y, g.cup.x, g.cup.y, g.blocks)) { let best = null, bd = Infinity; for (const v of H.via) { if (!MG.clearPath(b.x, b.y, v.x, v.y, g.blocks)) continue; const d = Math.hypot(v.x - b.x, v.y - b.y) + Math.hypot(g.cup.x - v.x, g.cup.y - v.y) * (MG.clearPath(v.x, v.y, g.cup.x, g.cup.y, g.blocks) ? 1 : 1.6); if (d < bd) { bd = d; best = v; } } if (best) tgt = best; }
+      const dist = Math.hypot(tgt.x - b.x, tgt.y - b.y) + (tgt === g.cup ? 0.15 : 1.5), v0 = Math.min(GOLF.base + GOLF.power * CONFIG.chair.maxSpeed, Math.sqrt(2 * GOLF.roll * dist) + 0.3);
+      const fwd = Math.max(0.3, (v0 - GOLF.base) / GOLF.power), err = ((m.difficulty || {}).reaction || 0.2) * 0.25 * (Math.random() - 0.5);
+      const a = Math.atan2(tgt.y - b.y, tgt.x - b.x) + err, R = R_CART() + 0.2; let run = 1.4 + fwd * fwd / (2 * CONFIG.chair.accel);
+      const free = d => { const x = b.x - Math.cos(a) * d, y = b.y - Math.sin(a) * d; return x > R && x < m.width - R && y > R && y < m.height - R && !g.blocks.some(k => x > k.x0 - R && x < k.x1 + R && y > k.y0 - R && y < k.y1 + R); };
+      while (run > 1.0 && !free(run)) run -= 0.2;                         // a ball by a wall: a shorter run-up (or a spin, below)
+      const spin = !free(run);
+      c.gs.plan = { a, sp: fwd / CONFIG.chair.maxSpeed, sx: b.x - Math.cos(a) * run, sy: b.y - Math.sin(a) * run, go: 0, at: m.simTime, spin };
+    }
+    const P = c.gs.plan, ux = Math.cos(P.a), uy = Math.sin(P.a);
+    if (m.simTime - P.at > 9) { c.gs.plan = null; return { x: 0, y: 0, speed: 0 }; }   // could not line up: think again
+    if (P.spin) { if (MH.dist(c, b) > 1.0) return MH.to(c, b.x, b.y, 0.4); return { x: 0, y: 0, speed: 0, spin: Math.random() < 0.5 ? 1 : -1 }; }   // pinned against a wall: swat it out with a spin
+    if (!P.go) { if (Math.hypot(c.x - P.sx, c.y - P.sy) > 0.5) return MH.to(c, P.sx, P.sy, 0.5); if (Math.abs(normalizeAngle(c.heading - P.a)) > 0.12) return { x: ux * 0.2, y: uy * 0.2, speed: 0.12 }; P.go = 1; }
+    if (b.cd > 0) { c.gs.plan = null; return { x: 0, y: 0, speed: 0 }; }
+    return { x: ux, y: uy, speed: Math.min(1, P.sp * 1.08) };
   },
   hud(m) { const g = m.gs; return { clock: `HOLE ${Math.min(g.hole + 1, m.mini.holes)} / ${m.mini.holes}`, a: 'MINI GOLF', b: MG.up(g.name || ''), mid: `${Math.max(0, Math.ceil(m.mini.holeTime - g.ht))}s left`, left: MG.peopleLine(m, c => `${c.gs.holed ? '⛳' : c.gs.strokes}  (total ${c.gs.total + (c.gs.holed ? 0 : c.gs.strokes)})`) }; },
   tag(c, m) { return c.player ? `${MG.pname(c)}: ${c.gs.strokes}` : ''; },
@@ -423,7 +489,7 @@ MODES.ctf = {
       if (f.car >= 0) { const c = m.chairs[f.car]; const p = c.toWorld(-0.7, 0); f.x = MG.r2(p.x); f.y = MG.r2(p.y); return; }
       if (!f.home) { f.drop -= h; if (f.drop <= 0) { this.home(m, s); MG.notice(m, `THE ${MG.up(TEAMS[m.teams[s]].name)} FLAG IS BACK`, 1.4); return; } }
       for (const c of live) if (Math.hypot(c.x - f.x, c.y - f.y) < R_CART() + 0.4) {
-        if (c.side !== s && !this.carrying(m, c)) { f.car = c.k; f.home = 0; m.sfx('select'); MG.notice(m, `${MG.up(m.name(c))} HAS THE ${MG.up(TEAMS[m.teams[s]].name)} FLAG!`, 1.6); if (Math.random() < 0.6) m.line(`${m.name(c)} grabs the flag!`); break; }
+        if (c.side !== s && !this.carrying(m, c) && !(c.gs.noPick > m.simTime) && !(f.lock > m.simTime)) { f.car = c.k; f.home = 0; m.sfx('select'); MG.notice(m, `${MG.up(m.name(c))} HAS THE ${MG.up(TEAMS[m.teams[s]].name)} FLAG!`, 1.6); if (Math.random() < 0.6) m.line(`${m.name(c)} grabs the flag!`); break; }
         if (c.side === s && !f.home) { this.home(m, s); m.sfx('blip'); MG.notice(m, `${MG.up(m.name(c))} RETURNS THE FLAG`, 1.4); break; }
       }
     });
@@ -435,7 +501,7 @@ MODES.ctf = {
   home(m, s) { const g = m.gs; Object.assign(g.flag[s], { x: g.base[s].x, y: g.base[s].y, home: 1, car: -1 }); },
   contact(m, a, b, d) {
     if (a.side === b.side || d > 2 * R_CART() + 0.08) return;
-    for (const [car, tagger] of [[a, b], [b, a]]) { const f = m.gs.flag.find(x => x.car === car.k); if (f) { f.car = -1; f.drop = 8; car.stunLeft = 0.8; m.sfx('foul'); MG.notice(m, `${MG.up(m.name(tagger))} KNOCKS THE FLAG LOOSE`, 1.4); } }
+    for (const [car, tagger] of [[a, b], [b, a]]) { const f = m.gs.flag.find(x => x.car === car.k); if (f) { f.car = -1; f.drop = 8; f.lock = m.simTime + 0.8; car.gs.noPick = m.simTime + 3; car.stunLeft = 1.2; m.sfx('foul'); MG.notice(m, `${MG.up(m.name(tagger))} KNOCKS THE FLAG LOOSE`, 1.4); } }
   },
   cmd(c, cmd, m) { if (this.carrying(m, c)) c.speedMul *= 0.88; return cmd; },
   end(m) { const sc = m.gs.score; m.finishGame(MG.teamTitle(m, sc), MG.rankRows(m, m.chairs, c => c.gs.caps, c => `${c.gs.caps} capture${c.gs.caps === 1 ? '' : 's'}`), sc[0] === sc[1] ? -1 : sc[0] > sc[1] ? 0 : 1, `${sc[0]} - ${sc[1]}`); },
@@ -617,15 +683,175 @@ MODES.delivery = {
   startLine: () => 'Parcels are waiting. Go go go!'
 };
 
+/* =============================== PAINTBALL =============================== */
+/* Big maps with walls, a bunker, mazes and moving things. Walls: [x0, y0, x1, y1, kind] (kind: wall, bags (sandbags), crate).
+   Moving things are functions of the game clock (m.gs.t), so every player computes the same positions:
+     slide { w, h, a: [x, y], b: [x, y], period }   a block sliding to and fro
+     gate  { w, h, a, b, period }                   a gate that stays shut, slides open, stays open, slides shut
+     spin  { x, y, len, speed }                     a spinning bar (a row of round posts) */
+const PB = { speed: 18, life: 1.3, ammo: 12, maxAmmo: 24, pickup: 8, cool: 0.42, rapidCool: 0.14, respawn: 3.5, protect: 2, wallH: 1.5 };
+const PB_MAPS = {
+  bunker: { name: 'Bunker Hill', size: { width: 48, height: 28 }, blurb: 'A sandbag bunker on the left, a fort on the right, a maze in the middle and sliding gates on both flanks.',
+    walls: [[3, 8.5, 10, 9.1, 'bags'], [3, 18.9, 10, 19.5, 'bags'], [9.4, 9.1, 10, 12.4, 'bags'], [9.4, 15.6, 10, 18.9, 'bags'], [3, 9.1, 3.6, 12, 'bags'], [3, 16, 3.6, 18.9, 'bags'],
+      [38, 10.5, 44, 11.1, 'wall'], [38, 16.9, 44, 17.5, 'wall'], [38, 11.1, 38.6, 12.6, 'wall'], [38, 15.4, 38.6, 16.9, 'wall'],
+      [19.5, 5, 20.1, 11, 'wall'], [19.5, 5, 25, 5.6, 'wall'], [27.9, 17, 28.5, 23, 'wall'], [23, 22.4, 28.5, 23, 'wall'], [16, 13.4, 17.2, 14.6, 'crate'], [30.8, 13.4, 32, 14.6, 'crate'],
+      [13, 4, 14.2, 5.2, 'crate'], [13, 22.8, 14.2, 24, 'crate'], [33.8, 4, 35, 5.2, 'crate'], [33.8, 22.8, 35, 24, 'crate'], [35, 8, 36.2, 9.2, 'crate'], [11.8, 18.8, 13, 20, 'crate']],
+    moving: [{ type: 'gate', w: 0.7, h: 5, a: [24, 2.6], b: [24, -2.4], period: 9 }, { type: 'gate', w: 0.7, h: 5, a: [24, 25.4], b: [24, 30.4], period: 9, phase: 0.5 }, { type: 'spin', x: 24, y: 14, len: 3.4, speed: 0.7 }],
+    spawn: [[[1.6, 11], [1.6, 14], [1.6, 17], [6.5, 14]], [[46.4, 11], [46.4, 14], [46.4, 17], [41.5, 14]]] },
+  maze: { name: 'The Maze', size: { width: 44, height: 30 }, blurb: 'A maze of corners and corridors, with blocks sliding down the long halls.',
+    walls: (() => { const w = []; let s = 7; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+      for (let gx = 2; gx <= 8; gx++) for (let gy = 1; gy <= 6; gy++) { if (gy === 3 && gx % 2 === 0) continue; const x = gx * 4.4, y = gy * 4.1, r = rnd(), kind = gx === 5 && gy === 3 ? 'crate' : 'wall';
+        if (r < 0.4) w.push([x - 2, y - 0.3, x + 2, y + 0.3, kind]); else if (r < 0.8) w.push([x - 0.3, y - 2, x + 0.3, y + 2, kind]); else { w.push([x - 2, y - 0.3, x + 0.3, y + 0.3, kind]); w.push([x - 0.3, y - 0.3, x + 0.3, y + 2, kind]); } }
+      return w; })(),
+    moving: [{ type: 'slide', w: 1.6, h: 1.6, a: [11, 14.4], b: [33, 14.4], period: 10 }, { type: 'slide', w: 1.6, h: 1.6, a: [22, 2], b: [22, 28], period: 12 }, { type: 'gate', w: 4.4, h: 0.7, a: [6.6, 14.4], b: [1.6, 14.4], period: 8 }, { type: 'gate', w: 4.4, h: 0.7, a: [37.4, 14.4], b: [42.4, 14.4], period: 8, phase: 0.5 }],
+    spawn: [[[1.6, 4], [1.6, 10], [1.6, 20], [1.6, 26]], [[42.4, 4], [42.4, 10], [42.4, 20], [42.4, 26]]] },
+  warehouse: { name: 'The Warehouse', size: { width: 50, height: 30 }, blurb: 'Rows of shelves, forklifts racing down the aisles, a big sliding door and a sandbag bunker.',
+    walls: [...[11, 17, 23, 29, 35].flatMap(x => [[x, 3, x + 1.4, 12, 'crate'], [x, 18, x + 1.4, 27, 'crate']]), [2.5, 10, 6.5, 10.6, 'bags'], [2.5, 19.4, 6.5, 20, 'bags'], [6, 10.6, 6.6, 13, 'bags'], [6, 17, 6.6, 19.4, 'bags'],
+      [42, 6, 46, 6.6, 'wall'], [45.4, 6.6, 46, 11, 'wall'], [42, 23.4, 46, 24, 'wall'], [45.4, 19, 46, 23.4, 'wall']],
+    moving: [{ type: 'slide', w: 1.8, h: 1.2, a: [14.2, 3.5], b: [14.2, 26.5], period: 9 }, { type: 'slide', w: 1.8, h: 1.2, a: [32.2, 26.5], b: [32.2, 3.5], period: 9 }, { type: 'gate', w: 0.8, h: 6, a: [26, 15], b: [26, 21.5], period: 10 }, { type: 'spin', x: 20.2, y: 15, len: 2.6, speed: -0.9 }],
+    spawn: [[[1.6, 12], [1.6, 15], [1.6, 18], [4.5, 15]], [[48.4, 9], [48.4, 15], [48.4, 21], [44, 15]]] }
+};
+const PB_ITEMS = { ammo: { icon: '🎯', label: 'AMMO' }, shield: { icon: '🛡', label: 'SHIELD' }, rapid: { icon: '⚡', label: 'RAPID FIRE' } };
+MODES.paintball = {
+  map: m => PB_MAPS[m.mini.map] || PB_MAPS.bunker,
+  walls(m) { const M = this.map(m); return M._w || (M._w = M.walls.map(([x0, y0, x1, y1, kind]) => ({ x0, y0, x1, y1, kind }))); },
+  movers(m) {                                                            // the moving blocks now (boxes) and the spinning posts (circles)
+    const t = m.gs.t || 0, boxes = [], posts = [];
+    for (const [i, o] of this.map(m).moving.entries()) {
+      if (o.type === 'spin') { const a = t * o.speed; for (let k = -3; k <= 3; k++) posts.push({ x: o.x + Math.cos(a) * o.len * k / 3, y: o.y + Math.sin(a) * o.len * k / 3, r: 0.38, i }); continue; }
+      let u = ((t / o.period + (o.phase || 0)) % 1 + 1) % 1, k;
+      if (o.type === 'gate') k = u < 0.4 ? 0 : u < 0.5 ? (u - 0.4) / 0.1 : u < 0.9 ? 1 : 1 - (u - 0.9) / 0.1; else k = (1 - Math.cos(u * Math.PI * 2)) / 2;
+      const x = o.a[0] + (o.b[0] - o.a[0]) * k, y = o.a[1] + (o.b[1] - o.a[1]) * k; boxes.push({ x0: x - o.w / 2, y0: y - o.h / 2, x1: x + o.w / 2, y1: y + o.h / 2, kind: o.type, i });
+    }
+    return { boxes, posts };
+  },
+  allWalls(m) { const mv = this.movers(m); return [...this.walls(m), ...mv.boxes, ...mv.posts.map(p => ({ x0: p.x - p.r, y0: p.y - p.r, x1: p.x + p.r, y1: p.y + p.r }))]; },
+  foes: (m, c) => m.chairs.filter(o => o !== c && !o.out && !(o.gs.dead > 0) && (m.mini.mode !== 'teams' || o.side !== c.side)),
+  init(m) {
+    const g = m.gs; g.map = m.mini.map; g.t = 0; g.score = [0, 0]; g.boxIn = 3; g.powIn = 8;
+    for (const c of m.chairs) c.gs = { ammo: PB.ammo, cd: 0, hits: 0, outs: 0, dead: 0, prot: 0, shield: 0, rapid: 0 };
+  },
+  spawnAt(m, c) {
+    const S = this.map(m).spawn, list = m.mini.mode === 'teams' ? S[c.side] : [...S[0], ...S[1]], foes = this.foes(m, c);
+    const p = list.slice().sort((a, b) => Math.min(...foes.map(o => Math.hypot(o.x - b[0], o.y - b[1])), 99) - Math.min(...foes.map(o => Math.hypot(o.x - a[0], o.y - a[1])), 99))[m.mini.mode === 'teams' ? Math.floor(Math.random() * 2) : 0];
+    const x = p[0] + (Math.random() - 0.5) * 0.6, y = p[1] + (Math.random() - 0.5) * 0.6, h = x < m.width / 2 ? 0 : Math.PI;
+    Object.assign(c, { x, y, px: x, py: y, vx: 0, vy: 0, heading: h, ph: h });
+  },
+  kickoff(m) { m.chairs.forEach((c, i) => { const S = this.map(m).spawn, side = m.mini.mode === 'teams' ? c.side : i % 2, list = S[side], p = list[Math.floor(i / 2) % list.length], x = p[0], y = p[1] + (i % 3 - 1) * 0.4, h = x < m.width / 2 ? 0 : Math.PI; Object.assign(c, { x, y, px: x, py: y, heading: h, ph: h, vx: 0, vy: 0 }); }); },
+  freeSpot(m) { const W = this.allWalls(m); for (let t = 0; t < 40; t++) { const x = 2 + Math.random() * (m.width - 4), y = 2 + Math.random() * (m.height - 4); if (!W.some(b => x > b.x0 - 0.8 && x < b.x1 + 0.8 && y > b.y0 - 0.8 && y < b.y1 + 0.8) && m.chairs.every(c => Math.hypot(c.x - x, c.y - y) > 3) && (m.gs.objs || []).every(o => Math.hypot(o.x - x, o.y - y) > 2.5)) return { x: MG.r2(x), y: MG.r2(y) }; } return null; },
+  step(m, h) {
+    const g = m.gs, K = CONFIG.chair, R = R_CART(); g.t += h;
+    const walls = this.walls(m), mv = this.movers(m), all = [...walls, ...mv.boxes];
+    for (const c of m.chairs) {
+      const G = c.gs; G.cd = Math.max(0, G.cd - h); G.prot = Math.max(0, G.prot - h); G.rapid = Math.max(0, G.rapid - h); G.hitT = Math.max(0, (G.hitT || 0) - h);
+      if (G.dead > 0) { G.dead -= h; c.binLeft = Math.max(0.01, G.dead); if (G.dead <= 0) { G.dead = 0; c.binLeft = 0; G.ghost = 0; G.prot = PB.protect; G.ammo = Math.max(G.ammo, PB.ammo); this.spawnAt(m, c); } continue; }
+      for (const b of all) MG.rectPush(c, R, b, K.boardBounce);
+      for (const p of mv.posts) { const dx = c.x - p.x, dy = c.y - p.y, d = Math.hypot(dx, dy), mn = R + p.r; if (d < mn && d > 0) { c.x = p.x + dx / d * mn; c.y = p.y + dy / d * mn; const vn = c.vx * dx / d + c.vy * dy / d; if (vn < 0) { c.vx -= 1.6 * vn * dx / d; c.vy -= 1.6 * vn * dy / d; } } }
+    }
+    // paintballs
+    for (const o of MG.all(m, 'pb')) {
+      const n = 3; let gone = false;
+      for (let s = 0; s < n && !gone; s++) {
+        o.x += o.vx * h / n; o.y += o.vy * h / n;
+        if (o.x < 0 || o.y < 0 || o.x > m.width || o.y > m.height || all.some(b => o.x > b.x0 && o.x < b.x1 && o.y > b.y0 && o.y < b.y1) || mv.posts.some(p => Math.hypot(o.x - p.x, o.y - p.y) < p.r)) { this.splat(m, o.x - o.vx * 0.012, o.y - o.vy * 0.012, o.col); gone = true; break; }
+        const sh = m.chairs[o.k];
+        for (const c of m.chairs) { if (c === sh || c.out || c.gs.dead > 0 || (m.mini.mode === 'teams' && sh && c.side === sh.side)) continue; if (Math.hypot(c.x - o.x, c.y - o.y) < R + 0.08) { this.hit(m, c, sh, o); gone = true; break; } }
+      }
+      if (gone || g.t > o.until) MG.remove(m, o); else { o.x = MG.r2(o.x); o.y = MG.r2(o.y); }
+    }
+    for (const o of MG.all(m, 'splat')) if (g.t > o.until) MG.remove(m, o);
+    // pick-ups: ammo often, power-ups now and then
+    if ((g.boxIn -= h) <= 0) { g.boxIn = 3.5 + Math.random() * 2.5; if (MG.all(m, 'pbammo').length < 6) { const p = this.freeSpot(m); if (p) MG.add(m, { t: 'pbammo', ...p }); } }
+    if ((g.powIn -= h) <= 0) { g.powIn = 9 + Math.random() * 6; if (MG.all(m, 'pbpow').length < 2) { const p = this.freeSpot(m); if (p) MG.add(m, { t: 'pbpow', kind: Math.random() < 0.55 ? 'shield' : 'rapid', ...p }); } }
+    for (const o of [...MG.all(m, 'pbammo'), ...MG.all(m, 'pbpow')]) for (const c of m.chairs) {
+      if (c.out || c.gs.dead > 0 || Math.hypot(c.x - o.x, c.y - o.y) > R + 0.45) continue;
+      if (o.t === 'pbammo') { if (c.gs.ammo >= PB.maxAmmo) continue; c.gs.ammo = Math.min(PB.maxAmmo, c.gs.ammo + PB.pickup); }
+      else if (o.kind === 'shield') { if (c.gs.shield) continue; c.gs.shield = 1; } else c.gs.rapid = 8;
+      MG.remove(m, o); if (c.player) { m.sfx('select'); MG.notice(m, `${MG.up(m.name(c))}: ${o.t === 'pbammo' ? '+' + PB.pickup + ' PAINTBALLS' : PB_ITEMS[o.kind].label}`, 1.1); } break;
+    }
+  },
+  splat(m, x, y, col) { MG.add(m, { t: 'splat', x: MG.r2(x), y: MG.r2(y), col, until: MG.r2(m.gs.t + 9), a: Math.round(Math.random() * 6) }); const sp = MG.all(m, 'splat'); if (sp.length > 36) MG.remove(m, sp[0]); },
+  hit(m, c, by, o) {
+    this.splat(m, c.x + (Math.random() - 0.5) * 0.4, c.y + (Math.random() - 0.5) * 0.4, o.col);
+    if (c.gs.prot > 0) return;
+    if (c.gs.shield) { c.gs.shield = 0; c.gs.hitT = 0.4; m.sfx('bump'); MG.notice(m, `${MG.up(m.name(c))}'S SHIELD TAKES THE HIT`, 1.2); return; }
+    c.gs.dead = PB.respawn; c.gs.outs++; c.gs.ghost = 1; c.binLeft = PB.respawn; c.gs.rapid = 0; m.sfx('foul');
+    if (by) { by.gs.hits++; if (m.mini.mode === 'teams') m.gs.score[by.side]++; }
+    MG.notice(m, `${MG.up(m.name(by))} TAGS ${MG.up(m.name(c))}`, 1.4); if (Math.random() < 0.35) m.line(`${m.name(c)} is splatted by ${m.name(by)}!`);
+    const top = m.mini.mode === 'teams' ? Math.max(...m.gs.score) : Math.max(...m.chairs.map(k => k.gs.hits)); if (top >= m.mini.target) this.end(m, false);
+  },
+  use(c, m) {                                                            // A / X: fire
+    const G = c.gs; if (G.dead > 0 || G.cd > 0) return;
+    if (G.ammo <= 0) { G.cd = 0.4; if (c.player) { m.sfx('back'); MG.notice(m, 'OUT OF PAINT: FIND AMMO 🎯', 1); } return; }
+    G.ammo--; G.cd = G.rapid > 0 ? PB.rapidCool : PB.cool; G.prot = 0;
+    const err = c.player ? 0 : (Math.random() - 0.5) * (0.06 + ((m.difficulty || {}).reaction || 0.2) * 0.35), f = c.toWorld(0.75, 0), hx = Math.cos(c.heading + err), hy = Math.sin(c.heading + err), col = m.mini.mode === 'teams' ? TEAMS[m.teams[c.side]].color : MINI.palette[c.k % MINI.palette.length];
+    MG.add(m, { t: 'pb', k: c.k, x: MG.r2(f.x), y: MG.r2(f.y), vx: MG.r2(hx * PB.speed + c.vx * 0.3), vy: MG.r2(hy * PB.speed + c.vy * 0.3), until: MG.r2(m.gs.t + PB.life), col }); m.sfx('blip');
+  },
+  end(m, timeUp) {
+    if (m.state !== 'play') return; const teams = m.mini.mode === 'teams', sc = m.gs.score;
+    const rows = MG.rankRows(m, m.chairs, c => c.gs.hits * 100 - c.gs.outs, c => `${c.gs.hits} tag${c.gs.hits === 1 ? '' : 's'}, splatted ${c.gs.outs} time${c.gs.outs === 1 ? '' : 's'}`);
+    if (teams) m.finishGame(MG.teamTitle(m, sc), rows, sc[0] === sc[1] ? -1 : sc[0] > sc[1] ? 0 : 1, `${sc[0]} - ${sc[1]}${timeUp ? ' (time up)' : ''}`);
+    else m.finishGame(MG.ffaTitle(m, rows.map(r => r.c), c => c.gs.hits), rows, -1, timeUp ? 'Time up: the most tags wins' : `First to ${m.mini.target} tags`);
+  },
+  timeUp(m) { this.end(m, true); },
+  cmd(c, cmd) { return c.gs.dead > 0 ? { x: 0, y: 0, spin: 0, speed: 0 } : cmd; },
+  /* The CPU: a route through the maze (A* on a 0.8 m grid of the fixed walls), shoot what it can see. */
+  nav(m) {
+    if (m.pbNav) return m.pbNav; const cs = 0.8, W = Math.ceil(m.width / cs), H = Math.ceil(m.height / cs), g = new Uint8Array(W * H), pad = R_CART() + 0.2, walls = this.walls(m);
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const x = (i + 0.5) * cs, y = (j + 0.5) * cs; if (x < pad || y < pad || x > m.width - pad || y > m.height - pad || walls.some(b => x > b.x0 - pad && x < b.x1 + pad && y > b.y0 - pad && y < b.y1 + pad)) g[j * W + i] = 1; }
+    return (m.pbNav = { cs, W, H, g });
+  },
+  route(m, c, tx, ty) {
+    const N = this.nav(m), { cs, W, H, g } = N, cell = (x, y) => [Math.max(0, Math.min(W - 1, Math.floor(x / cs))), Math.max(0, Math.min(H - 1, Math.floor(y / cs)))];
+    const free = ([i, j]) => { if (!g[j * W + i]) return [i, j]; for (let r = 1; r < 4; r++) for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) { const a = i + di, b = j + dj; if (a >= 0 && b >= 0 && a < W && b < H && !g[b * W + a]) return [a, b]; } return [i, j]; };
+    const [si, sj] = free(cell(c.x, c.y)), [ti, tj] = free(cell(tx, ty)), start = sj * W + si, goal = tj * W + ti;
+    const gs = new Float32Array(W * H).fill(Infinity), from = new Int32Array(W * H).fill(-1), heap = [[0, start]]; gs[start] = 0;
+    const push = e => { heap.push(e); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let s = i; if (l < heap.length && heap[l][0] < heap[s][0]) s = l; if (r < heap.length && heap[r][0] < heap[s][0]) s = r; if (s === i) break; [heap[s], heap[i]] = [heap[i], heap[s]]; i = s; } } return top; };
+    let found = false, n = 0;
+    while (heap.length && n++ < 6000) { const [, cur] = pop(); if (cur === goal) { found = true; break; } const ci = cur % W, cj = (cur / W) | 0;
+      for (const [di, dj, w] of [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.41], [1, -1, 1.41], [-1, 1, 1.41], [-1, -1, 1.41]]) { const a = ci + di, b = cj + dj; if (a < 0 || b < 0 || a >= W || b >= H) continue; const k = b * W + a; if (g[k] || (di && dj && (g[cj * W + a] || g[b * W + ci]))) continue; const ng = gs[cur] + w; if (ng < gs[k]) { gs[k] = ng; from[k] = cur; push([ng + Math.hypot(a - ti, b - tj), k]); } } }
+    if (!found) return null; const path = []; for (let k = goal; k !== -1 && k !== start; k = from[k]) path.push({ x: (k % W + 0.5) * cs, y: (((k / W) | 0) + 0.5) * cs }); return path.reverse();
+  },
+  ai(c, m) {
+    const G = c.gs; if (G.dead > 0) return { x: 0, y: 0, speed: 0 };
+    const walls = this.allWalls(m), foes = this.foes(m, c), sees = o => MH.dist(c, o) < 17 && MG.clearPath(c.x, c.y, o.x, o.y, walls, 0.05);
+    const t = foes.filter(sees).sort((a, b) => MH.dist(c, a) - MH.dist(c, b))[0];
+    if (t && G.ammo > 0) {                                               // aim (lead the target a little) and fire when lined up
+      const d = MH.dist(c, t), lead = d / PB.speed, ax = t.x + (t.vx || 0) * lead - c.x, ay = t.y + (t.vy || 0) * lead - c.y, a = Math.atan2(ay, ax), off = Math.abs(normalizeAngle(a - c.heading));
+      if (off < 0.06 + 0.35 / Math.max(1, d) && G.cd <= 0 && Math.random() < 0.8) c.wantUse = true;
+      return { x: Math.cos(a), y: Math.sin(a), speed: off > 0.5 ? 0.15 : d > 10 ? 0.55 : d < 4 ? 0.05 : 0.25 };
+    }
+    let goal = null;
+    if (G.ammo < 5) goal = MH.nearest(c, MG.all(m, 'pbammo'));
+    if (!goal) { const pw = MH.nearest(c, MG.all(m, 'pbpow')); if (pw && MH.dist(c, pw) < 10) goal = pw; }
+    if (!goal) goal = foes.sort((a, b) => MH.dist(c, a) - MH.dist(c, b))[0] || { x: m.width / 2, y: m.centerY };
+    const N = c.pbNav || (c.pbNav = {});                                 // (kept on the cart, not in c.gs: it is not sent online)
+    if (!N.path || !N.at || m.simTime - N.at > 0.9 || N.goal !== (goal.id || goal.k)) { N.path = this.route(m, c, goal.x, goal.y); N.at = m.simTime; N.goal = goal.id || goal.k; }
+    const P = N.path; if (!P || !P.length) return MH.to(c, goal.x, goal.y, 0.8);
+    while (P.length > 1 && Math.hypot(P[0].x - c.x, P[0].y - c.y) < 0.9) P.shift();
+    let wp = P[0]; for (let i = Math.min(P.length - 1, 9); i > 0; i--) if (MG.clearPath(c.x, c.y, P[i].x, P[i].y, walls, 0.5)) { wp = P[i]; break; }   // cut corners where the way is clear
+    return MH.to(c, wp.x, wp.y, 0.9);
+  },
+  hud(m) {
+    const teams = m.mini.mode === 'teams', sc = m.gs.score;
+    if (teams) return { a: MG.up(TEAMS[m.teams[0]].name), b: MG.up(TEAMS[m.teams[1]].name), sa: String(sc[0]), sb: String(sc[1]), mid: `PAINTBALL   •   first to ${m.mini.target}`, left: MG.peopleLine(m, c => `🎯${c.gs.ammo}`) };
+    const lead = m.chairs.reduce((a, c) => c.gs.hits > a.gs.hits ? c : a, m.chairs[0]); return { a: 'PAINTBALL', b: `LEADER ${MG.up(m.name(lead))} ${lead.gs.hits}`, mid: `First to ${m.mini.target} tags`, left: MG.peopleLine(m, c => `${c.gs.hits}  🎯${c.gs.ammo}`) };
+  },
+  tag(c, m) { return c.gs.dead > 0 ? '' : c.player ? MG.pname(c) + (c.gs.shield ? ' 🛡' : '') : c.gs.shield ? '🛡' : ''; },
+  itemLine(c, m) { const G = c.gs; return G.dead > 0 ? `SPLATTED: back in ${Math.ceil(G.dead)}s` : `🎯 ${G.ammo}${G.ammo === 0 ? ' (find ammo!)' : ''}${G.shield ? '   🛡 SHIELD' : ''}${G.rapid > 0 ? `   ⚡ RAPID ${Math.ceil(G.rapid)}s` : ''}   A: fire`; },
+  startLine: () => 'Paintball! Lock and load.'
+};
+
 /* =============================== descriptions (How to play) =============================== */
 Object.assign(GAME_INFO, {
   bomb: { name: 'Hot Potato Bomb', cat: 'party', blurb: 'Pass the ticking bomb by bumping someone. Do not be holding it when it blows.', noItems: true,
     goal: 'Be the last cart that has not blown up.',
     rules: ['One cart holds the bomb (it sits on top of the cart and ticks faster as the fuse burns).', 'Bump another cart to pass the bomb to them. You cannot pass it straight back.', 'The holder is a little faster than everyone else.', 'When the fuse runs out, the holder is out and the blast throws everyone near it.', 'A new bomb goes to a random cart. Last one left wins.'],
     controls: [CTRL.drive, CTRL.spin, CTRL.pause], opts: [{ key: 'fuse', label: 'Fuse', values: [10, 15, 20], def: 15, fmt: v => `about ${v}s` }] },
-  hill: { name: 'King of the Hill', cat: 'party', blurb: 'Hold the glowing circle alone to score. It moves every 20 seconds.', minutes: 3,
+  hill: { name: 'King of the Hill', cat: 'party', blurb: 'A big rink, a moving hill and weapons. Blast them off the hill.', minutes: 3, court: { width: 44, height: 24 }, itemsOn: true,
     goal: 'Be first to the target score, or have the most points when the clock runs out.',
-    rules: ['A glowing circle is the hill.', 'The cart nearest the middle of the hill is king and scores a point every second.', 'Anyone else on the hill: contested, the king scores at less than half speed. Push them off!', 'The hill moves somewhere new every 20 seconds.'],
+    rules: ['A glowing circle is the hill.', 'The cart nearest the middle of the hill is king and scores a point every second.', 'Anyone else on the hill: contested, the king scores at less than half speed. Push them off!', 'The hill moves somewhere new every 15 seconds.', 'Weapons in the ? boxes: SHOCKWAVE (throws everyone near you away), ZAP (a shot that spins a cart out), BOOST and OIL.'],
     controls: [CTRL.drive, CTRL.spin, CTRL.item, CTRL.pause], opts: [minOpt([2, 3, 4], 3), { key: 'target', label: 'Points to win', values: [20, 30, 45], def: 30 }] },
   sumo: { name: 'Sumo Ring', cat: 'party', blurb: 'Bumps hit extra hard. Shove everyone off the ring.', noItems: true,
     goal: 'Win the most rounds by being the last cart on the ring.',
@@ -633,7 +859,7 @@ Object.assign(GAME_INFO, {
     controls: [CTRL.drive, 'Spin (a hard shove): triggers  /  E Q  /  . ,  /  SPIN buttons', CTRL.pause], opts: [{ key: 'rounds', label: 'Rounds', values: [1, 3, 5], def: 3 }] },
   lava: { name: 'Floor Is Lava', cat: 'party', blurb: 'Tiles glow orange, then turn to lava. Keep moving.', minutes: 2,
     goal: 'Be the last cart that has not touched the lava (or survive the clock).',
-    rules: ['The floor is a grid of tiles.', 'A tile glows orange for a moment before it turns to lava.', 'Drive onto lava and you are out.', 'Lava cools back down after a while, but more and more tiles melt as the game goes on.', 'Last one left wins; everyone still standing at the end wins together.'],
+    rules: ['The floor is a grid of tiles.', 'A tile glows orange for a moment before it turns to lava.', 'Drive onto lava and you are out.', 'Lava cools back down after a while, but more and more tiles melt as the game goes on.', 'After a few seconds the LAVA SNAKE wakes up: it chases the nearest cart, gets faster and longer, and melts the floor behind it. Touch it and you are out.', 'Last one left wins; everyone still standing at the end wins together.'],
     controls: [CTRL.drive, CTRL.spin, CTRL.item, CTRL.pause], opts: [minOpt([1, 2, 3], 2)] },
   multiball: { name: 'Multiball Madness', cat: 'ball', blurb: 'Team hockey with lots of balls at once.', minutes: 3, teams: true, noItems: true,
     goal: 'Score more goals than the other team.',
@@ -641,15 +867,15 @@ Object.assign(GAME_INFO, {
     controls: [CTRL.drive, CTRL.spin, CTRL.pause], opts: [minOpt([2, 3, 5], 3), { key: 'balls', label: 'Balls', values: [3, 5, 8], def: 5 }] },
   giant: { name: 'Giant Ball', cat: 'ball', blurb: 'One huge, heavy ball. Everyone pushes.', minutes: 3, teams: true, noItems: true,
     goal: 'Push the giant ball into the other team\'s wide goal.',
-    rules: ['There is one giant ball. It is heavy: it takes teamwork to move it.', 'It rolls a long way once it gets going.', 'Push it into the other team\'s goal to score.', 'First to the target, or the most goals when time runs out.'],
+    rules: ['There is one giant beach ball. It bounces!', 'Hit it while it is low and it pops up into the air; a spin sends it higher. When it is high you drive right under it.', 'It floats a long way once it gets going.', 'Push it into the other team\'s goal to score.', 'First to the target, or the most goals when time runs out.'],
     controls: [CTRL.drive, CTRL.spin, CTRL.pause], opts: [minOpt([2, 3, 5], 3), { key: 'target', label: 'Goals to win', values: [2, 3, 5], def: 3 }] },
   bowling: { name: 'Cart Bowling', cat: 'ball', blurb: 'Take turns pushing a heavy ball down the rink at ten pins.', noItems: true,
     goal: 'Score the most pins over all the frames.',
-    rules: ['Players take turns. Everyone else watches from the side.', 'Push the ball towards the pins. Do not cross the foul line (the cart stops there).', 'Each turn has two balls. All ten with the first: STRIKE (+10). All ten with two: SPARE (+5).', 'One point for every pin knocked down.'],
+    rules: ['Players take turns. Everyone else watches from the side.', 'Push the ball down the lane at the pins. The bumper rails bounce it back in, so there are no gutters.', 'Do not cross the foul line (the cart stops there).', 'You have 12 seconds to bowl each ball.', 'Each turn has two balls. All ten with the first: STRIKE (+10). All ten with two: SPARE (+5).', 'One point for every pin knocked down.'],
     controls: [CTRL.drive, 'Spin (a sharper push): triggers  /  E Q  /  . ,', CTRL.pause], opts: [{ key: 'frames', label: 'Frames', values: [2, 3, 5], def: 3 }] },
   golf: { name: 'Mini Golf', cat: 'ball', blurb: 'Everyone plays the same hole at once, each with their own ball.', noItems: true,
     goal: 'Finish every hole in the fewest strokes.',
-    rules: ['Your ball is the one in your colour. Only your cart can move it.', 'Every touch is a stroke (pushing it along counts again every 0.7 s), so tap it, do not dribble it.', 'Get it in the cup to finish the hole. Walls and blocks bounce it.', 'Not in when the hole\'s time runs out: +3 strokes.', 'Fewest strokes after all the holes wins.'],
+    rules: ['Your golf ball is the one in your colour. Only your cart can hit it; carts drive through each other.', 'Drive into it to putt: aim with the way you face, and the faster you drive, the harder you hit. A spin is a big drive.', 'Every hit is a stroke. A ball going too fast skips over the cup.', 'Get it in the cup to finish the hole. Walls and blocks bounce it.', 'Not in when the hole\'s time runs out: +3 strokes.', 'Fewest strokes after all the holes wins.'],
     controls: [CTRL.drive, 'Spin (a big hit): triggers  /  E Q  /  . ,', CTRL.pause], opts: [{ key: 'holes', label: 'Holes', values: [2, 3, 4], def: 3 }, { key: 'holeTime', label: 'Time per hole', values: [45, 60, 90], def: 60, fmt: v => v + 's' }] },
   imposter: { name: 'Imposter Carts', cat: 'sneaky', blurb: 'Every cart looks the same. Find the real players among the CPUs.', minutes: 3, noItems: true,
     goal: 'Collect the orbs while blending in, or unmask every other agent.',
@@ -671,6 +897,13 @@ Object.assign(GAME_INFO, {
     goal: 'Go through every gate, in order, in the fastest time.',
     rules: ['Drive through the gates (between the two cones) in order; the next one glows.', 'Miss a gate and you must go back for it.', 'Carts pass through each other: it is all about your line.', 'Your best time on each course is saved, and next time its ghost races you.', 'When the first cart finishes, everyone else has 25 seconds.'],
     controls: [CTRL.drive, CTRL.spin, CTRL.pause], opts: [{ key: 'course', label: 'Course', values: ['zigzag', 'eight', 'hairpin'], names: ['Zig-zag', 'Figure of eight', 'Hairpins'], def: 'zigzag' }] },
+  paintball: { name: 'Paintball', cat: 'sneaky', blurb: 'Every cart has a paintball gun. Big maps, a bunker, mazes and moving gates.', minutes: 4, teams: true, noItems: true,
+    court: mini => (PB_MAPS[mini && mini.map] || PB_MAPS.bunker).size, label: cfg => `${(PB_MAPS[cfg.map] || PB_MAPS.bunker).name}, ${cfg.mode === 'teams' ? 'teams' : 'free for all'}`,
+    goal: 'Tag the other team (or everyone) with paint more times than they tag you.',
+    rules: ['Every cart has a paintball gun: A fires straight ahead.', 'One hit and you are splatted: back at your spawn in a few seconds (with a moment of protection).', 'Paint is limited (24 at most). Ammo crates 🎯 appear around the map: drive over one for 8 more.', 'Power-ups: SHIELD 🛡 blocks the next shot, RAPID FIRE ⚡ for 8 seconds.', 'Walls, crates and moving gates stop paint. Use the bunker and the maze for cover.', 'First to the target, or the most when time runs out.'],
+    controls: [CTRL.drive, 'Fire: A or X  /  Space or X  /  Right Shift or \\  /  touch A', CTRL.spin, CTRL.pause],
+    opts: [{ key: 'map', label: 'Map', values: ['bunker', 'maze', 'warehouse'], names: ['Bunker Hill', 'The Maze', 'The Warehouse'], def: 'bunker', hint: () => (PB_MAPS[modeOpts('paintball').map] || PB_MAPS.bunker).blurb },
+      { key: 'mode', label: 'Mode', values: ['teams', 'ffa'], names: ['Teams', 'Free for all'], def: 'teams' }, minOpt([3, 4, 6], 4), { key: 'target', label: 'Tags to win', values: [10, 20, 30], def: 20 }] },
   delivery: { name: 'Delivery Rush', cat: 'racing', blurb: 'Grab parcels at the depot and deliver them to the right house.', minutes: 3,
     goal: 'Earn the most points delivering parcels.',
     rules: ['Parcels wait at the depot in the middle. Drive over one to pick it up.', 'Its colour is the house it goes to: drive up to that house.', 'Fast deliveries earn a bonus.', 'Ram a courier hard to knock their parcel loose and steal it.'],

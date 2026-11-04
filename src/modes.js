@@ -40,7 +40,7 @@ const GAME_CATS = [
   { id: 'party', name: 'Party chaos', blurb: 'Free-for-all mayhem: popping, tagging, bombs and lava' },
   { id: 'ball', name: 'Ball games', blurb: 'Hockey with a twist, giant balls, bowling and mini golf' },
   { id: 'racing', name: 'Racing and driving', blurb: 'Races, time trials with ghosts, stunts and deliveries' },
-  { id: 'sneaky', name: 'Sneaky and teams', blurb: 'Hide among the CPUs, or capture the flag' }
+  { id: 'sneaky', name: 'Battles and sneaky', blurb: 'Paintball, capture the flag, hiding among the CPUs' }
 ];
 const MINI_KINDS = () => Object.keys(GAME_INFO).filter(k => k !== 'hockey');
 const modeOf = m => m && MODES[m.kind];
@@ -49,7 +49,7 @@ const modeOf = m => m && MODES[m.kind];
    { key, label, min, max, step?, def, fmt? } numbers, or { key, label, values: [...], names?, def } choices. */
 function modeOpts(kind) { const I = GAME_INFO[kind] || {}, saved = (Settings.mg && Settings.mg[kind]) || {}, out = {}; for (const o of I.opts || []) out[o.key] = saved[o.key] !== undefined ? saved[o.key] : o.def; return out; }
 function modeSave(kind, patch) { Settings.mg = { ...miniOpts(), [kind]: { ...modeOpts(kind), ...patch } }; Settings.save(); }
-{ const base = miniCfg; miniCfg = kind => MODES[kind] ? { kind, mode: GAME_INFO[kind].teams ? 'teams' : 'ffa', items: !!miniOpts().items[kind], minutes: modeOpts(kind).minutes || GAME_INFO[kind].minutes || 3, ...modeOpts(kind) } : base(kind); }
+{ const base = miniCfg; miniCfg = kind => MODES[kind] ? { kind, mode: GAME_INFO[kind].teams ? 'teams' : 'ffa', items: miniOpts().items[kind] !== undefined ? !!miniOpts().items[kind] : !!GAME_INFO[kind].itemsOn, minutes: modeOpts(kind).minutes || GAME_INFO[kind].minutes || 3, ...modeOpts(kind) } : base(kind); }
 { const base = miniLabel; miniLabel = cfg => { if (!cfg || !MODES[cfg.kind]) return base(cfg); const I = GAME_INFO[cfg.kind]; return I.name + (I.label ? ' (' + I.label(cfg) + ')' : '') + (cfg.items ? ', power-ups' : ''); }; }
 
 /* ----- the framework: MiniMatch hands the new kinds over to their mode ----- */
@@ -92,6 +92,7 @@ function modeSave(kind, patch) { Settings.mg = { ...miniOpts(), [kind]: { ...mod
   const want = Math.hypot(cmd.x || 0, cmd.y || 0) * (cmd.speed === undefined ? 1 : cmd.speed), moving = Math.hypot(c.vx, c.vy);     // stuck in a scrum (wants to go, is not moving): back off sideways for a moment
   c.stuckT = !M.noUnstick && want > 0.4 && moving < 0.35 ? (c.stuckT || 0) + 0.1 : 0;
   if (c.stuckT > 1.5) { c.stuckT = 0; c.unstickT = m.simTime + 0.9; c.unstickA = c.heading + Math.PI * (0.6 + Math.random() * 0.8) * (Math.random() < 0.5 ? 1 : -1); }
+  if (m.mini.items && c.item && typeof MG !== 'undefined') MG.autoItem(c, m);   // the CPU uses its power-ups
   if (c.unstickT > m.simTime) cmd = { x: Math.cos(c.unstickA), y: Math.sin(c.unstickA), speed: 0.9 };
   if (cmd.speed === undefined) cmd.speed = (m.difficulty || {}).speed || 0.9; c.aiCmd = { ...cmd, spin: 0 }; return cmd; }; miniAI.base = base; }
 

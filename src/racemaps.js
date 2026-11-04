@@ -45,7 +45,8 @@ const raceMap = id => RACE_MAPS.find(m => m.id === id) || RACE_MAPS[0];
 function setWorld(mini) {
   const C = CONFIG.court; if (!CONFIG.courtBase) CONFIG.courtBase = { width: C.width, height: C.height, cornerRadius: C.cornerRadius };
   const map = mini && mini.kind === 'race' ? raceMap(mini.track) : null;
-  Object.assign(C, map && !map.rink ? { width: map.w, height: map.h, cornerRadius: 0.5 } : CONFIG.courtBase);
+  let big = !map && mini && typeof GAME_INFO !== 'undefined' && GAME_INFO[mini.kind] && GAME_INFO[mini.kind].court; if (typeof big === 'function') big = big(mini);   // a minigame on a bigger rink (King of the Hill)
+  Object.assign(C, map && !map.rink ? { width: map.w, height: map.h, cornerRadius: 0.5 } : big ? { ...CONFIG.courtBase, ...big } : CONFIG.courtBase);
 }
 
 /* The centre line: from control points (a smooth closed curve through them) or a function, resampled every `step` metres. */

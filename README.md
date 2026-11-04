@@ -3,6 +3,25 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v10.1: Paintball, and fixes from play-testing
+- **Paintball** (Battles and sneaky): every cart has a paintball gun (A fires). Three big maps (`PB_MAPS` in `src/modes_games.js`):
+  Bunker Hill (sandbag bunker, fort, centre maze, sliding gates and a spinning bar), The Maze (corners and corridors, sliding blocks, gates)
+  and The Warehouse (shelf aisles, forklifts, a big sliding door, a bunker). Limited paint (12, up to 24); ammo crates appear around the map (+8).
+  Power-ups: SHIELD (blocks the next shot) and RAPID FIRE. One hit and you respawn a few seconds later. Teams or free for all. The CPU finds its
+  way through the mazes (A* on a grid of the walls) and leads its shots.
+- **Capture the Flag**: no more grab / knock-loose loop (a carrier who loses the flag cannot grab it again for 3 s, and a dropped flag cannot be
+  picked up for a moment).
+- **King of the Hill**: a much bigger rink (44 x 24), the hill moves every 15 s, power-ups on by default with weapons: SHOCKWAVE (throws everyone
+  near you away), ZAP, BOOST, OIL. The CPU uses them. (A minigame can have its own rink size: `court` in its GAME_INFO.)
+- **Floor Is Lava**: the LAVA SNAKE wakes after a few seconds, hunts the nearest cart, grows and speeds up, and melts the floor behind it.
+  The CPUs keep moving and plan routes that avoid lava.
+- **Giant Ball** is a beach ball: it bounces, hits pop it up (spins higher), and you can drive under it while it is high.
+- **Bowling**: a proper lane with padded bumper rails (no gutters) and a 12 second clock for each ball.
+- **Mini Golf**: real putting. Drive into your ball to hit it (aim with your heading, power with your speed; a spin is a big drive), it rolls
+  with golf-ball friction and lips out of the cup if too fast. Dimpled golf balls, one colour per player.
+- **Infection Night** is much darker: only headlights and the carts' glow.
+- Fixed: balls and pins could freeze when moving slowly (positions were rounded every physics step).
+
 ## v10: fourteen new minigames, awareness signs, crash slow-down
 New games (Minigames menu, each with a live demo, How to play page, CPU players, split screen and online):
 - **Party chaos**: Hot Potato Bomb (bump to pass the bomb), King of the Hill (the hill moves every 20 s), Sumo Ring (hard shoves, a shrinking ring, rounds),

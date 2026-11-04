@@ -450,7 +450,7 @@ class GameScene extends Phaser.Scene {
     this.arrows = this.add.graphics().setDepth(24); this.arrowTags = [];
     this.buildScoreboard(V, C);
     this.cap = this.add.text(V.width / 2, V.height - 40, '', { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: '#ffffff', align: 'center', backgroundColor: '#0d151bcc', padding: { x: 16, y: 8 }, wordWrap: { width: V.width - 120 } }).setOrigin(0.5).setDepth(30).setVisible(false); this.capLeft = 0;
-    this.events.once('shutdown', () => { if (!this.demo && this.match && this.match.map) setWorld(null); Commentator.stop(); if (this.crowd) { this.crowd.destroyTexts(); this.crowd = null; } if (Sound.crowd) Sound.crowd.stop(); if (!this.demo) { viewFlip = false; viewInv = null; } this.teardownTilt(); });
+    this.events.once('shutdown', () => { if (!this.demo && this.match && (this.match.map || this.match.mini)) setWorld(null); Commentator.stop(); if (this.crowd) { this.crowd.destroyTexts(); this.crowd = null; } if (Sound.crowd) Sound.crowd.stop(); if (!this.demo) { viewFlip = false; viewInv = null; } this.teardownTilt(); });
     this.events.on('resume', () => { try { this.applyCamera(); } catch (e) {} });
     this.lastScore = this.match.score.slice();
     this.banner = this.add.text(this.courtCX, this.viewY, '', STYLE.big).setOrigin(0.5).setStroke('#0d151b', 8);

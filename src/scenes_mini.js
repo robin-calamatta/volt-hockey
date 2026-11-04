@@ -112,8 +112,8 @@ class MiniSetupScene extends ListMenuScene {
     }
     const IK = GAME_INFO[k] || {};
     if (!IK.noCarts) items.push({ label: () => `Carts   ◀ ${o().carts} ▶`, change: d => step('carts', d, 2, CONFIG.match.chairsPerTeam * 2), hint: 'Carts nobody drives are played by the CPU.' });
-    const flipItems = () => miniSave({ items: { ...o().items, [k]: !o().items[k] } });
-    if (!IK.noItems) items.push({ label: () => `Power-ups   ◀ ${o().items[k] ? 'On' : 'Off'} ▶`, change: flipItems, select: flipItems, hint: '? boxes: BOOST, ZAP (a shot) or OIL (reverses steering). Use with A or X.' });
+    const itemsOn = () => miniCfg(k).items, flipItems = () => miniSave({ items: { ...o().items, [k]: !itemsOn() } });
+    if (!IK.noItems) items.push({ label: () => `Power-ups   ◀ ${itemsOn() ? 'On' : 'Off'} ▶`, change: flipItems, select: flipItems, hint: () => '? boxes: ' + ((MODES[k] && MODES[k].items) || ['boost', 'zap', 'oil']).map(i => MINI.items[i].label).join(', ') + '. Use with A or X.' });
     items.push({ label: () => `CPU skill   ◀ ${Settings.difficulty} ▶`, change: d => Settings.cycleDifficulty(d) });
     items.push({ label: () => `Colours   ◀ ${TEAMS[Settings.teamA].name} v ${TEAMS[Settings.teamB].name} ▶`, change: d => Settings.cycleTeam('teamA', d), hint: k === 'hunt' ? 'The runners wear the first colours, IT the second.' : k === 'balloons' ? 'The two teams\' colours (in free for all, every cart has its own balloon colour).' : 'Cart colours.' });
     items.push({ label: () => 'How to play (full screen, controls)', hint: 'The goal, the rules and every control, over a bigger demo', select: () => this.scene.start('HowTo', { kind: k, back: { scene: 'MiniSetup', data: { kind: k } } }) });
