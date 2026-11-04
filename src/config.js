@@ -101,7 +101,8 @@ const CONFIG = {
   look:    { shadowDx: 0.16, shadowDy: 0.2, shadowAlpha: 0.35, ballShadowDx: 0.05, ballShadowDy: 0.07, bodyLift: 0.09, sideShade: 0x0b0f12, boardRim: 0xa07a4a, boardRimWidth: 0.12, innerShadowSteps: 6, innerShadowWidth: 0.7, innerShadowAlpha: 0.07, ballHighlight: 0.35 },
   render:  { smooth: true, tagFade: { alpha: 0.12, margin: 10, speed: 14 }, ringWidth: 0.07, ringOffset: 0.1, ringGapRadians: 0.18, ringDimAlpha: 0.22 },
   /* The 3D view (src/view3d.js, Three.js). Heights in metres above the floor; angles in degrees; follow rates per second (higher = snappier).
-     The camera button (View / R3, T, P, or the eye on the touch pad) steps through `cycle`; '2d' is the original flat view and is only offered to a lone player. */
+     The camera button (View / R3, T, P, or the eye on the touch pad) steps through `cycle`; '2d' is the original flat view and is only offered to a lone player.
+     'third' is left out unless Settings.allowThird (Settings > Camera and graphics > Third person view). */
   view3d: {
     cycle: ['first', 'third', 'broadcast', '2d'],
     names: { first: 'First person', third: 'Third person', broadcast: 'Broadcast (3D)', '2d': 'Classic 2D' },
@@ -128,7 +129,7 @@ const CONFIG = {
     shake:   { seconds: 0.35, metres: 0.08 }, maxFov: 92
   },
   // Starting values of the settings that can also be changed in the menus.
-  defaults: { masterVolume: 1, voiceVolume: 1, micVolume: 1, micMonitor: false, voiceMode: 'open', lockCart: false, invertLook: false, camMode: 'third', fov3d: 74, chaseDist: 2, speedLevel: 5, speedCap: 5, ballBounce: 0.1, ballGrip: 30, stickLength: 0.26, ballFriction: 1.6, adapt: true, sizeA: 3, sizeB: 3, collisions: true, penalties: true },
+  defaults: { masterVolume: 1, voiceVolume: 1, micVolume: 1, micMonitor: false, voiceMode: 'open', lockCart: false, invertLook: false, camMode: 'broadcast', allowThird: false, fov3d: 74, chaseDist: 2, speedLevel: 5, speedCap: 5, ballBounce: 0.1, ballGrip: 30, stickLength: 0.26, ballFriction: 1.6, adapt: true, sizeA: 3, sizeB: 3, collisions: true, penalties: true },
 
   // Slider limits used by the settings menus.
   ranges:  { masterVolume: { min: 0, max: 1, step: 0.05 }, voiceVolume: { min: 0, max: 1, step: 0.05 }, micVolume: { min: 0, max: 2, step: 0.1 }, musicVolume: { min: 0, max: 1, step: 0.05 }, sfxVolume: { min: 0, max: 1, step: 0.05 },

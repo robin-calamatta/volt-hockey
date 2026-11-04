@@ -2,21 +2,94 @@
    3D view (View3D) and the classic 2D view (GameScene): the race island and finish line, balloons, ? boxes, zap shots, oil slicks and effects,
    plus the minigame scoreboard, the item you are holding and the results. The rules are in minigames.js. */
 
-class MinigamesScene extends ListMenuScene {
+/* A live demo of a game in a window on a menu, the goal and rules under it and a caption along the bottom of the "video". */
+const DEMO_WIN = { x: 462, y: 64, w: 796, h: 448 };
+const HOWTO_WIN = { x: 596, y: 96, w: 664, h: 374 };                    // How to play: the video beside the rules panel (16:9)
+const MENU_SIDE = { x: 232, panelWidth: 430, size: 28, noBackdrop: true, noFooter: true, hintX: 232, hintY: 692, hintWidth: 410, hintSize: '17px', hintBg: '#0d151bd0' };
+function sideTitle(sc, name) {                                          // the page title, clear of the Log in button at the top left
+  const t = sc.add.text(124, 40, name.toUpperCase(), { ...STYLE.title, fontSize: '40px' }).setOrigin(0, 0.5);
+  if (t.width > 330) t.setScale(330 / t.width); return t;
+}
+class DemoWindow {
+  constructor(sc) {
+    this.sc = sc; this.kind = null; this.key = ''; this.capI = 0; this.capAt = 0; this.overFor = 0; const W = DEMO_WIN;
+    sc.add.graphics().lineStyle(3, 0x2f4a5c, 1).strokeRoundedRect(W.x - 2, W.y - 2, W.w + 4, W.h + 4, 8);
+    this.tag = sc.add.text(W.x + 10, W.y + 8, 'DEMO', { fontFamily: FONT, fontSize: '15px', fontStyle: 'bold', color: '#ffe27a', backgroundColor: '#0d151bcc', padding: { x: 6, y: 2 } }).setDepth(5);
+    this.cap = sc.add.text(W.x + W.w / 2, W.y + W.h - 24, '', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#ffffff', backgroundColor: '#0d151bdd', padding: { x: 10, y: 5 }, align: 'center', wordWrap: { width: W.w - 60 } }).setOrigin(0.5).setDepth(5);
+    this.info = []; this.infoBg = sc.add.graphics().setDepth(-1);
+    sc.events.once('shutdown', () => this.stop());
+  }
+  show(kind) {
+    const mini = kind === 'hockey' ? null : miniCfg(kind), key = kind + JSON.stringify(mini);
+    if (key === this.key && DemoWindow.owner === this) return; this.key = key; this.kind = kind;
+    if (DemoWindow.cam === undefined) DemoWindow.cam = Settings.camMode; Settings.camMode = 'broadcast'; DemoWindow.owner = this;   // one demo at a time; the player's own camera is remembered once
+    setWorld(mini); this.setup = { players: [], sizes: mini ? miniSizes(Math.max(4, miniOpts().carts)) : [3, 3], practice: !!mini, mini, demo: true, win: DEMO_WIN };
+    const d = this.sc.scene.get('Demo'); if (d && d.sys.isActive()) d.scene.restart(this.setup); else this.sc.scene.launch('Demo', this.setup);
+    this.sc.scene.bringToTop(); this.capI = 0; this.capAt = 0; this.writeInfo();
+  }
+  writeInfo() {                                                          // the goal and the rules, under the video (smaller text until it fits)
+    const I = GAME_INFO[this.kind], W = DEMO_WIN, top = W.y + W.h + 12, room = CONFIG.view.height - top - 6; this.info.forEach(t => t.destroy()); this.info = []; this.rules = [];
+    for (let size = 18; size >= 12; size--) {
+      this.info.forEach(t => t.destroy()); this.info = []; this.rules = [];
+      const g = this.sc.add.text(W.x, top, 'GOAL:  ' + I.goal, { fontFamily: FONT, fontSize: (size + 1) + 'px', fontStyle: 'bold', color: THEME.gold_css, wordWrap: { width: W.w } }); this.info.push(g);
+      const half = Math.ceil(I.rules.length / 2), colW = W.w / 2 - 12; let bottom = 0;
+      [I.rules.slice(0, half), I.rules.slice(half)].forEach((col, ci) => { let y = top + g.height + 6; col.forEach(r => { const t = this.sc.add.text(W.x + ci * (colW + 24), y, '•  ' + r, { fontFamily: FONT, fontSize: size + 'px', color: '#e8eef2', wordWrap: { width: colW } }); this.info.push(t); this.rules.push(t); y += t.height + 3; }); bottom = Math.max(bottom, y); });
+      if (bottom - top <= room) { this.fitBottom = bottom; break; }
+      this.fitBottom = bottom;
+    }
+    this.infoBg.clear().fillStyle(0x0d151b, 0.82).fillRoundedRect(W.x - 10, top - 6, W.w + 20, Math.min(CONFIG.view.height - 2, this.fitBottom + 6) - (top - 6), 8);
+    this.infoBg.lineStyle(2, 0x2f4a5c, 1).strokeRoundedRect(W.x - 10, top - 6, W.w + 20, Math.min(CONFIG.view.height - 2, this.fitBottom + 6) - (top - 6), 8);
+  }
+  update(time, delta) {
+    if (!this.kind) return; const I = GAME_INFO[this.kind], lines = [I.goal, ...I.rules];
+    if (time - this.capAt > 4200) { this.capAt = time; this.capI = (this.capI + 1) % lines.length; this.cap.setText(lines[this.capI]); this.rules.forEach((t, i) => t.setColor(i === this.capI - 1 ? '#ffe27a' : '#e8eef2')); }
+    const d = this.sc.scene.get('Demo');
+    if (d && d.match && d.match.state === 'over') { this.overFor += delta; if (this.overFor > 3500) { this.overFor = 0; d.scene.restart(this.setup); } } else this.overFor = 0;
+    if (this.kind !== 'hockey' && (this.chk = (this.chk || 0) + delta) > 800) { this.chk = 0; this.show(this.kind); }   // an option changed (the track, the mode...): the demo follows
+  }
+  stop() {
+    const mine = DemoWindow.owner === this; this.kind = null; this.key = ''; if (!mine) return;      // another menu's demo has taken over: leave it alone
+    DemoWindow.owner = null; try { this.sc.scene.stop('Demo'); } catch (e) {} setWorld(null);
+    if (DemoWindow.cam !== undefined) { Settings.camMode = DemoWindow.cam; DemoWindow.cam = undefined; }
+  }
+}
+
+class MinigamesScene extends ListMenuScene {                          // the categories
   constructor() { super('Minigames'); }
   create() {
-    const go = kind => () => this.scene.start('MiniSetup', { kind });
     this.buildMenu('MINIGAMES', [
-      ...['balloons', 'race', 'hunt'].map(k => ({ label: () => MINI.names[k], hint: MINI.hints[k], select: go(k) })),
+      ...GAME_CATS.map(c => ({ label: () => `${c.name}   (${MINI_KINDS().filter(k => GAME_INFO[k].cat === c.id).length})`, hint: c.blurb, select: () => this.scene.start('MiniList', { cat: c.id }) })),
+      { label: () => 'How to play Volt Hockey', hint: 'The rules and controls of hockey, with a demo', select: () => this.scene.start('HowTo', { kind: 'hockey', back: { scene: 'Minigames' } }) },
       { label: () => 'Back', select: () => this.scene.start('Main') }
     ]);
     this.onBack = () => this.scene.start('Main');
+  }
+}
+class MiniListScene extends ListMenuScene {                            // the games in one category
+  constructor() { super('MiniList'); }
+  init(data) { this.cat = (data && data.cat) || 'party'; }
+  create() {
+    const C = GAME_CATS.find(c => c.id === this.cat) || GAME_CATS[0];
+    sideTitle(this, C.name);
+    this.buildMenu('', [
+      ...MINI_KINDS().filter(k => GAME_INFO[k].cat === C.id).map(k => ({ kind: k, label: () => GAME_INFO[k].name, hint: GAME_INFO[k].blurb, select: () => this.scene.start('MiniSetup', { kind: k }) })),
+      { label: () => 'Back', select: () => this.scene.start('Minigames') }
+    ], 120, MENU_SIDE);
+    this.onBack = () => this.scene.start('Minigames');
+    this.demo = new DemoWindow(this); this.shownAt = 0; this.want = null;
+  }
+  update(time, delta) {
+    super.update(); const k = this.items && this.items[this.cursor] && this.items[this.cursor].kind;
+    if (k && k !== this.want) { this.want = k; this.wantAt = time; }
+    if (this.want && this.want !== this.demo.kind && time - this.wantAt > 450) this.demo.show(this.want);   // (a moment after the highlight settles)
+    this.demo.update(time, delta);
   }
 }
 
 class MiniSetupScene extends ListMenuScene {
   constructor() { super('MiniSetup'); }
   init(data) { this.kind = data.kind || 'balloons'; }
+  update(time, delta) { super.update(); if (this.demo) this.demo.update(time, delta); }
   create() {
     const k = this.kind, o = () => miniOpts(), step = (key, d, lo, hi) => miniSave({ [key]: clamp(o()[key] + d, lo, hi) });
     const items = [];
@@ -32,17 +105,27 @@ class MiniSetupScene extends ListMenuScene {
       items.push({ label: () => `Laps   ◀ ${o().laps} ▶`, change: d => step('laps', d, 1, 15) });
     }
     if (k === 'hunt') items.push({ label: () => `Round length   ◀ ${o().huntMinutes} min ▶`, change: d => step('huntMinutes', d, 1, 8), hint: 'Anyone still free when the clock runs out wins.' });
-    items.push({ label: () => `Carts   ◀ ${o().carts} ▶`, change: d => step('carts', d, 2, CONFIG.match.chairsPerTeam * 2), hint: 'Carts nobody drives are played by the CPU.' });
+    if (MODES[k]) for (const op of GAME_INFO[k].opts || []) {
+      const val = () => modeOpts(k)[op.key], show = v => op.values ? (op.names ? op.names[op.values.indexOf(v)] : String(v)) : op.fmt ? op.fmt(v) : String(v);
+      const chg = d => { if (op.values) { const i = op.values.indexOf(val()); modeSave(k, { [op.key]: op.values[(i + d + op.values.length) % op.values.length] }); } else modeSave(k, { [op.key]: clamp(+(val() + d * (op.step || 1)).toFixed(2), op.min, op.max) }); };
+      items.push({ label: () => `${op.label}   ◀ ${show(val())} ▶`, change: chg, select: op.values ? () => chg(1) : undefined, hint: op.hint });
+    }
+    const IK = GAME_INFO[k] || {};
+    if (!IK.noCarts) items.push({ label: () => `Carts   ◀ ${o().carts} ▶`, change: d => step('carts', d, 2, CONFIG.match.chairsPerTeam * 2), hint: 'Carts nobody drives are played by the CPU.' });
     const flipItems = () => miniSave({ items: { ...o().items, [k]: !o().items[k] } });
-    items.push({ label: () => `Power-ups   ◀ ${o().items[k] ? 'On' : 'Off'} ▶`, change: flipItems, select: flipItems, hint: '? boxes: BOOST, ZAP (a shot) or OIL (reverses steering). Use with A or X.' });
+    if (!IK.noItems) items.push({ label: () => `Power-ups   ◀ ${o().items[k] ? 'On' : 'Off'} ▶`, change: flipItems, select: flipItems, hint: '? boxes: BOOST, ZAP (a shot) or OIL (reverses steering). Use with A or X.' });
     items.push({ label: () => `CPU skill   ◀ ${Settings.difficulty} ▶`, change: d => Settings.cycleDifficulty(d) });
     items.push({ label: () => `Colours   ◀ ${TEAMS[Settings.teamA].name} v ${TEAMS[Settings.teamB].name} ▶`, change: d => Settings.cycleTeam('teamA', d), hint: k === 'hunt' ? 'The runners wear the first colours, IT the second.' : k === 'balloons' ? 'The two teams\' colours (in free for all, every cart has its own balloon colour).' : 'Cart colours.' });
+    items.push({ label: () => 'How to play (full screen, controls)', hint: 'The goal, the rules and every control, over a bigger demo', select: () => this.scene.start('HowTo', { kind: k, back: { scene: 'MiniSetup', data: { kind: k } } }) });
     items.push({ label: () => (Party.role === 'leader' && Party.others().length ? 'Play with your party' : 'Play on this screen') + leaderPicks(), hint: 'Pick players on this screen: split screen and controllers; CPUs fill the empty carts.', select: () => this.start() });
     items.push({ label: () => 'Host an online room' + leaderPicks(), hint: 'A room already set to this game: share its code, or make it public. You can switch games from the room.', select: () => this.online() });
-    items.push({ label: () => 'Back', select: () => this.scene.start('Minigames') });
-    this.buildMenu(MINI.names[k].toUpperCase(), items, 200);
-    this.onBack = () => this.scene.start('Minigames');
-    this.add.text(CX, 140, MINI.hints[k], { ...STYLE.hint, fontSize: '22px', color: '#9fb2bf', align: 'center', wordWrap: { width: 1000 } }).setOrigin(0.5);
+    const up = () => this.scene.start('MiniList', { cat: IK.cat || 'party' });
+    items.push({ label: () => 'Back', select: up });
+    sideTitle(this, IK.name || MINI.names[k]);
+    this.buildMenu('', items, 110, MENU_SIDE);
+    this.onBack = up;
+    this.demo = new DemoWindow(this); this.demo.show(k);
+    if (false) this.add.text(CX, 140, IK.blurb || MINI.hints[k], { ...STYLE.hint, fontSize: '22px', color: '#9fb2bf', align: 'center', wordWrap: { width: 1000 } }).setOrigin(0.5);
   }
   online() {
     if (memberWaits()) return;
@@ -273,4 +356,49 @@ Object.assign(GameScene.prototype, {
       else if (o.type === 'bumper' && o.hitAt !== undefined && m.simTime - o.hitAt < 0.25) g.fillStyle(0xffe27a, 1).fillCircle(o.x, o.y, o.r * 0.7);
     }
   };
+}
+
+/* ===== How to play: the goal, the rules and the controls, over a live CPU demo of the game (a "video" that never goes out of date) ===== */
+class DemoScene extends GameScene {
+  constructor() { super('Demo'); }
+  init(data) { super.init({ ...data, demo: true }); }
+}
+class HowToScene extends Phaser.Scene {
+  constructor() { super('HowTo'); }
+  init(data) { this.kind = data.kind || 'hockey'; this.back = data.back || { scene: 'Minigames' }; }
+  create() {
+    const I = GAME_INFO[this.kind], V = CONFIG.view, mini = this.kind === 'hockey' ? null : miniCfg(this.kind);
+    if (DemoWindow.cam === undefined) DemoWindow.cam = Settings.camMode; Settings.camMode = 'broadcast'; DemoWindow.owner = this;                     // the demo is filmed from the TV camera (not saved)
+    setWorld(mini);
+    this.setup = { players: [], sizes: mini ? miniSizes(Math.max(4, miniOpts().carts)) : [3, 3], practice: !!mini, mini, demo: true, win: HOWTO_WIN };
+    this.scene.launch('Demo', this.setup); this.scene.bringToTop(); this.overFor = 0; this.capI = 0; this.capAt = 0;
+    const W = HOWTO_WIN; this.add.graphics().fillStyle(0x0d151b, 0.6).fillRoundedRect(W.x - 10, W.y - 40, W.w + 20, W.h + 200, 12).lineStyle(3, 0x2f4a5c, 1).strokeRoundedRect(W.x - 2, W.y - 2, W.w + 4, W.h + 4, 8);
+    const px = 28, pw = 540; panel(this, px - 10, 14, pw + 20, V.height - 28, { alpha: 0.86, radius: 16 });
+    this.add.text(px + 10, 44, I.name.toUpperCase(), { ...STYLE.title, fontSize: '40px' });
+    const body = [['GOAL', [I.goal]], ['RULES', I.rules], ['CONTROLS', I.controls]];
+    let y = 82, size = 19;
+    const draw = () => {                                                 // shrink the text until it all fits in the panel
+      (this.bodyTexts || []).forEach(t => t.destroy()); this.bodyTexts = []; this.ruleTexts = []; y = 100;
+      for (const [head, lines] of body) {
+        this.bodyTexts.push(this.add.text(px + 10, y, head, { fontFamily: FONT, fontSize: (size + 2) + 'px', fontStyle: 'bold', color: THEME.gold_css })); y += size + 10;
+        for (const l of lines) { const t = this.add.text(px + 16, y, (head === 'GOAL' ? '' : '•  ') + l, { fontFamily: FONT, fontSize: size + 'px', color: '#e8eef2', wordWrap: { width: pw - 30 } }); this.bodyTexts.push(t); if (head === 'RULES') this.ruleTexts.push(t); y += t.height + 4; }
+        y += 8;
+      }
+    };
+    draw(); while (y > V.height - 80 && size > 13) { size--; draw(); }
+    tapButton(this, px + pw / 2, V.height - 46, 240, 'Back  (B)', () => this.leave());
+    this.cap = this.add.text(W.x + W.w / 2, W.y + W.h + 60, '', { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: '#ffffff', backgroundColor: '#0d151bdd', padding: { x: 14, y: 8 }, align: 'center', wordWrap: { width: W.w - 30 } }).setOrigin(0.5).setDepth(5);
+    this.add.text(W.x, W.y - 32, 'DEMO: CPU carts playing', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#ffe27a', backgroundColor: '#0d151bcc', padding: { x: 8, y: 3 } });
+    this.events.once('shutdown', () => this.release());
+  }
+  release() { if (DemoWindow.owner !== this) return; DemoWindow.owner = null; try { this.scene.stop('Demo'); } catch (e) {} setWorld(null); if (DemoWindow.cam !== undefined) { Settings.camMode = DemoWindow.cam; DemoWindow.cam = undefined; } }
+  leave() { Sound.play('back'); this.release(); this.scene.start(this.back.scene, this.back.data || {}); }
+  update(time, delta) {
+    Controls.update(this.game.loop.frame); const e = Controls.menu();
+    if (Controls.escPressed || e.b || e.a || e.start) return this.leave();
+    const I = GAME_INFO[this.kind], lines = [I.goal, ...I.rules];                     // captions: the goal, then each rule in turn, the rule lit up on the left
+    if (time - this.capAt > 4200) { this.capAt = time; this.capI = (this.capI + 1) % lines.length; this.cap.setText(lines[this.capI]); this.ruleTexts.forEach((t, i) => t.setColor(i === this.capI - 1 ? '#ffe27a' : '#e8eef2')); }
+    const d = this.scene.get('Demo');                                                  // the demo plays on a loop
+    if (d && d.match && d.match.state === 'over') { this.overFor += delta; if (this.overFor > 4000) { this.overFor = 0; d.scene.restart(this.setup); } } else this.overFor = 0;
+  }
 }

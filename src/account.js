@@ -70,7 +70,7 @@ const Account = {
   applyServer(prefs, progress) {
     this.applying = true;
     try {
-      if (prefs && typeof prefs === 'object') { for (const [k, v] of Object.entries(prefs)) if (!this.deviceKeys.includes(k) && typeof v !== 'function') Settings[k] = v; Settings.save(); Sound.applyVolumes && Sound.applyVolumes(); }
+      if (prefs && typeof prefs === 'object') { for (const [k, v] of Object.entries(prefs)) if (!this.deviceKeys.includes(k) && typeof v !== 'function') Settings[k] = v; Settings.migrate(prefs); Settings.fixCam(); Settings.save(); Sound.applyVolumes && Sound.applyVolumes(); }
       if (progress && typeof progress === 'object') {
         if (progress.career) { Settings.career = progress.career; Settings.save(); }
         try { if (progress.season) localStorage.setItem(Season.key, JSON.stringify(progress.season)); else localStorage.removeItem(Season.key); } catch (e) { /* storage blocked */ }

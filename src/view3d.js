@@ -105,7 +105,8 @@ class CanvasPen {
 /* ----- the view ----- */
 class View3D {
   constructor(scene) {
-    this.sc = scene; this.m = scene.match; this.mats = {}; this.cams = new Map(); this.shakeLeft = 0; this.fanAcc = 1;
+    this.sc = scene; this.m = scene.match; this.win = (scene.setup && scene.setup.win) || null;   // a demo on a menu: drawn into its window
+    this.mats = {}; this.cams = new Map(); this.shakeLeft = 0; this.fanAcc = 1;
     const A = CONFIG.view3d.arena;
     this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(A.fog); this.scene.fog = new THREE.Fog(A.fog, A.fogNear, A.fogFar);
     this.buildLights(); this.buildArena(); this.buildCarts(); this.buildBall(); this.buildFans();
@@ -506,7 +507,8 @@ class View3D {
     const R = Render3D, b = R.sync(); if (!b) return; const r = R.r, s = b.width / CONFIG.view.width;
     r.setScissor(0, 0, b.width, b.height); r.setViewport(0, 0, b.width, b.height); r.setClearColor(CONFIG.view3d.arena.fog, 1); r.clear();
     for (const vp of viewports) {
-      const cam = this.placeCamera(vp, dt), x = vp.rect.x * s, y = (CONFIG.view.height - vp.rect.y - vp.rect.h) * s, w = vp.rect.w * s, h = vp.rect.h * s;
+      const W = this.win, kx = W ? W.w / CONFIG.view.width : 1, ky = W ? W.h / CONFIG.view.height : 1, R = W ? { x: W.x + vp.rect.x * kx, y: W.y + vp.rect.y * ky, w: vp.rect.w * kx, h: vp.rect.h * ky } : vp.rect;   // win: drawn into a window (a menu's demo)
+      const cam = this.placeCamera(vp, dt), x = R.x * s, y = (CONFIG.view.height - R.y - R.h) * s, w = R.w * s, h = R.h * s;
       this.scaleBall(cam, vp.rect.h);
       r.setViewport(x, y, w, h); r.setScissor(x, y, w, h); r.render(this.scene, cam);
     }

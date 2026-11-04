@@ -174,7 +174,7 @@ class RoomScene extends ListMenuScene {
     const names = Object.keys(CONFIG.difficulties), me = () => this.session.roster.find(r => r.id === this.session.myId);
     const flip = () => { const side = me() ? 1 - me().side : 0; if (host) this.session.setSide(1, side); else this.session.setSide(side); };
     const cfg = () => this.session.cfg, teamName = i => TEAMS[i].name;
-    const GAMES = [null, 'balloons', 'race', 'hunt'], cycleGame = d => {           // hockey or a minigame (its options come from the host's Minigames settings)
+    const GAMES = [null, ...MINI_KINDS()], cycleGame = d => {           // hockey or a minigame (its options come from the host's Minigames settings)
       const i = GAMES.indexOf(cfg().mini ? cfg().mini.kind : null), k = GAMES[(i + d + GAMES.length) % GAMES.length];
       this.session.setConfig(k ? { mini: miniCfg(k), practice: true } : { mini: null, practice: false });
     };

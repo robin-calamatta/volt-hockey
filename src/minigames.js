@@ -21,7 +21,7 @@ const MINI = {
 };
 const miniOpts = () => { const d = MINI.defaults, s = Settings.mg || {}; return { ...d, ...s, items: { ...d.items, ...(s.items || {}) } }; };
 const miniSave = patch => { Settings.mg = { ...miniOpts(), ...patch }; Settings.save(); };
-const miniCfg = kind => { const o = miniOpts(); return { kind, mode: kind === 'balloons' ? o.balloonMode : kind === 'race' ? 'ffa' : 'hunt', balloons: o.balloons, laps: o.laps, track: o.track || 'rink', minutes: kind === 'balloons' ? o.balloonMinutes : o.huntMinutes, items: !!o.items[kind] }; };
+let miniCfg = kind => { const o = miniOpts(); return { kind, mode: kind === 'balloons' ? o.balloonMode : kind === 'race' ? 'ffa' : 'hunt', balloons: o.balloons, laps: o.laps, track: o.track || 'rink', minutes: kind === 'balloons' ? o.balloonMinutes : o.huntMinutes, items: !!o.items[kind] }; };
 const miniSizes = n => [Math.ceil(n / 2), Math.floor(n / 2)];
 function makeMatch(opts, world = true) { if (world) setWorld(opts.mini); return opts.mini ? new MiniMatch(opts) : new Match(opts); }   // world: the playing area follows a race map (not for the camera preview)
 function miniLabel(cfg) {

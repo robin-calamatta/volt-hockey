@@ -40,7 +40,7 @@ const solveHomography = (pts) => {            // pts: [[u, v, x, y] x4] -> the 8
   return A.map((row, i) => row[n] / row[i]);
 };
 const VIEW_NAMES = { nhl: 'Upright, follows the puck (NHL)', side: 'Sideways, follows the puck', classic: 'Whole rink (classic)' };
-const cycleCamMode = d => { const c = CONFIG.view3d.cycle, i = Math.max(0, c.indexOf(Settings.camMode)); Settings.camMode = c[(i + (d || 1) + c.length) % c.length]; Settings.save(); };
+const cycleCamMode = d => { const c = Settings.camCycle(), i = Math.max(0, c.indexOf(Settings.camMode)); Settings.camMode = c[(i + (d || 1) + c.length) % c.length]; Settings.save(); };
 const GFX = [undefined, 'Low', 'Medium', 'High'], gfxLabel = () => Settings.gfx ? Settings.gfx : `Auto (${Settings.touch ? 'Medium' : 'High'})`;
 const cycleGfx = d => { const i = Math.max(0, GFX.indexOf(Settings.gfx)); Settings.gfx = GFX[(i + (d || 1) + GFX.length) % GFX.length]; Settings.save(); };
 const cycleView = d => { const v = ['nhl', 'side', 'classic'], i = Math.max(0, v.indexOf(Settings.view || 'nhl')); Settings.setView(v[(i + (d || 1) + 3) % 3]); };
@@ -86,7 +86,7 @@ const SETTINGS_HINTS = {
   'Player': 'Your name and your career totals',
   'Voice chat': 'Voice on or off, push to talk, microphone, mic volume, hear yourself, voice volume',
   'Sound and commentary': 'Master volume, speakers, music, effects and crowd volume, commentator voice and captions',
-  'Camera and graphics': 'First / third person, broadcast, 2D view, field of view, court, crowd, graphics quality',
+  'Camera and graphics': 'First person, broadcast, 2D view, third person on / off, field of view, court, crowd, graphics quality',
   'Game rules': 'Game clock, cart speeds, switching carts, collisions, penalties',
   'Ball and carts': 'Turning speed, stick length, ball bounce, grip and friction',
   'CPU opponent': 'Difficulty and how the CPU learns your play',
@@ -110,13 +110,15 @@ class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: [ring, bolt], alpha: { from: 0.7, to: 1 }, scale: { from: 1, to: 1.04 }, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     const volt = this.add.text(CX, 190, 'VOLT', { ...STYLE.title, fontSize: '170px', color: THEME.accent_css, strokeThickness: 10 }).setOrigin(0.5);
     const hockey = this.add.text(CX, 330, 'HOCKEY', { ...STYLE.title, fontSize: '130px', strokeThickness: 10 }).setOrigin(0.5);
-    this.tweens.add({ targets: [volt, hockey], y: '+=6', duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    const bob = () => this.tweens.add({ targets: [volt, hockey], y: '+=6', duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.logo = [volt, hockey]; this.fizz = new Sparks(this, 12); this.fizzAt = 0;               // the logo keeps fizzling now and then
+    if (!SparklerIntro.played) { SparklerIntro.played = true; this.intro = new SparklerIntro(this, [volt, hockey], bob); } else bob();   // the sparkler opening, once per visit
     this.add.rectangle(CX, 414, 520, 3, THEME.gold, 0.9);
     this.add.text(CX, 446, '3 v 3   POWER CHAIR   HOCKEY', { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: THEME.gold_css }).setOrigin(0.5).setShadow(0, 3, '#000', 6, true, true);
     panel(this, CX - 210, 500, 420, 68, { radius: 34, depth: -20 });
     this.prompt = this.add.text(CX, 534, 'PRESS START  /  TAP', { ...STYLE.hint, fontSize: '36px', color: '#ffffff' }).setOrigin(0.5);
     this.touchPills();
-    this.input.on('pointerdown', (p, over) => { if (!over.length && !TouchPad.editing) this.begin(); });       // tap anywhere else to start
+    this.input.on('pointerdown', (p, over) => { if (this.intro && this.intro.running) return this.intro.skip(); if (!over.length && !TouchPad.editing) this.begin(); });   // a tap during the opening only skips it       // tap anywhere else to start
     this.musicInfo = this.add.text(CX, 696, '', { ...STYLE.hint, fontSize: '16px', color: THEME.dim }).setOrigin(0.5);
     MUSIC_READY.then(() => {                                  // tells you whether your own songs were found
       if (!this.musicInfo || !this.musicInfo.active) return;
@@ -139,11 +141,20 @@ class TitleScene extends Phaser.Scene {
       mk(CX + 330, 220, () => 'FULLSCREEN', () => toggleFullscreen())
     ];
   }
-  update(time) {
-    Controls.update(this.game.loop.frame);
+  update(time, delta) {
+    Controls.update(this.game.loop.frame); const dt = Math.min(0.05, delta / 1000);
     this.prompt.setAlpha(0.55 + 0.45 * Math.sin(time / 260));
     this.pills.forEach(p => p.t.setText(p.label()));
     const e = Controls.menu();
+    if (this.intro) {
+      if (this.intro.running && (e.start || e.a || e.b || Controls.escPressed)) return this.intro.skip();
+      this.intro.update(dt); if (this.intro.done) this.intro = null; if (this.intro && this.intro.running) return;
+    }
+    if (time > this.fizzAt) {                                                       // a little fizzle off a random edge of the logo
+      this.fizzAt = time + 900 + Math.random() * 1800; const w = this.logo[Math.random() < 0.5 ? 0 : 1], b = w.getBounds();
+      this.fizz.burst(b.x + 10 + Math.random() * (b.width - 20), b.y + 18 + Math.random() * (b.height - 36), 14, 0.55);
+    }
+    this.fizz.update(dt);
     if (e.start || e.a) this.begin();
   }
 }
@@ -155,7 +166,7 @@ class ListMenuScene extends Phaser.Scene {
     row.setScale(Math.min(want, room / w));
   }
   buildMenu(title, items, top = 210, opts = {}) {                    // opts: { x: row centre, size: max font size, noFooter }
-    this.items = items; this.cursor = 0; menuBackdrop(this);
+    this.items = items; this.cursor = 0; if (!opts.noBackdrop) menuBackdrop(this);
     const long = items.length > 8, V = CONFIG.view;                   // long menus use a smaller title and tighter rows
     if (long) top = 110;
     if (title) {
@@ -177,7 +188,7 @@ class ListMenuScene extends Phaser.Scene {
         else if (item.change) { item.change(1); Sound.play('blip'); }
       });
     });
-    this.hintText = items.some(it => it.hint) ? this.add.text(CX, V.height - 58, '', { fontFamily: FONT, fontSize: '22px', color: '#9fb2bf' }).setOrigin(0.5) : null;   // a line saying what the highlighted item is for
+    this.hintText = items.some(it => it.hint) ? this.add.text(opts.hintX || CX, opts.hintY || V.height - 58, '', { fontFamily: FONT, fontSize: opts.hintSize || '22px', color: '#9fb2bf', align: 'center', wordWrap: opts.hintWidth ? { width: opts.hintWidth } : undefined, ...(opts.hintBg ? { backgroundColor: opts.hintBg, padding: { x: 8, y: 4 } } : {}) }).setOrigin(0.5) : null;   // a line saying what the highlighted item is for
     if (!opts.noFooter) this.add.text(CX, V.height - 22, '▲ ▼  choose        ◀ ▶  change        A  select        B  back', { fontFamily: FONT, fontSize: '19px', color: THEME.dim }).setOrigin(0.5);
   }
   update() {
@@ -335,6 +346,7 @@ class SetupScene extends ListMenuScene {
       { label: () => `Difficulty   ◀ ${Settings.difficulty} ▶`, change: d => Settings.cycleDifficulty(d) },
       speedCapItem('Max cart speed'), lockCartItem(),
       ...(this.practice ? [] : [{ label: () => `Game clock   ◀ ${times(Settings.timeSpeed)} ▶`, change: d => Settings.adjust('timeSpeed', d) }]),
+      { label: () => 'How to play', hint: 'The rules and controls of hockey, with a demo game', select: () => this.scene.start('HowTo', { kind: 'hockey', back: { scene: 'Setup', data: { practice: this.practice } } }) },
       { label: () => 'Choose players', select: toLobby },
       { label: () => 'Back', select: () => this.scene.start('Main') }
     ], 250);
@@ -446,6 +458,7 @@ class GameScene extends Phaser.Scene {
     this.pingText = this.add.text(V.width - 10, V.height - 22, '', { ...STYLE.hint, fontSize: '14px', color: '#9fb2bf' }).setOrigin(1, 0);   // online: ping and players
     this.noticeText = this.add.text(this.courtCX, this.viewTop + 14, '', { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: '#ffe27a', align: 'center' }).setOrigin(0.5, 0).setStroke('#0d151b', 6).setAlpha(0.92).setDepth(30);   // fouls and other events: over the top of the court, smallish so play stays visible
     this.setup3d();                                          // first / third person and broadcast cameras (scenes_3d.js)
+    if (this.setup.win) { const W = this.setup.win; this.cameras.main.setViewport(W.x, W.y, W.w, W.h).setZoom(W.w / V.width).centerOn(V.width / 2, V.height / 2); if (this.v3) this.v3.win = W; }   // a demo shown in a window on a menu
     if (!this.demo) {                                          // a pause button for the mouse (the touch controller has its own)
       this.pauseBtn = tapButton(this, 155, 30, 62, 'II', () => this.pauseFromTap());   // between the 👥 button and the scoreboard (clear of split-screen labels)
       for (const o of [this.pauseBtn.bg, this.pauseBtn.t, this.pauseBtn.hit]) o.setDepth(60).setScrollFactor(0);
@@ -958,6 +971,7 @@ class CameraPageScene extends ListMenuScene {
     const N3 = CONFIG.view3d.names, is2d = () => Settings.camMode === '2d', no3d = () => Render3D.ok === false;
     this.items = [
       { label: () => no3d() ? 'Camera   (3D is not supported on this device: Classic 2D)' : `Camera   ◀ ${N3[Settings.camMode] || N3.third} ▶`, change: d => { cycleCamMode(d); apply(); }, select: () => { cycleCamMode(1); apply(); } },
+      { label: () => `Third person view   ◀ ${Settings.allowThird ? 'On' : 'Off'} ▶`, hint: 'On: the camera button also offers the chase camera behind your cart', change: () => { Settings.setThird(!Settings.allowThird); apply(); }, select: () => { Settings.setThird(!Settings.allowThird); apply(); } },
       { label: () => `Court   ◀ ${CONFIG.surfaces[Settings.court | 0].name} ▶`, change: d => { Settings.court = ((Settings.court | 0) + d + CONFIG.surfaces.length) % CONFIG.surfaces.length; Settings.save(); redo(); }, select: () => { Settings.court = ((Settings.court | 0) + 1) % CONFIG.surfaces.length; Settings.save(); redo(); } },
       { label: () => `Crowd   ◀ ${Settings.crowd !== false ? 'On' : 'Off'} ▶`, change: () => { Settings.toggle('crowd'); redo(); }, select: () => { Settings.toggle('crowd'); redo(); } },
       { label: () => is2d() ? `2D view   ◀ ${VIEW_NAMES[Settings.view || 'nhl']} ▶` : '2D view   (Classic 2D camera only)', change: d => { if (is2d()) { cycleView(d); apply(); } }, select: () => { if (is2d()) { cycleView(1); apply(); } } },

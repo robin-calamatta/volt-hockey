@@ -3,6 +3,22 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v9.3: sparkler intro, camera and speed defaults
+- **Sparkler opening** on the title screen: a sparkler burns the VOLT HOCKEY logo in letter by letter, the logo flares, the title fades in, and the
+  logo keeps fizzling now and then. Plays once per visit; any key, button or tap skips it (`src/intro.js`, timings in `INTRO`).
+- **Third person is off by default.** Turn it on in Settings > Camera and graphics > Third person view; then the camera button offers it again.
+  New players start in Broadcast.
+- **Carts start at full power (5 of 5)** for new players. Older saves (this browser or a logged-in account) are moved to 5 once, and third person off;
+  after that your own choice in Settings > Game rules is kept.
+
+## How to play pages and game demos (v9.2)
+- **Minigames** is grouped into categories (Party chaos, Ball games, Racing and driving, Sneaky and teams), plus "How to play Volt Hockey".
+- Every game list and setup page has a **narrow menu on the left and a live demo on the right**: CPU carts play the highlighted game
+  (filmed from the broadcast camera), a caption along the bottom of the video steps through the rules, and the goal and rules sit under it.
+  The demo follows your options (pick another track and the demo drives it).
+- **How to play** (setup pages, and hockey's Setup): goal, rules and every control for gamepad / keyboard / touch on the left, the demo on the right.
+- Games are described in `src/modes.js` (`GAME_INFO`); new modes plug into `MODES`. Demo window: `DemoWindow` in `src/scenes_mini.js`.
+
 ## Minigames (v9)
 Main menu > **Minigames** > a game > **Play on this screen** (local: split screen, controllers, CPUs) or **Host an online room**
 (a room already set to that game). Also Online > **Create a minigame room**, and every online room has a **Game** row (hockey or any
@@ -92,7 +108,7 @@ The match is now drawn in 3D: a real arena with a hardwood (or tile, concrete, i
 - **One cart all game**: Match setup, Season setup, the online room and Settings > Game rules have **Switch carts with Y: On / Off**. Off locks everyone to the cart they start in (online it is the host's rule).
 - **Settings, regrouped** (nothing removed): Camera and graphics, Sound and commentary, Game rules, Ball and carts, CPU opponent, Controls and screen (controls guide, right-stick look, touch buttons, fullscreen), Player. A line under the menu says what is on the highlighted page. The pause menu has Camera right under Resume.
 - **Commentator**: Voice and captions, **Voice only**, Captions only, or Off.
-- **Camera button**: D-pad down on a gamepad (View until v8.1), **T** on keyboard 1, **P** on keyboard 2, **◉ VIEW** on the touch pad. It steps through **First person -> Third person -> Broadcast -> Classic 2D**. Also in the pause menu and Settings > Camera.
+- **Camera button**: D-pad down on a gamepad (View until v8.1), **T** on keyboard 1, **P** on keyboard 2, **◉ VIEW** on the touch pad. It steps through **First person -> Broadcast -> Classic 2D**, plus **Third person** when it is turned on (Settings > Camera and graphics > Third person view; off by default since v9.3). Also in the pause menu and Settings > Camera.
 - **Steering in first and third person is cart-relative**: push forward to drive, left / right to turn. How far you push sideways sets how fast you turn; sideways alone turns on the spot; pull back to reverse. Spin shots work as before (the camera eases round so a 90 degree spin does not whip the view).
 - **Broadcast** is a TV camera high on the near side that slides along with the ball; the stick follows the screen like the 2D game.
 - **Classic 2D** is the original flat view, unchanged (zoom, tilt, NHL/sideways/whole rink).
