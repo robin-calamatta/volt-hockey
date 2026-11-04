@@ -3,6 +3,28 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v10: fourteen new minigames, awareness signs, crash slow-down
+New games (Minigames menu, each with a live demo, How to play page, CPU players, split screen and online):
+- **Party chaos**: Hot Potato Bomb (bump to pass the bomb), King of the Hill (the hill moves every 20 s), Sumo Ring (hard shoves, a shrinking ring, rounds),
+  Floor Is Lava (tiles glow orange, then melt).
+- **Ball games**: Multiball Madness (team hockey with 3-8 balls), Giant Ball (one huge heavy ball, wide goals), Cart Bowling (take turns, strikes and spares),
+  Mini Golf (everyone plays the same hole with their own ball; four hole layouts).
+- **Racing and driving**: Stunt Arena (ramps, spins in the air, clean landings and combos), Slalom Time Trial (gates in order; your best run is saved in
+  this browser and its ghost races you next time), Delivery Rush (parcels from the depot to the matching house; ram couriers to steal).
+- **Sneaky and teams**: Imposter Carts (every cart looks the same; agents collect orbs and zap with A), Capture the Flag, Infection Night (Manhunt with the
+  lights out: headlights and glows only).
+Code: rules and CPU in `src/modes_games.js` (one `MODES[kind]` + `GAME_INFO[kind]` each), drawing in `src/modes_draw.js` (3D and 2D), framework in `src/modes.js`.
+
+Also:
+- **Crowd awareness signs** in each cause's colour: arthrogryposis / AMC (blue), Defeat Duchenne (red), autism (gold), TBI / brain injury and cerebral palsy
+  (green), spina bifida (yellow), Down syndrome (blue and yellow), SMA (ivory), muscular dystrophy (lime), disability pride (lavender). The shirtless fans
+  sometimes paint AMC STRONG, DEFEAT DMD, DUCHENNE, AUTISM, TBI STRONG or CP PRIDE instead of the team name (now also drawn in 3D). Lists: `CAUSE_SIGNS`
+  and `CAUSE_WORDS` in `src/crowd.js`. Signs are printed on both sides so they read the right way from either stand.
+- **Crashes slow both carts**: a real hit keeps 60% of each cart's speed; carts pushing against each other bleed speed (`CONFIG.crash`).
+- **The CPU always keeps learning** how you play (the off switch and "Forget what the CPU learned" are gone).
+- **Broadcast is off by default too**, like third person: turn either on in Settings > Camera and graphics. New players start in first person.
+- **Menu demos** play in real time (they no longer slow down when the frame rate drops), skip the 3-2-1 and run a little faster (`CONFIG.demoSpeed`).
+
 ## v9.3: sparkler intro, camera and speed defaults
 - **Sparkler opening** on the title screen: a sparkler burns the VOLT HOCKEY logo in letter by letter, the logo flares, the title fades in, and the
   logo keeps fizzling now and then. Plays once per visit; any key, button or tap skips it (`src/intro.js`, timings in `INTRO`).
@@ -108,7 +130,7 @@ The match is now drawn in 3D: a real arena with a hardwood (or tile, concrete, i
 - **One cart all game**: Match setup, Season setup, the online room and Settings > Game rules have **Switch carts with Y: On / Off**. Off locks everyone to the cart they start in (online it is the host's rule).
 - **Settings, regrouped** (nothing removed): Camera and graphics, Sound and commentary, Game rules, Ball and carts, CPU opponent, Controls and screen (controls guide, right-stick look, touch buttons, fullscreen), Player. A line under the menu says what is on the highlighted page. The pause menu has Camera right under Resume.
 - **Commentator**: Voice and captions, **Voice only**, Captions only, or Off.
-- **Camera button**: D-pad down on a gamepad (View until v8.1), **T** on keyboard 1, **P** on keyboard 2, **◉ VIEW** on the touch pad. It steps through **First person -> Broadcast -> Classic 2D**, plus **Third person** when it is turned on (Settings > Camera and graphics > Third person view; off by default since v9.3). Also in the pause menu and Settings > Camera.
+- **Camera button**: D-pad down on a gamepad (View until v8.1), **T** on keyboard 1, **P** on keyboard 2, **◉ VIEW** on the touch pad. It steps through **First person -> Classic 2D**, plus **Third person** and **Broadcast** when they are turned on (Settings > Camera and graphics; off by default since v10). Also in the pause menu and Settings > Camera.
 - **Steering in first and third person is cart-relative**: push forward to drive, left / right to turn. How far you push sideways sets how fast you turn; sideways alone turns on the spot; pull back to reverse. Spin shots work as before (the camera eases round so a 90 degree spin does not whip the view).
 - **Broadcast** is a TV camera high on the near side that slides along with the ball; the stick follows the screen like the 2D game.
 - **Classic 2D** is the original flat view, unchanged (zoom, tilt, NHL/sideways/whole rink).

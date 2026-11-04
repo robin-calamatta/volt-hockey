@@ -2,7 +2,7 @@
      lane  - which part of the net you shoot at   (-1 = top, 0 = middle, +1 = bottom)
      pass  - how often you pass instead of shoot  (0 = never, 1 = always)
      side  - which wing you carry the ball down   (-1 = top, +1 = bottom)
-   Opposing CPU carts then shade their guarding towards those habits (see rolePoint in ai.js). Turn it off, or wipe it, in Settings. */
+   Opposing CPU carts then shade their guarding towards those habits (see rolePoint in ai.js). It is always on and never wiped (v10): an ongoing record of how you play. */
 const Learn = {
   key: 'voltHockeyHabits',
   data: { games: 0, shots: 0, passes: 0, lane: 0, pass: 0.3, side: 0 },
@@ -14,7 +14,7 @@ const Learn = {
   confidence() { return Math.min(1, (this.data.shots + this.data.passes) / CONFIG.learn.samplesForFull); },    // trust the habits more the more we have seen
   /* what the CPU uses: each habit scaled by how sure we are and by how clever this skill level is */
   profile(D) {
-    const k = this.confidence() * (D.adapt || 0) * (Settings.adapt === false ? 0 : 1);
+    const k = this.confidence() * (D.adapt || 0);
     return k > 0 ? { lane: this.data.lane * k, pass: this.data.pass * k, side: this.data.side * k, k } : null;
   },
   /* Called every physics step by the match. Watches human carts only. */

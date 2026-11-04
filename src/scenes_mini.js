@@ -106,7 +106,7 @@ class MiniSetupScene extends ListMenuScene {
     }
     if (k === 'hunt') items.push({ label: () => `Round length   ◀ ${o().huntMinutes} min ▶`, change: d => step('huntMinutes', d, 1, 8), hint: 'Anyone still free when the clock runs out wins.' });
     if (MODES[k]) for (const op of GAME_INFO[k].opts || []) {
-      const val = () => modeOpts(k)[op.key], show = v => op.values ? (op.names ? op.names[op.values.indexOf(v)] : String(v)) : op.fmt ? op.fmt(v) : String(v);
+      const val = () => modeOpts(k)[op.key], show = v => op.names ? op.names[op.values.indexOf(v)] : op.fmt ? op.fmt(v) : String(v);
       const chg = d => { if (op.values) { const i = op.values.indexOf(val()); modeSave(k, { [op.key]: op.values[(i + d + op.values.length) % op.values.length] }); } else modeSave(k, { [op.key]: clamp(+(val() + d * (op.step || 1)).toFixed(2), op.min, op.max) }); };
       items.push({ label: () => `${op.label}   ◀ ${show(val())} ▶`, change: chg, select: op.values ? () => chg(1) : undefined, hint: op.hint });
     }
@@ -372,7 +372,7 @@ class HowToScene extends Phaser.Scene {
     setWorld(mini);
     this.setup = { players: [], sizes: mini ? miniSizes(Math.max(4, miniOpts().carts)) : [3, 3], practice: !!mini, mini, demo: true, win: HOWTO_WIN };
     this.scene.launch('Demo', this.setup); this.scene.bringToTop(); this.overFor = 0; this.capI = 0; this.capAt = 0;
-    const W = HOWTO_WIN; this.add.graphics().fillStyle(0x0d151b, 0.6).fillRoundedRect(W.x - 10, W.y - 40, W.w + 20, W.h + 200, 12).lineStyle(3, 0x2f4a5c, 1).strokeRoundedRect(W.x - 2, W.y - 2, W.w + 4, W.h + 4, 8);
+    const W = HOWTO_WIN; this.add.graphics().fillStyle(0x0d151b, 0.6).fillRoundedRect(W.x - 10, W.y + W.h + 12, W.w + 20, 100, 12).lineStyle(3, 0x2f4a5c, 1).strokeRoundedRect(W.x - 2, W.y - 2, W.w + 4, W.h + 4, 8);
     const px = 28, pw = 540; panel(this, px - 10, 14, pw + 20, V.height - 28, { alpha: 0.86, radius: 16 });
     this.add.text(px + 10, 44, I.name.toUpperCase(), { ...STYLE.title, fontSize: '40px' });
     const body = [['GOAL', [I.goal]], ['RULES', I.rules], ['CONTROLS', I.controls]];

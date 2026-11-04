@@ -22,6 +22,11 @@ function buildNets() {
   });
 }
 
+/* Two carts that hit (or keep pushing against) each other both slow down. */
+function crashSlow(a, b, closing) {
+  const C = CONFIG.crash, k = closing > C.minClosing ? C.keep : Math.exp(-C.touchPerSecond / CONFIG.physics.hz);
+  a.vx *= k; a.vy *= k; b.vx *= k; b.vy *= k;
+}
 class Match {
   constructor({ teamA, teamB, players, difficulty, sizes, practice, remote, periodSeconds, diffBySide }) {
     const C = CONFIG;
@@ -265,7 +270,7 @@ class Match {
     const R = CONFIG.chair.radius, F = CONFIG.foul, dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
     if (d >= 2 * R || d === 0) return;
     const nx = dx / d, ny = dy / d, aSpeed = a.vx * nx + a.vy * ny, bSpeed = -(b.vx * nx + b.vy * ny);
-    const closing = Physics.circles(a, R, CONFIG.chair.mass, b, R, CONFIG.chair.mass, CONFIG.chair.chairBounce);
+    const closing = Physics.circles(a, R, CONFIG.chair.mass, b, R, CONFIG.chair.mass, CONFIG.chair.chairBounce); crashSlow(a, b, closing);
     if (closing > F.bumpSoundSpeed) this.sfx('bump');
     if (closing > F.bumpSoundSpeed * 1.8 && a.side !== b.side) this.call('hit', this.V({ ...this.W(a, 'who'), ...this.W(b, 'who2') }));
     if (closing > F.minClosingSpeed && a.side !== b.side && Settings.penalties) {   // a hard head-on or rear hit by the faster cart is a foul

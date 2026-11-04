@@ -166,7 +166,7 @@ class MiniMatch extends Match {
     if (this.kind === 'hunt' && a.side !== b.side && d < 2 * R + MINI.hunt.catchGap) { const hunter = a.side === 1 ? a : b, runner = hunter === a ? b : a; if (runner.safeLeft <= 0 && hunter.stunLeft <= 0 && !(hunter.freezeLeft > 0)) this.caught(runner, hunter); }
     if (this.kind === 'balloons') for (const [att, vic] of [[a, b], [b, a]]) this.tryPop(att, vic);
     if (d >= 2 * R || d === 0) return;
-    const closing = Physics.circles(a, R, CONFIG.chair.mass, b, R, CONFIG.chair.mass, CONFIG.chair.chairBounce);
+    const closing = Physics.circles(a, R, CONFIG.chair.mass, b, R, CONFIG.chair.mass, CONFIG.chair.chairBounce); crashSlow(a, b, closing);
     if (closing > CONFIG.foul.bumpSoundSpeed) this.sfx('bump');
   }
   enemies(a, b) { return a !== b && !a.out && !b.out && (this.mini.mode !== 'teams' || a.side !== b.side); }

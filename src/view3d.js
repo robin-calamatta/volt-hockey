@@ -369,7 +369,7 @@ class View3D {
 
   /* ----- the crowd: every fan from the 2D crowd (crowd.js), as instanced bodies on the steps ----- */
   buildFans() {
-    if (this.fans) { this.scene.remove(this.fans.group); this.fans.meshes.forEach(m => m.dispose && m.dispose()); this.fans.signs.forEach(s => s.mesh.material.map.dispose()); }
+    if (this.fans) { this.scene.remove(this.fans.group); this.fans.meshes.forEach(m => m.dispose && m.dispose()); this.fans.signs.forEach(s => s.tex.dispose()); }
     this.fans = null; const cr = this.sc.crowd; if (!cr || !cr.fans.length) return;
     const n = cr.fans.length, group = new THREE.Group(), white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 });
     const inst = geo => { const m = new THREE.InstancedMesh(geo, white, n); m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.castShadow = false; m.receiveShadow = true; group.add(m); return m; };
@@ -380,11 +380,11 @@ class View3D {
     // signs that some fans hold up now and then
     const signs = cr.fans.filter(f => f.sign).map(f => {
       const cv = G3.canvas(256, 160), c = cv.getContext('2d'), dark = ((f.signCol >> 16 & 255) + (f.signCol >> 8 & 255) + (f.signCol & 255)) > 600;
-      c.fillStyle = G3.css(f.signCol); c.fillRect(0, 0, 256, 160); c.fillStyle = dark ? '#14181c' : '#ffffff'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillStyle = G3.css(f.signCol); c.fillRect(0, 0, 256, 160); c.fillStyle = f.signInk || (dark ? '#14181c' : '#ffffff'); c.textAlign = 'center'; c.textBaseline = 'middle';
       const lines = f.sign.split('\n'); c.font = '800 54px "Barlow Condensed", Impact, sans-serif'; lines.forEach((l, k) => c.fillText(l, 128, 80 + (k - (lines.length - 1) / 2) * 58, 240));
       const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding;
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.5), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })); mesh.visible = false; group.add(mesh);
-      return { f, mesh };
+      const mesh = new THREE.Group(), mat = new THREE.MeshBasicMaterial({ map: tex }), back = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.5), mat); back.rotation.y = Math.PI; mesh.add(new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.5), mat), back); mesh.visible = false; group.add(mesh);   // printed on both sides, so it reads from either stand
+      return { f, mesh, tex };
     });
     this.fans = { group, torso, head, hair, armL, armR, legs, signs, meshes: [torso, head, hair, armL, armR, legs] }; this.fans.group.visible = Render3D.quality().fans;
     this.scene.add(group); this.updateFans(0, true);
@@ -422,6 +422,12 @@ class View3D {
       const shirt = f.letter ? f.skin : f.shirt; F.torso.setColorAt(i, col.set(shirt));
     });
     for (const m of F.meshes) m.instanceMatrix.needsUpdate = true; F.torso.instanceColor.needsUpdate = true;
+    { const S = cr.strip, want = S ? S.fans.filter(f => f.letter && f.letter !== ' ' && t >= f.at && !gone(f)) : []; F.letters = F.letters || [];   // painted letters on the shirtless fans
+      while (F.letters.length < want.length) { const cv = G3.canvas(64, 64), tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding; const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.26), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })); F.group.add(mesh); F.letters.push({ mesh, cv, tex, key: '' }); }
+      F.letters.forEach((L, i) => { const f = want[i]; L.mesh.visible = !!f; if (!f) return;
+        const col = S.col !== undefined ? S.col : cr.teamCol[S.side], key = f.letter + col; if (L.key !== key) { L.key = key; const c = L.cv.getContext('2d'); c.clearRect(0, 0, 64, 64); c.font = '900 54px "Barlow Condensed", Impact, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 8; c.strokeStyle = '#ffffff'; c.strokeText(f.letter, 32, 35); c.fillStyle = G3.css(col); c.fillText(f.letter, 32, 35); L.tex.needsUpdate = true; }
+        const P = this.fanPose(cr, f, t), seat = A3.stepBase + f.row * A3.stepRise, by = seat + 0.36 * f.sc + P.stand * 0.32 + P.bob;
+        L.mesh.position.set(f.x + P.shake, by + 0.08 * f.sc, f.y - f.fy * P.lean + f.fy * 0.16 * f.sc); L.mesh.rotation.set(0, f.fy > 0 ? 0 : Math.PI, 0); L.mesh.scale.setScalar(f.sc); }); }
     for (const s of F.signs) {
       const f = s.f, on = !!f.signUp && !gone(f); s.mesh.visible = on; if (!on) continue;
       const seat = A3.stepBase + f.row * A3.stepRise; s.mesh.position.set(f.x, seat + 1.25, f.y + f.fy * 0.1); s.mesh.rotation.set(0, f.fy > 0 ? 0 : Math.PI, Math.sin(t * 2 + f.ph) * 0.06);

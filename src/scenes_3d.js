@@ -27,7 +27,7 @@ Object.assign(GameScene.prototype, {
     this.sharedFlat = Settings.camMode === '2d'; this.shownFlat = null;
     if (this.v3) this.v3.applyQuality();
   },
-  modeOf(p) { const m = (p && p.camMode) || Settings.camMode || 'broadcast'; return m === 'third' && !Settings.allowThird ? 'broadcast' : m; },   // third person only when turned on
+  modeOf(p) { const m = (p && p.camMode) || Settings.camMode || 'first'; return Settings.camAllowed(m) ? m : 'first'; },   // third person and broadcast only when turned on
   /* Who is playing on this screen, and which device each of them is using right now. */
   localControls() {
     const o = this.online;
@@ -40,7 +40,7 @@ Object.assign(GameScene.prototype, {
   },
   cycleCamera(p, LP) {
     const lone = LP.length <= 1, cyc = Settings.camCycle().filter(m => m !== '2d' || lone), N = CONFIG.view3d.names;
-    if (!lone && this.sharedFlat) { this.sharedFlat = false; for (const q of LP) if (this.modeOf(q) === '2d') q.camMode = Settings.allowThird ? 'third' : 'broadcast'; }
+    if (!lone && this.sharedFlat) { this.sharedFlat = false; for (const q of LP) if (this.modeOf(q) === '2d') q.camMode = 'first'; }
     else {
       const next = cyc[(cyc.indexOf(this.modeOf(p)) + 1) % cyc.length];
       if (lone) { Settings.camMode = next; Settings.save(); p.camMode = undefined; } else p.camMode = next;      // a lone player's choice is remembered for next time

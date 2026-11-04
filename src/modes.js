@@ -49,12 +49,12 @@ const modeOf = m => m && MODES[m.kind];
    { key, label, min, max, step?, def, fmt? } numbers, or { key, label, values: [...], names?, def } choices. */
 function modeOpts(kind) { const I = GAME_INFO[kind] || {}, saved = (Settings.mg && Settings.mg[kind]) || {}, out = {}; for (const o of I.opts || []) out[o.key] = saved[o.key] !== undefined ? saved[o.key] : o.def; return out; }
 function modeSave(kind, patch) { Settings.mg = { ...miniOpts(), [kind]: { ...modeOpts(kind), ...patch } }; Settings.save(); }
-{ const base = miniCfg; miniCfg = kind => MODES[kind] ? { kind, mode: 'ffa', items: !!miniOpts().items[kind], minutes: modeOpts(kind).minutes || GAME_INFO[kind].minutes || 3, ...modeOpts(kind) } : base(kind); }
+{ const base = miniCfg; miniCfg = kind => MODES[kind] ? { kind, mode: GAME_INFO[kind].teams ? 'teams' : 'ffa', items: !!miniOpts().items[kind], minutes: modeOpts(kind).minutes || GAME_INFO[kind].minutes || 3, ...modeOpts(kind) } : base(kind); }
 { const base = miniLabel; miniLabel = cfg => { if (!cfg || !MODES[cfg.kind]) return base(cfg); const I = GAME_INFO[cfg.kind]; return I.name + (I.label ? ' (' + I.label(cfg) + ')' : '') + (cfg.items ? ', power-ups' : ''); }; }
 
 /* ----- the framework: MiniMatch hands the new kinds over to their mode ----- */
 {
-  const P = MiniMatch.prototype, o = { kickoff: P.kickoff, step: P.step, simulate: P.simulate, chairHit: P.chairHit, miniCmd: P.miniCmd, hud: P.hud, miniSnap: P.miniSnap, miniApply: P.miniApply };
+  const P = MiniMatch.prototype, o = { useItem: P.useItem, focusOn: P.focusOn, kickoff: P.kickoff, step: P.step, simulate: P.simulate, chairHit: P.chairHit, miniCmd: P.miniCmd, hud: P.hud, miniSnap: P.miniSnap, miniApply: P.miniApply };
   P.kickoff = function () {
     const M = modeOf(this); if (!this.mini || !M) return o.kickoff.call(this);
     if (!this.modeReady) { this.modeReady = true; this.gs = {}; for (const c of this.chairs) c.gs = {}; if (GAME_INFO[this.kind].minutes || this.mini.minutes) this.clock = (this.mini.minutes || GAME_INFO[this.kind].minutes) * 60; if (M.init) M.init(this); }
@@ -77,16 +77,23 @@ function modeSave(kind, patch) { Settings.mg = { ...miniOpts(), [kind]: { ...mod
     const R = CONFIG.chair.radius, d = Math.hypot(b.x - a.x, b.y - a.y); if ((a.gs && a.gs.ghost) || (b.gs && b.gs.ghost)) return;
     if (d < 2 * R + 0.12 && M.contact) M.contact(this, a, b, d);
     if (d >= 2 * R || d === 0) return;
-    const K = CONFIG.chair, closing = Physics.circles(a, R, K.mass * (a.massMul || 1), b, R, K.mass * (b.massMul || 1), K.chairBounce);
+    const K = CONFIG.chair, closing = Physics.circles(a, R, K.mass * (a.massMul || 1), b, R, K.mass * (b.massMul || 1), K.chairBounce); crashSlow(a, b, closing);
     if (closing > CONFIG.foul.bumpSoundSpeed) this.sfx('bump');
     if (M.bump) M.bump(this, a, b, closing);
   };
+  P.useItem = function (c) { const M = modeOf(this); if (M && M.use) { if (!c.out && this.state === 'play') M.use(c, this); return; } return o.useItem.call(this, c); };   // A / X: the mode's own action (Imposter's zap)
+  P.focusOn = function () { o.focusOn.call(this); const M = modeOf(this), f = M && M.focus && this.gs && M.focus(this); if (f) Object.assign(this.ball, { x: f.x, y: f.y, vx: 0, vy: 0 }); };   // what the TV camera follows
   P.miniCmd = function (c, cmd) { cmd = o.miniCmd.call(this, c, cmd); const M = modeOf(this); return M && M.cmd ? M.cmd(c, cmd, this) : cmd; };
   P.hud = function () { const M = modeOf(this); if (!M || !M.hud) return o.hud.call(this); const t = Math.max(0, Math.ceil(this.clock)); return { clock: `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, a: '', b: '', sa: '', sb: '', left: '', mid: '', right: '', ...M.hud(this) }; };
   P.miniSnap = function () { const s = o.miniSnap.call(this); if (modeOf(this)) { s.gs = this.gs; s.cs = this.chairs.map(c => c.gs || 0); s.mm = this.chairs.map(c => [Math.round((c.massMul || 1) * 10), c.out ? 1 : 0]); } return s; };
   P.miniApply = function (s) { o.miniApply.call(this, s); if (s && s.gs) { this.gs = s.gs; (s.cs || []).forEach((g, i) => { if (this.chairs[i]) this.chairs[i].gs = g || {}; }); (s.mm || []).forEach(([mm, out], i) => { const c = this.chairs[i]; if (c) { c.massMul = mm / 10; c.out = !!out; } }); } };
 }
-{ const base = miniAI; miniAI = function (c, m, h) { const M = modeOf(m); if (!M || !M.ai) return base(c, m, h); c.aiNext = (c.aiNext || 0) - h; if (c.aiNext > 0 && c.aiCmd) return { ...c.aiCmd, spin: 0 }; c.aiNext = 0.05 + ((m.difficulty || {}).reaction || 0.15) * 0.5; const cmd = M.ai(c, m, h) || { x: 0, y: 0 }; if (cmd.speed === undefined) cmd.speed = (m.difficulty || {}).speed || 0.9; c.aiCmd = { ...cmd, spin: 0 }; return cmd; }; }
+{ const base = miniAI; miniAI = function (c, m, h) { const M = modeOf(m); if (!M || !M.ai) return base(c, m, h); c.aiNext = (c.aiNext || 0) - h; if (c.aiNext > 0 && c.aiCmd) return { ...c.aiCmd, spin: 0 }; c.aiNext = 0.05 + ((m.difficulty || {}).reaction || 0.15) * 0.5; let cmd = M.ai(c, m, h) || { x: 0, y: 0 };
+  const want = Math.hypot(cmd.x || 0, cmd.y || 0) * (cmd.speed === undefined ? 1 : cmd.speed), moving = Math.hypot(c.vx, c.vy);     // stuck in a scrum (wants to go, is not moving): back off sideways for a moment
+  c.stuckT = !M.noUnstick && want > 0.4 && moving < 0.35 ? (c.stuckT || 0) + 0.1 : 0;
+  if (c.stuckT > 1.5) { c.stuckT = 0; c.unstickT = m.simTime + 0.9; c.unstickA = c.heading + Math.PI * (0.6 + Math.random() * 0.8) * (Math.random() < 0.5 ? 1 : -1); }
+  if (c.unstickT > m.simTime) cmd = { x: Math.cos(c.unstickA), y: Math.sin(c.unstickA), speed: 0.9 };
+  if (cmd.speed === undefined) cmd.speed = (m.difficulty || {}).speed || 0.9; c.aiCmd = { ...cmd, spin: 0 }; return cmd; }; miniAI.base = base; }
 
 /* ----- helpers the modes share ----- */
 const MH = {

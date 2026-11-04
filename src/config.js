@@ -1,7 +1,9 @@
 /* Every tunable number lives here. Units: metres, seconds, radians unless noted. */
 const CONFIG = {
   view:    { width: 1280, height: 720, hudHeight: 98, margin: 8, logoSize: 256 },   // side panel: controls list beside the court
-  physics: { hz: 240 },                                   // fixed simulation steps per second
+  physics: { hz: 240 },
+  crash: { keep: 0.6, minClosing: 0.5, touchPerSecond: 1.4 },   // carts that hit each other both slow down: a real hit keeps this much of their speed; carts pushing against each other bleed speed at this rate
+  demoSpeed: 1.4,                                         // the menu demos (How to play) play this much faster than real time                                   // fixed simulation steps per second
 
   court:   { width: 28, height: 15, boardColor: 0x1f140b, lineColor: 0xf2c200, lineWidth: 0.12, centerCircleRadius: 2,
              cornerRadius: 3 },                                   // rounded rink corners, like a hockey arena
@@ -102,7 +104,7 @@ const CONFIG = {
   render:  { smooth: true, tagFade: { alpha: 0.12, margin: 10, speed: 14 }, ringWidth: 0.07, ringOffset: 0.1, ringGapRadians: 0.18, ringDimAlpha: 0.22 },
   /* The 3D view (src/view3d.js, Three.js). Heights in metres above the floor; angles in degrees; follow rates per second (higher = snappier).
      The camera button (View / R3, T, P, or the eye on the touch pad) steps through `cycle`; '2d' is the original flat view and is only offered to a lone player.
-     'third' is left out unless Settings.allowThird (Settings > Camera and graphics > Third person view). */
+     'third' and 'broadcast' are left out unless turned on (Settings.allowThird / allowBroadcast, in Settings > Camera and graphics). */
   view3d: {
     cycle: ['first', 'third', 'broadcast', '2d'],
     names: { first: 'First person', third: 'Third person', broadcast: 'Broadcast (3D)', '2d': 'Classic 2D' },
@@ -129,7 +131,7 @@ const CONFIG = {
     shake:   { seconds: 0.35, metres: 0.08 }, maxFov: 92
   },
   // Starting values of the settings that can also be changed in the menus.
-  defaults: { masterVolume: 1, voiceVolume: 1, micVolume: 1, micMonitor: false, voiceMode: 'open', lockCart: false, invertLook: false, camMode: 'broadcast', allowThird: false, fov3d: 74, chaseDist: 2, speedLevel: 5, speedCap: 5, ballBounce: 0.1, ballGrip: 30, stickLength: 0.26, ballFriction: 1.6, adapt: true, sizeA: 3, sizeB: 3, collisions: true, penalties: true },
+  defaults: { masterVolume: 1, voiceVolume: 1, micVolume: 1, micMonitor: false, voiceMode: 'open', lockCart: false, invertLook: false, camMode: 'first', allowThird: false, allowBroadcast: false, fov3d: 74, chaseDist: 2, speedLevel: 5, speedCap: 5, ballBounce: 0.1, ballGrip: 30, stickLength: 0.26, ballFriction: 1.6, adapt: true, sizeA: 3, sizeB: 3, collisions: true, penalties: true },
 
   // Slider limits used by the settings menus.
   ranges:  { masterVolume: { min: 0, max: 1, step: 0.05 }, voiceVolume: { min: 0, max: 1, step: 0.05 }, micVolume: { min: 0, max: 2, step: 0.1 }, musicVolume: { min: 0, max: 1, step: 0.05 }, sfxVolume: { min: 0, max: 1, step: 0.05 },

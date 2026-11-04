@@ -2,6 +2,19 @@
    Every fan has their own seat, shirt, skin, hair, energy and reaction delay, so the stands never move in lock-step.
    The crowd watches the match (score, shots, steals, fouls...) and reacts; it also does the wave, holds up signs, strips down to show a painted team name,
    and lets vendors walk the aisle. Nothing here touches the game itself, so it is the same on every machine (and different every match). */
+/* Awareness signs, in each cause's own colour: arthrogryposis (AMC) blue, Duchenne red (World Duchenne Awareness Day lights up red),
+   brain injury and cerebral palsy green, autism gold (neurodiversity), spina bifida yellow, Down syndrome blue and yellow,
+   SMA ivory, muscular dystrophy lime, all disabilities lavender. { text, bg, ink } */
+const CAUSE_SIGNS = [
+  { text: 'AMC\nAWARENESS', bg: 0x1f6fd1, ink: '#ffffff' }, { text: 'DEFEAT\nDUCHENNE', bg: 0xd8262e, ink: '#ffffff' }, { text: 'AUTISM\nAWARENESS', bg: 0xf2c200, ink: '#14181c' },
+  { text: 'TBI\nAWARENESS', bg: 0x2e9e44, ink: '#ffffff' }, { text: 'ARTHROGRYPOSIS\nAWARENESS', bg: 0x1f6fd1, ink: '#ffffff' }, { text: 'DUCHENNE\nWARRIORS', bg: 0xd8262e, ink: '#ffffff' },
+  { text: 'BRAIN INJURY\nAWARENESS', bg: 0x2e9e44, ink: '#ffffff' }, { text: 'AUTISM\nACCEPTANCE', bg: 0xf2c200, ink: '#14181c' }, { text: 'AMC\nSTRONG', bg: 0x1f6fd1, ink: '#ffffff' },
+  { text: 'CP\nAWARENESS', bg: 0x2e9e44, ink: '#ffffff' }, { text: 'TBI\nSURVIVORS', bg: 0x2e9e44, ink: '#ffffff' }, { text: 'SPINA BIFIDA\nAWARENESS', bg: 0xf2c200, ink: '#14181c' },
+  { text: 'DOWN SYNDROME\nAWARENESS', bg: 0x2b6fd1, ink: '#ffd23f' }, { text: 'SMA\nAWARENESS', bg: 0xf0e6d2, ink: '#14181c' }, { text: 'MUSCULAR\nDYSTROPHY', bg: 0x9ccc1f, ink: '#14181c' },
+  { text: 'DISABILITY\nPRIDE', bg: 0xb59ddb, ink: '#14181c' }, { text: 'NEURO-\nDIVERSITY', bg: 0xf2c200, ink: '#14181c' }
+];
+/* Words the shirtless fans paint across their chests, one letter each (a space is a fan with nothing painted). */
+const CAUSE_WORDS = [{ w: 'AMC', col: 0x1f6fd1 }, { w: 'AMC STRONG', col: 0x1f6fd1 }, { w: 'DEFEAT DMD', col: 0xd8262e }, { w: 'DUCHENNE', col: 0xd8262e }, { w: 'AUTISM', col: 0xc99a00 }, { w: 'TBI STRONG', col: 0x2e9e44 }, { w: 'CP PRIDE', col: 0x2e9e44 }];
 const CROWD_SIGNS = ['#INCLUSIVE\nSPORTS', 'SPORTS\nFOR ALL', 'GO\n{T}', 'GO\n{T}', 'GO\n{T}', '{T}\nPOWER!', 'ROLL\nON!', 'EVERY BODY\nPLAYS', '#VOLT\nHOCKEY', 'LET\'S GO\n{T}', 'NO\nLIMITS', 'POWER\nUP!', '#INCLUSIVE\nSPORTS', 'SPORTS\nFOR ALL', 'WE BACK\n{T}'];
 const CROWD_SKIN = [0xf1c7a0, 0xe0a97d, 0xc68a5c, 0xa86b43, 0x7b4a2d, 0x5a3520, 0xf6d5b8];
 const CROWD_HAIR = [0x1a1410, 0x2d1d12, 0x4a2c17, 0x7a4a22, 0xb98a4a, 0xd9b870, 0xa8a8a8, 0x6b2a1a, 0xe8e8e8];
@@ -37,8 +50,12 @@ class Crowd {
       }
     }
     // signs: a handful of fans own one and hold it up now and then
-    const signers = this.fans.filter(f => f.row < 3).sort(() => Math.random() - 0.5).slice(0, 15);
-    signers.forEach((f, i) => { f.sign = CROWD_SIGNS[i % CROWD_SIGNS.length].replace(/\{T\}/g, TEAMS[m.teams[f.team >= 0 ? f.team : (i % 2)]].name.toUpperCase()); f.signAt = r(2, 14); f.signCol = f.team >= 0 ? teamCol[f.team] : 0xffffff; });
+    const signers = this.fans.filter(f => f.row < 3).sort(() => Math.random() - 0.5).slice(0, 26), causes = CAUSE_SIGNS.slice().sort(() => Math.random() - 0.5);
+    signers.forEach((f, i) => {
+      if (i % 2 === 0 && causes.length) { const c = causes.pop(); f.sign = c.text; f.signCol = c.bg; f.signInk = c.ink; }       // every other sign is for a cause
+      else { f.sign = CROWD_SIGNS[i % CROWD_SIGNS.length].replace(/\{T\}/g, TEAMS[m.teams[f.team >= 0 ? f.team : (i % 2)]].name.toUpperCase()); f.signCol = f.team >= 0 ? teamCol[f.team] : 0xffffff; }
+      f.signAt = r(2, 14);
+    });
     this.vendors = [0, 1].map(stand => ({ stand, kind: Math.random() < 0.5 ? 'beer' : 'dog', state: 'away', timer: r(6, 22) + stand * 8, x: 0, dir: 1, pause: 0, nextStop: 0, vy: 0 }));
     this.last = null;
   }
@@ -99,11 +116,12 @@ class Crowd {
   /* ----- little shows: the wave, painted fans, vendors ----- */
   startWave() { const C = CONFIG.court; this.wave = { pos: 0, len: 2 * (C.width + 5), speed: this.rnd(6, 8) }; }
   stripGroup(s) {                                                // a run of fans in the front rows take their jerseys off: a letter of the team name painted on each
-    if (this.strip) return; const name = TEAMS[this.sc.match.teams[s]].name.toUpperCase().replace(/[^A-Z]/g, ''), n = name.length; if (n < 2 || n > 9) return;
+    if (this.strip) return; const cause = Math.random() < 0.5 ? CAUSE_WORDS[Math.floor(Math.random() * CAUSE_WORDS.length)] : null;   // half the time a cause instead of the team
+    const name = cause ? cause.w : TEAMS[this.sc.match.teams[s]].name.toUpperCase().replace(/[^A-Z]/g, ''), n = name.length, col = cause ? cause.col : this.teamCol[s]; if (n < 2 || n > 12) return;
     for (let tries = 0; tries < 12; tries++) {
       const stand = Math.floor(Math.random() * 2), row = Math.floor(Math.random() * 2), list = this.rows[stand][row], i0 = Math.floor(Math.random() * Math.max(1, list.length - n));
       const run = list.slice(i0, i0 + n); if (run.length < n || run.some(f => !f)) continue;
-      this.strip = { until: this.t + this.rnd(26, 40), fans: run, name, side: s };
+      this.strip = { until: this.t + this.rnd(26, 40), fans: run, name, side: s, col };
       run.forEach((f, k) => { f.team = s; f.letter = name[k]; f.mood = 'cheer'; f.at = this.t + k * 0.12; f.until = this.t + 26; f.jersey = f.shirt; f.toss = this.t + k * 0.12; });
       return;
     }
@@ -236,7 +254,7 @@ class Crowd {
   initTexts(world) {
     const sc = this.sc, mk = (style) => { const t = sc.add.text(0, 0, '', style).setOrigin(0.5).setVisible(false); world.add(t); return t; };
     this.signTx = Array.from({ length: 14 }, () => mk({ fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', align: 'center', color: '#ffffff', padding: { x: 7, y: 4 }, lineSpacing: -2 }));
-    this.letterTx = Array.from({ length: 9 }, () => mk({ fontFamily: FONT, fontSize: '44px', fontStyle: 'bold', color: '#ffffff', stroke: '#ffffff', strokeThickness: 0 }));
+    this.letterTx = Array.from({ length: 12 }, () => mk({ fontFamily: FONT, fontSize: '44px', fontStyle: 'bold', color: '#ffffff', stroke: '#ffffff', strokeThickness: 0 }));
     this.vendorTx = Array.from({ length: 2 }, () => mk({ fontFamily: FONT, fontSize: '26px', fontStyle: 'bold', color: '#1b1b1b', backgroundColor: '#ffffff', padding: { x: 6, y: 3 } }));
   }
   placeTexts(rot, view) {
@@ -246,7 +264,7 @@ class Crowd {
       if (!f.sign || !f.signUp || !inV(f) || n >= this.signTx.length) continue;
       const tx = this.signTx[n++], dark = (f.signCol === 0xffffff || f.signCol === 0xffe066 || f.signCol === 0xc9d6df || f.signCol === 0x7cf5c0 || f.signCol === 0xb5e61d);
       if (tx.text !== f.sign) tx.setText(f.sign);
-      tx.setColor(dark ? '#14181c' : '#ffffff').setBackgroundColor('#' + f.signCol.toString(16).padStart(6, '0'));
+      tx.setColor(f.signInk || (dark ? '#14181c' : '#ffffff')).setBackgroundColor('#' + f.signCol.toString(16).padStart(6, '0'));
       const k = Math.min(0.0125, 1.7 / Math.max(40, tx.width));
       tx.setScale(k).setRotation(-rot + Math.sin(t * 1.7 + f.ph) * 0.07).setPosition(f.x, f.y + f.fy * 0.32).setVisible(true).setDepth(5);
     }
@@ -254,8 +272,8 @@ class Crowd {
     const S = this.strip, order = Math.cos(rot) + Math.sin(rot) >= 0 ? 1 : -1;
     for (let i = 0; i < this.letterTx.length; i++) {
       const tx = this.letterTx[i]; const f = S && S.fans[order > 0 ? i : S.fans.length - 1 - i];
-      if (!f || !f.letter || this.t < f.at || !inV(f)) { tx.setVisible(false); continue; }
-      const col = '#' + this.teamCol[S.side].toString(16).padStart(6, '0');
+      if (!f || !f.letter || f.letter === ' ' || this.t < f.at || !inV(f)) { tx.setVisible(false); continue; }
+      const col = '#' + (S.col !== undefined ? S.col : this.teamCol[S.side]).toString(16).padStart(6, '0');
       if (tx.text !== f.letter) tx.setText(f.letter);
       tx.setColor(col).setStroke('#ffffff', 5).setScale(0.0095).setRotation(-rot).setPosition(f.x, f.y).setVisible(true).setDepth(5);
     }

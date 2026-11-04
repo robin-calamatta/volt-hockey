@@ -72,8 +72,7 @@ const SETTINGS_PAGES = {
     slider('Ball bounce off carts', 'ballBounce', pct), slider('Ball grip', 'ballGrip', v => String(Math.round(v))), slider('Ball friction (higher = slows sooner)', 'ballFriction', v => v.toFixed(1))],
   'CPU opponent': () => [
     { label: () => `Difficulty   ◀ ${Settings.difficulty} ▶`, change: d => Settings.cycleDifficulty(d) },
-    toggle('CPU learns how you play', 'adapt'),
-    { label: () => `Forget what the CPU learned   (${Learn.data.shots} shots, ${Learn.data.passes} passes seen)`, select: () => Learn.reset() }],
+    { label: () => `The CPU keeps learning how you play   (${Learn.data.shots} shots, ${Learn.data.passes} passes seen)`, hint: 'Always on: it remembers your habits from game to game' }],
   'Controls and screen': sc => [
     { label: () => 'Controls guide', hint: 'What every button does on a gamepad, keyboard and touch', select: () => sc.scene.start('ControlsGuide', { ctx: sc.ctx, page: 'Controls and screen' }) },
     { label: () => `Look up / down (right stick)   ◀ ${Settings.invertLook ? 'Inverted' : 'Normal'} ▶`, change: () => Settings.toggle('invertLook'), select: () => Settings.toggle('invertLook') },
@@ -86,10 +85,10 @@ const SETTINGS_HINTS = {
   'Player': 'Your name and your career totals',
   'Voice chat': 'Voice on or off, push to talk, microphone, mic volume, hear yourself, voice volume',
   'Sound and commentary': 'Master volume, speakers, music, effects and crowd volume, commentator voice and captions',
-  'Camera and graphics': 'First person, broadcast, 2D view, third person on / off, field of view, court, crowd, graphics quality',
+  'Camera and graphics': 'First person, 2D view, third person and broadcast on / off, field of view, court, crowd, graphics quality',
   'Game rules': 'Game clock, cart speeds, switching carts, collisions, penalties',
   'Ball and carts': 'Turning speed, stick length, ball bounce, grip and friction',
-  'CPU opponent': 'Difficulty and how the CPU learns your play',
+  'CPU opponent': 'Difficulty, and what the CPU has learned about your play',
   'Controls and screen': 'Controls guide, right-stick look, touch buttons, fullscreen'
 };
 const sampleCall = key => { const e = Commentary.pick(key, { whoT: 'Volts', whoN: 2, who: 'Robin', a: 3, o: 2, sa: 12, sb: 7, team: 'Volts', opp: 'Comets', tail: ' 3 to 2.' }); if (e) { const l = Commentary.parse(e); Commentator.speak({ ...l, mood: Math.max(l.mood, 2) }); } };
@@ -741,7 +740,11 @@ class GameScene extends Phaser.Scene {
   update(time, delta) {
     if (!this.clockText || !this.clockText.active || !this.world || !this.world.scene) return;      // the scene is being torn down (backing out to the menu): nothing left to draw
     Controls.update(this.game.loop.frame); this.showPauseBtn();
-    if (this.demo) { this.match.update(Math.min(delta / 1000, 0.05)); this.pre3d(Math.min(delta / 1000, 0.05)); this.render(); return; }          // the camera-settings preview: the CPU plays itself, nobody can pause it
+    if (this.demo) {                                                                   // the camera-settings preview and the menu demos: the CPU plays itself, nobody can pause it
+      const vid = this.scene.key === 'Demo', dt = vid ? Math.min((this.game.loop.rawDelta || delta) / 1000, 0.1) * CONFIG.demoSpeed : Math.min(delta / 1000, 0.05);   // rawDelta: the real time between frames (Phaser's smoothed delta turns a slow frame rate into slow motion)   
+      if (vid && this.match.state === 'countdown' && this.match.timer > 0.3) this.match.timer = 0.3;      // no 3-2-1 in a demo
+      this.match.update(dt); this.pre3d(dt); this.render(); return;
+    }          // the camera-settings preview: the CPU plays itself, nobody can pause it
     if (this.online) return this.updateOnline(delta);
     const m = this.match;
     for (const p of this.setup.players) {
@@ -910,6 +913,7 @@ class GameScene extends Phaser.Scene {
     else {                                                                 // the classic 2D view
       g.clear(); this.updateCamera(dt3); this.drawArrows();
       const bs = this.toScreen(m.ball.x, m.ball.y), bz = this.tilted ? this.zoom * this.s0 * (bs.k || 1) : this.zoom, bpx = Math.max(B.radius * (B.drawScale || 1) * bz, B.minDrawRadiusPx || 0);
+      if (m.mini && this.drawMode2D && modeOf(m)) this.drawMode2D(g, true);   // a minigame's floor (rings, lava, goals...), under the carts
       m.chairs.forEach((c, i) => {
         const tag = this.tags[i]; tag.setVisible(!c.benched);
         if (c.benched) return;
@@ -971,6 +975,7 @@ class CameraPageScene extends ListMenuScene {
     const N3 = CONFIG.view3d.names, is2d = () => Settings.camMode === '2d', no3d = () => Render3D.ok === false;
     this.items = [
       { label: () => no3d() ? 'Camera   (3D is not supported on this device: Classic 2D)' : `Camera   ◀ ${N3[Settings.camMode] || N3.third} ▶`, change: d => { cycleCamMode(d); apply(); }, select: () => { cycleCamMode(1); apply(); } },
+      { label: () => `Broadcast view   ◀ ${Settings.allowBroadcast ? 'On' : 'Off'} ▶`, change: () => { Settings.setBroadcast(!Settings.allowBroadcast); apply(); }, select: () => { Settings.setBroadcast(!Settings.allowBroadcast); apply(); } },
       { label: () => `Third person view   ◀ ${Settings.allowThird ? 'On' : 'Off'} ▶`, hint: 'On: the camera button also offers the chase camera behind your cart', change: () => { Settings.setThird(!Settings.allowThird); apply(); }, select: () => { Settings.setThird(!Settings.allowThird); apply(); } },
       { label: () => `Court   ◀ ${CONFIG.surfaces[Settings.court | 0].name} ▶`, change: d => { Settings.court = ((Settings.court | 0) + d + CONFIG.surfaces.length) % CONFIG.surfaces.length; Settings.save(); redo(); }, select: () => { Settings.court = ((Settings.court | 0) + 1) % CONFIG.surfaces.length; Settings.save(); redo(); } },
       { label: () => `Crowd   ◀ ${Settings.crowd !== false ? 'On' : 'Off'} ▶`, change: () => { Settings.toggle('crowd'); redo(); }, select: () => { Settings.toggle('crowd'); redo(); } },

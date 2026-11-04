@@ -7,14 +7,17 @@ const Settings = {
   ...CONFIG.defaults,            // speedLevel, ballBounce, ballGrip, stickLength, collisions, penalties
 
   load() { let saved = {}; try { saved = JSON.parse(localStorage.getItem(this.storageKey) || '{}'); Object.assign(this, saved); } catch (e) {} if (!saved.view) this.view = saved.vertical === false ? 'side' : 'nhl'; this.vertical = this.view === 'nhl'; this.collisions = CONFIG.defaults.collisions;   // cart collisions always start on
-    this.migrate(saved); this.fixCam(); },
+    this.migrate(saved); this.fixCam(); this.adapt = true; },   // the CPU always keeps learning (no off switch since v10)
   migrate(saved) {                                    // older saves (this device's or the account's): v9.2 starts carts at full power (5), third person off until turned on
-    if ((saved.settingsVer | 0) >= 2) return;
-    this.speedLevel = CONFIG.defaults.speedLevel; this.allowThird = false; this.settingsVer = 2; if (this.camMode === 'third') this.camMode = 'broadcast'; this.save();
+    const v = saved.settingsVer | 0; if (v >= 3) return;
+    if (v < 2) { this.speedLevel = CONFIG.defaults.speedLevel; this.allowThird = false; }
+    this.allowBroadcast = false; this.settingsVer = 3; this.fixCam(); this.save();             // v9.3: broadcast off by default too
   },
-  camCycle() { return CONFIG.view3d.cycle.filter(m => m !== 'third' || this.allowThird); },          // the views the camera button steps through
-  fixCam() { if (!this.camCycle().includes(this.camMode)) this.camMode = 'broadcast'; },
+  camAllowed(m) { return (m !== 'third' || this.allowThird) && (m !== 'broadcast' || this.allowBroadcast); },
+  camCycle() { return CONFIG.view3d.cycle.filter(m => this.camAllowed(m)); },                          // the views the camera button steps through
+  fixCam() { if (!this.camCycle().includes(this.camMode)) this.camMode = 'first'; },
   setThird(on) { this.allowThird = !!on; this.fixCam(); this.save(); },
+  setBroadcast(on) { this.allowBroadcast = !!on; this.fixCam(); this.save(); },
   setView(v) { this.view = v; this.vertical = v === 'nhl'; this.save(); },
   save() { try { localStorage.setItem(this.storageKey, JSON.stringify(this)); } catch (e) {} if (typeof Account !== 'undefined') Account.changed(); },   // logged in: also saved online
 
