@@ -11,7 +11,8 @@ Phaser loads from a CDN; download `phaser.min.js` and change the first script ta
   way through the mazes (A* on a grid of the walls) and leads its shots.
 - **Capture the Flag**: no more grab / knock-loose loop (a carrier who loses the flag cannot grab it again for 3 s, and a dropped flag cannot be
   picked up for a moment).
-- **King of the Hill**: a much bigger rink (44 x 24), the hill moves every 15 s, power-ups on by default with weapons: SHOCKWAVE (throws everyone
+- **King of the Hill**: two hills at once; only a cart alone on a hill scores; a crowded hill (two carts for a few seconds, three or more
+  sooner) OVERLOADS and throws everyone off. A much bigger rink (44 x 24), the hills move every 15 s, power-ups on by default with weapons: SHOCKWAVE (throws everyone
   near you away), ZAP, BOOST, OIL. The CPU uses them. (A minigame can have its own rink size: `court` in its GAME_INFO.)
 - **Floor Is Lava**: the LAVA SNAKE wakes after a few seconds, hunts the nearest cart, grows and speeds up, and melts the floor behind it.
   The CPUs keep moving and plan routes that avoid lava.

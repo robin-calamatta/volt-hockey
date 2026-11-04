@@ -95,28 +95,50 @@ MODES.bomb = {
 /* =============================== KING OF THE HILL =============================== */
 MODES.hill = {
   items: ['zap', 'wave', 'boost', 'wave', 'oil'],
-  init(m) { m.gs.zone = { x: m.width / 2, y: m.centerY, r: 3 }; m.gs.move = 15; m.gs.king = -1; for (const c of m.chairs) c.gs.pts = 0; },
-  step(m, h) {
-    const g = m.gs, Z = g.zone;
-    if ((g.move -= h) <= 0) {
-      let p; for (let t = 0; t < 30; t++) { p = { x: 4.5 + Math.random() * (m.width - 9), y: 4 + Math.random() * (m.height - 8) }; if (Math.hypot(p.x - Z.x, p.y - Z.y) > 12) break; }
-      Object.assign(Z, { x: MG.r2(p.x), y: MG.r2(p.y) }); g.move = 15; MG.notice(m, 'THE HILL MOVES!', 1.6); m.sfx('whistle');
-    }
-    const inside = MG.live(m).filter(c => Math.hypot(c.x - Z.x, c.y - Z.y) < Z.r).sort((a, b) => Math.hypot(a.x - Z.x, a.y - Z.y) - Math.hypot(b.x - Z.x, b.y - Z.y));
-    if (!inside.length) { g.king = -1; g.busy = 0; return; }
-    const k = inside[0]; if (g.king !== k.k && k.gs.pts > 3 && Math.random() < 0.5) m.line(`${m.name(k)} takes the hill.`);
-    g.king = k.k; g.busy = inside.length > 1 ? 1 : 0; k.gs.pts += h * (g.busy ? 0.4 : 1); if (k.gs.pts >= m.mini.target) this.end(m, false);
+  init(m) {
+    const g = m.gs; g.zones = [{ x: m.width * 0.3, y: m.centerY, r: 2.6, king: -1, crowd: 0, over: 0, move: 15 }, { x: m.width * 0.7, y: m.centerY, r: 2.6, king: -1, crowd: 0, over: 0, move: 22 }];
+    for (const c of m.chairs) c.gs.pts = 0;
   },
-  end(m, timeUp) { const r = MG.rankRows(m, m.chairs, c => c.gs.pts, c => `${Math.floor(c.gs.pts)} points`); m.finishGame(MG.ffaTitle(m, r.map(x => x.c), c => Math.floor(c.gs.pts)), r, -1, timeUp ? 'Time up: the most points wins' : `First to ${m.mini.target} points`); },
+  step(m, h) {
+    const g = m.gs, live = MG.live(m);
+    for (const [zi, Z] of g.zones.entries()) {
+      if ((Z.move -= h) <= 0) {                                           // the hills move (one at a time), well away from the other one
+        const other = g.zones[1 - zi]; let p; for (let t = 0; t < 40; t++) { p = { x: 4.5 + Math.random() * (m.width - 9), y: 4 + Math.random() * (m.height - 8) }; if (Math.hypot(p.x - Z.x, p.y - Z.y) > 10 && Math.hypot(p.x - other.x, p.y - other.y) > 14) break; }
+        Object.assign(Z, { x: MG.r2(p.x), y: MG.r2(p.y), move: 15, over: 0 }); MG.notice(m, 'A HILL MOVES!', 1.4); m.sfx('whistle');
+      }
+      const inside = live.filter(c => Math.hypot(c.x - Z.x, c.y - Z.y) < Z.r);
+      Z.crowd = inside.length; Z.king = inside.length === 1 ? inside[0].k : -1;
+      if (inside.length === 1) { const k = inside[0]; k.gs.pts += h; if (k.gs.pts >= m.mini.target) return this.end(m, false); }   // only a cart alone on a hill scores
+      Z.over = inside.length >= 3 ? Z.over + h * 2 : inside.length === 2 ? Z.over + h : Math.max(0, Z.over - h * 2);
+      if (Z.over > 2.5) {                                                  // too crowded: the hill overloads and throws everyone off
+        Z.over = 0; for (const c of inside) { const dx = c.x - Z.x, dy = c.y - Z.y, d = Math.hypot(dx, dy) || 1, k = 7; c.vx += dx / d * k; c.vy += dy / d * k; c.stunLeft = Math.max(c.stunLeft, 1); }
+        g.objs = g.objs || []; MG.add(m, { t: 'boom', x: Z.x, y: Z.y, life: 0.7, wave: 1 }); m.sfx('goal'); MG.notice(m, 'HILL OVERLOAD!  EVERYBODY OFF!', 1.6); if (Math.random() < 0.5) m.line('Too crowded! The hill blows everyone off.');
+      }
+    }
+    for (const o of MG.all(m, 'boom')) { o.life -= h; if (o.life <= 0) MG.remove(m, o); }
+  },
+  end(m, timeUp) { if (m.state !== 'play') return; const r = MG.rankRows(m, m.chairs, c => c.gs.pts, c => `${Math.floor(c.gs.pts)} points`); m.finishGame(MG.ffaTitle(m, r.map(x => x.c), c => Math.floor(c.gs.pts)), r, -1, timeUp ? 'Time up: the most points wins' : `First to ${m.mini.target} points`); },
   timeUp(m) { this.end(m, true); },
   ai(c, m) {
-    const Z = m.gs.zone, d = Math.hypot(c.x - Z.x, c.y - Z.y);
-    if (d < Z.r) { const rival = MG.live(m).find(o => o !== c && Math.hypot(o.x - Z.x, o.y - Z.y) < Z.r + 0.8); if (rival) return MG.chase(c, rival, 1, 0.1); return MH.to(c, Z.x + Math.cos(c.k) * 0.6, Z.y + Math.sin(c.k) * 0.6, 0.4); }
+    const g = m.gs, live = MG.live(m), on = (Z, o) => Math.hypot(o.x - Z.x, o.y - Z.y) < Z.r;
+    const mine = g.zones.find(Z => on(Z, c));
+    if (mine) {                                                            // on a hill: push the others off (or blast them), then sit near the middle
+      const rival = live.find(o => o !== c && Math.hypot(o.x - mine.x, o.y - mine.y) < mine.r + 0.6);
+      if (rival) { if (mine.over > 1.6 && !c.gs.stay) return MH.to(c, c.x + (c.x - mine.x), c.y + (c.y - mine.y), 1); return MG.chase(c, rival, 1, 0.1); }   // about to overload: get off
+      return MH.to(c, mine.x + Math.cos(c.k) * 0.5, mine.y + Math.sin(c.k) * 0.5, 0.35);
+    }
+    const score = Z => Math.hypot(c.x - Z.x, c.y - Z.y) / 6 + live.filter(o => o !== c && on(Z, o)).length * 2.5 + live.filter(o => o !== c && Math.hypot(o.x - Z.x, o.y - Z.y) < Z.r + 3).length * 0.5;
+    const Z = g.zones.slice().sort((a, b) => score(a) - score(b))[0], busy = live.filter(o => o !== c && on(Z, o)).length;
+    if (!c.gs.mood || m.simTime > c.gs.moodAt) { c.gs.mood = Math.random() < 0.35 ? 'push' : 'wait'; c.gs.moodAt = m.simTime + 4 + Math.random() * 4; }   // sometimes pile in, usually wait for a gap
+    if (busy >= 2 || (busy === 1 && c.gs.mood === 'wait' && !(c.item === 'wave' || c.item === 'zap'))) {                                                       // both hills crowded: grab a power-up, or wait at the edge to pounce
+      const box = !c.item && MH.nearest(c, m.boxes || []); if (box && MH.dist(c, box) < 12) return MH.to(c, box.x, box.y, 1);
+      const a = Math.atan2(c.y - Z.y, c.x - Z.x) + 0.02 * c.k; return MH.to(c, Z.x + Math.cos(a) * (Z.r + 1.6), Z.y + Math.sin(a) * (Z.r + 1.6), 0.7);
+    }
     return MH.to(c, Z.x, Z.y, 1);
   },
-  hud(m) { const k = m.gs.king, lead = m.chairs.slice().sort((a, b) => b.gs.pts - a.gs.pts)[0]; return { a: 'KING OF THE HILL', b: k >= 0 ? `👑 ${MG.up(m.name(m.chairs[k]))}${m.gs.busy ? ' (CONTESTED)' : ''}` : 'NOBODY ON THE HILL', mid: `First to ${m.mini.target}  •  ${m.name(lead)} ${Math.floor(lead.gs.pts)}`, left: MG.peopleLine(m, c => Math.floor(c.gs.pts)) }; },
-  tag(c, m) { return c.k === m.gs.king ? '👑 ' + Math.floor(c.gs.pts) : ''; },
-  startLine: () => 'Get on the hill and stay there!'
+  hud(m) { const g = m.gs, lead = m.chairs.slice().sort((a, b) => b.gs.pts - a.gs.pts)[0], kings = g.zones.map(Z => Z.king >= 0 ? `👑 ${MG.up(m.name(m.chairs[Z.king]))}` : Z.crowd ? 'CONTESTED' : 'EMPTY'); return { a: 'KING OF THE HILL', b: kings.join('   '), mid: `Alone on a hill = points  •  ${m.name(lead)} ${Math.floor(lead.gs.pts)} / ${m.mini.target}`, left: MG.peopleLine(m, c => Math.floor(c.gs.pts)) }; },
+  tag(c, m) { return m.gs.zones && m.gs.zones.some(Z => Z.king === c.k) ? '👑 ' + Math.floor(c.gs.pts) : c.player ? `${MG.pname(c)} ${Math.floor(c.gs.pts)}` : ''; },
+  startLine: () => 'Two hills. Be alone on one!'
 };
 
 /* =============================== SUMO RING =============================== */
@@ -849,9 +871,9 @@ Object.assign(GAME_INFO, {
     goal: 'Be the last cart that has not blown up.',
     rules: ['One cart holds the bomb (it sits on top of the cart and ticks faster as the fuse burns).', 'Bump another cart to pass the bomb to them. You cannot pass it straight back.', 'The holder is a little faster than everyone else.', 'When the fuse runs out, the holder is out and the blast throws everyone near it.', 'A new bomb goes to a random cart. Last one left wins.'],
     controls: [CTRL.drive, CTRL.spin, CTRL.pause], opts: [{ key: 'fuse', label: 'Fuse', values: [10, 15, 20], def: 15, fmt: v => `about ${v}s` }] },
-  hill: { name: 'King of the Hill', cat: 'party', blurb: 'A big rink, a moving hill and weapons. Blast them off the hill.', minutes: 3, court: { width: 44, height: 24 }, itemsOn: true,
+  hill: { name: 'King of the Hill', cat: 'party', blurb: 'Two moving hills on a big rink, and weapons. Be alone on a hill to score.', minutes: 3, court: { width: 44, height: 24 }, itemsOn: true,
     goal: 'Be first to the target score, or have the most points when the clock runs out.',
-    rules: ['A glowing circle is the hill.', 'The cart nearest the middle of the hill is king and scores a point every second.', 'Anyone else on the hill: contested, the king scores at less than half speed. Push them off!', 'The hill moves somewhere new every 15 seconds.', 'Weapons in the ? boxes: SHOCKWAVE (throws everyone near you away), ZAP (a shot that spins a cart out), BOOST and OIL.'],
+    rules: ['There are two glowing hills.', 'Alone on a hill, you are king and score a point every second. Anyone else on it: nobody scores. Push them off!', 'Crowd a hill (two carts for a few seconds, or three or more) and it OVERLOADS: it throws everyone off and stuns them.', 'The hills move somewhere new every 15 seconds or so.', 'Weapons in the ? boxes: SHOCKWAVE (throws everyone near you away), ZAP (a shot that spins a cart out), BOOST and OIL.'],
     controls: [CTRL.drive, CTRL.spin, CTRL.item, CTRL.pause], opts: [minOpt([2, 3, 4], 3), { key: 'target', label: 'Points to win', values: [20, 30, 45], def: 30 }] },
   sumo: { name: 'Sumo Ring', cat: 'party', blurb: 'Bumps hit extra hard. Shove everyone off the ring.', noItems: true,
     goal: 'Win the most rounds by being the last cart on the ring.',

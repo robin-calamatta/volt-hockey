@@ -42,7 +42,7 @@ Object.assign(View3D.prototype, {
     if (o.t === 'beam') { mesh.position.set(o.x, 0.45, o.y); const dx = o.x2 - o.x, dy = o.y2 - o.y; mesh.scale.set(Math.hypot(dx, dy), 1, 1); mesh.rotation.y = -Math.atan2(dy, dx); return; }
     if (o.t === 'boom') { const k = Math.max(0.05, 1 - o.life / 0.7); mesh.position.set(o.x, 0.4, o.y); mesh.scale.set(0.4 + k * (o.wave ? 3.6 : 3), o.wave ? 0.15 : 0.4 + k * 3, 0.4 + k * (o.wave ? 3.6 : 3)); mesh.children[0].material.opacity = 0.75 * (1 - k); if (o.wave) mesh.children[0].material.color.setHex(0x9fe8ff); return; }
     if (o.t === 'ramp') { mesh.position.set(o.x, 0, o.y); return; }
-    if (o.t === 'pb') { mesh.position.set(o.x, 0.75, o.y); return; }
+    if (o.t === 'pb') { mesh.position.set(o.x, 0.18, o.y); return; }
     if (o.t === 'splat') { mesh.position.set(o.x, 0.02 + (o.id % 7) * 0.001, o.y); mesh.children[0].material.opacity = Math.min(1, (o.until - (m.gs.t || 0)) / 2); return; }
     if (o.t === 'pbammo' || o.t === 'pbpow') { mesh.position.set(o.x, o.t === 'pbpow' ? 0.6 + Math.sin(t * 3 + o.id) * 0.1 : 0, o.y); mesh.rotation.y = t * 1.5 + o.id; return; }
     const y = o.t === 'pkg' ? (o.car >= 0 ? 1.32 : 0.2 + Math.sin(t * 3 + o.id) * 0.04) : o.t === 'orb' ? 0.5 + Math.sin(t * 2.5 + o.id) * 0.12 : o.t === 'star' ? 0.45 + Math.sin(t * 3 + o.id) * 0.08 : o.r || 0.2;
@@ -55,7 +55,7 @@ Object.assign(View3D.prototype, {
   buildModeStatic() {
     const m = this.m, g = m.gs, S = this.modeS = new THREE.Group(), add = x => { S.add(x); return x; }, flat = (geo, mat, x, y, h = 0.012) => { const p = new THREE.Mesh(geo.rotateX(-Math.PI / 2), mat); p.position.set(x, h, y); p.receiveShadow = true; return add(p); };
     const k = m.kind; this.modeHole = g.hole;
-    if (k === 'hill') { this.hillDisc = flat(new THREE.CircleGeometry(1, 40), this.modeMat(0xffd23f, { basic: true, op: 0.28 }), 0, 0); this.hillRing = flat(new THREE.RingGeometry(0.93, 1, 48), this.modeMat(0xffd23f, { basic: true }), 0, 0, 0.016); }
+    if (k === 'hill') this.hills = [0, 1].map(() => ({ disc: flat(new THREE.CircleGeometry(1, 40), new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.28, depthWrite: false }), 0, 0), ring: flat(new THREE.RingGeometry(0.93, 1, 48), new THREE.MeshBasicMaterial({ color: 0xffd23f }), 0, 0, 0.016) }));
     if (k === 'sumo') {
       flat(new THREE.PlaneGeometry(m.width, m.height), this.modeMat(0x163a5c, { rough: 0.2, metal: 0.2 }), m.width / 2, m.centerY, 0.004);
       this.sumoTop = add(new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.08, 64), this.mat(0xe8d3a1, { rough: 0.8 }))); this.sumoTop.position.set(m.width / 2, 0.04, m.centerY); this.sumoTop.receiveShadow = true;
@@ -142,7 +142,7 @@ Object.assign(View3D.prototype, {
     for (const o of g.objs || []) { let mesh = this.modePool.get(o.id); if (!mesh) { mesh = this.modeMake(o); this.modeG.add(mesh); this.modePool.set(o.id, mesh); } this.modePlace(mesh, o, t); seen.add(o.id); }
     for (const [id, mesh] of this.modePool) if (!seen.has(id)) { this.modeG.remove(mesh); this.modePool.delete(id); }
     const k = m.kind, me = (this.sc.LP || []).map(p => p.chair).filter(Boolean)[0];
-    if (k === 'hill' && g.zone) { const Z = g.zone, col = g.busy ? 0xff4d4d : g.king >= 0 ? 0x7dff6a : 0xffd23f; for (const x of [this.hillDisc, this.hillRing]) { x.position.x = Z.x; x.position.z = Z.y; x.scale.set(Z.r, 1, Z.r); x.material.color.setHex(col); } this.hillDisc.material.opacity = 0.2 + 0.1 * Math.sin(t * 4); }
+    if (k === 'hill' && g.zones && this.hills) g.zones.forEach((Z, i) => { const H = this.hills[i], hot = Z.over > 0, col = hot && Math.sin(t * 20) > 0 ? 0xffffff : Z.crowd > 1 ? 0xff4d4d : Z.king >= 0 ? 0x7dff6a : 0xffd23f; for (const x of [H.disc, H.ring]) { x.position.x = Z.x; x.position.z = Z.y; x.scale.set(Z.r, 1, Z.r); x.material.color.setHex(col); } H.disc.material.opacity = 0.2 + 0.1 * Math.sin(t * 4); });
     if (k === 'sumo' && g.R) { this.sumoTop.scale.set(g.R, 1, g.R); this.sumoRim.scale.set(g.R, 1, g.R); }
     if (k === 'lava' && g.t) { this.lavaMats[1].opacity = 0.35 + 0.35 * Math.abs(Math.sin(t * 9)); this.lavaMats[2].emissiveIntensity = 0.7 + 0.25 * Math.sin(t * 3); this.lavaTiles.forEach((p, i) => { const s = g.t[i]; p.visible = s !== '0'; if (s !== '0') p.material = this.lavaMats[s]; }); }
     if (k === 'ctf' && g.flag) g.flag.forEach((f, s) => { const fl = this.flags[s]; fl.position.set(f.x, f.car >= 0 ? 0.55 : 0, f.y); fl.userData.cloth.rotation.y = Math.sin(t * 3 + s) * 0.35; });
@@ -163,7 +163,7 @@ Object.assign(View3D.prototype, {
       for (const P of this.pbMovers) { if (P.o.type === 'spin') P.mesh.rotation.y = -(g.t || 0) * P.o.speed; else { const b = mv.boxes[bi++]; if (b) P.mesh.position.set((b.x0 + b.x1) / 2, P.mesh.geometry.parameters.height / 2, (b.y0 + b.y1) / 2); } }
       this.pbGear = this.pbGear || new Map();
       for (const cart of this.carts) {                                   // a paintball gun on every cart, and a bubble when shielded
-        let G2 = this.pbGear.get(cart.group); if (!G2) { const gun = new THREE.Group(), barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.75, 10).rotateZ(Math.PI / 2), this.mat(0x22262b, { metal: 0.6, rough: 0.3 })); barrel.position.set(0.55, 0.95, 0); const hop = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), this.mat(MINI.palette[cart.ch.k % MINI.palette.length], { rough: 0.3 })); hop.position.set(0.25, 1.1, 0); gun.add(barrel, hop); gun.traverse(x => { if (x.isMesh) x.castShadow = true; }); cart.group.add(gun);
+        let G2 = this.pbGear.get(cart.group); if (!G2) { const gun = new THREE.Group(), barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.75, 10).rotateZ(Math.PI / 2), this.mat(0x22262b, { metal: 0.6, rough: 0.3 })); barrel.position.set(0.72, 0.15, 0); const hop = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 10), this.mat(MINI.palette[cart.ch.k % MINI.palette.length], { rough: 0.3 })); hop.position.set(0.44, 0.24, 0);   // down at stick level, under the nose (out of the first-person view) gun.add(barrel, hop); gun.traverse(x => { if (x.isMesh) x.castShadow = true; }); cart.group.add(gun);
           const bub = new THREE.Mesh(new THREE.SphereGeometry(0.95, 20, 14), new THREE.MeshBasicMaterial({ color: 0x3dd6ff, transparent: true, opacity: 0.18, depthWrite: false })); bub.position.y = 0.6; cart.group.add(bub); G2 = { gun, bub }; this.pbGear.set(cart.group, G2); }
         const S2 = cart.ch.gs || {}; G2.bub.visible = !!S2.shield || S2.prot > 0; G2.bub.material.opacity = S2.shield ? 0.2 : 0.08 + 0.06 * Math.sin(t * 12);
       }
@@ -190,7 +190,7 @@ Object.assign(GameScene.prototype, {
     if (floor) {
     if (k === 'sumo' && s.R) { g.fillStyle(0x163a5c, 0.85).fillRect(0, 0, m.width, m.height); g.fillStyle(0xe8d3a1, 1).fillCircle(m.width / 2, m.centerY, s.R).lineStyle(0.14, 0xd8392b, 1).strokeCircle(m.width / 2, m.centerY, s.R); }
     if (k === 'lava' && s.t) { const w = m.width / s.cols, h = m.height / s.rows; for (let i = 0; i < s.t.length; i++) { const st = s.t[i]; if (st === '0') continue; const x = (i % s.cols) * w, y = Math.floor(i / s.cols) * h; g.fillStyle(st === '2' ? 0xff3b1c : 0xff9f1c, st === '2' ? 0.95 : 0.35 + 0.35 * Math.abs(Math.sin(t * 9))).fillRect(x + 0.03, y + 0.03, w - 0.06, h - 0.06); } }
-    if (k === 'hill' && s.zone) { const Z = s.zone, col = s.busy ? 0xff4d4d : s.king >= 0 ? 0x7dff6a : 0xffd23f; g.fillStyle(col, 0.25).fillCircle(Z.x, Z.y, Z.r).lineStyle(0.12, col, 1).strokeCircle(Z.x, Z.y, Z.r); }
+    if (k === 'hill' && s.zones) for (const Z of s.zones) { const col = Z.over > 0 && Math.sin(t * 20) > 0 ? 0xffffff : Z.crowd > 1 ? 0xff4d4d : Z.king >= 0 ? 0x7dff6a : 0xffd23f; g.fillStyle(col, 0.25).fillCircle(Z.x, Z.y, Z.r).lineStyle(0.12, col, 1).strokeCircle(Z.x, Z.y, Z.r); }
     if ((k === 'multiball' || k === 'giant') && s.gw) [0, 1].forEach(sd => { const gx = sd ? m.width - s.gl : s.gl, col = TEAMS[m.teams[sd]].color; g.fillStyle(0xffffff, 0.15).fillRect(sd ? gx : 0, m.centerY - s.gw, s.gl, 2 * s.gw).lineStyle(0.12, col, 1).lineBetween(gx, m.centerY - s.gw, gx, m.centerY + s.gw).fillStyle(col, 1).fillCircle(gx, m.centerY - s.gw, 0.12).fillCircle(gx, m.centerY + s.gw, 0.12); });
     if (k === 'ctf' && s.base) { s.base.forEach((B, sd) => g.lineStyle(0.14, TEAMS[m.teams[sd]].color, 1).strokeCircle(B.x, B.y, 1.45)); s.flag.forEach((f, sd) => { const col = TEAMS[m.teams[sd]].color; g.lineStyle(0.06, 0xdddddd, 1).lineBetween(f.x, f.y, f.x, f.y - 0.9).fillStyle(col, 1).fillTriangle(f.x, f.y - 0.9, f.x + 0.6, f.y - 0.72, f.x, f.y - 0.52); }); }
     if (k === 'golf') { for (const b of s.blocks || []) g.fillStyle(0x8b5a2b, 1).fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); if (s.cup) g.fillStyle(0x4fa35a, 0.5).fillCircle(s.cup.x, s.cup.y, 2.2).fillStyle(0x05080b, 1).fillCircle(s.cup.x, s.cup.y, 0.24).lineStyle(0.05, 0xffffff, 1).strokeCircle(s.cup.x, s.cup.y, 0.27); }
