@@ -88,7 +88,7 @@ Object.assign(GameScene.prototype, {
     const bar = (k, col, label) => { const w = 220, x = V.width / 2 - w / 2, y = V.height / 2 + 150; G2.fillStyle(0x0d151b, 0.8).fillRoundedRect(x - 4, y - 4, w + 8, 16, 6).fillStyle(col, 1).fillRoundedRect(x, y, w * Math.max(0, Math.min(1, k)), 8, 4); return label; };
     let txt = '', M = MODES.br; const mates = m.chairs.filter(o => o !== c && !o.out && o.gs.team === G.team);
     if (G.down) { txt = `✚ YOU'RE DOWN  ${Math.ceil(G.dhp / BR.downHp * BR.bleed)} s   crawl to a team-mate so they can revive you`; bar(G.dhp / BR.downHp, 0xff2a2a); G2.fillStyle(0x5a0000, 0.18 + 0.08 * Math.sin(this.time.now / 200)).fillRect(0, 0, V.width, V.height); }
-    else if (G.rl > 0) txt = bar(1 - G.rl / (G.rlT || 1), 0xffd23f, 'RELOADING');
+    else if (G.rl > 0) { const it = G.inv[G.rlS], gun = it && BR_GUNS[it.k]; txt = gun && gun.shell ? bar((it.a + 1 - G.rl / (G.rlT || 1)) / gun.mag, 0xffd23f, `LOADING SHELLS  ${it.a}/${gun.mag}   RT: fire`) : bar(1 - G.rl / (G.rlT || 1), 0xffd23f, 'RELOADING'); }
     else if (G.use) { const U = G.use, I = BR_ITEMS[U.k], t = U.tk >= 0 ? m.chairs[U.tk] : null; txt = bar(1 - U.left / U.tot, I.sh && !I.hp ? 0x3d8bff : 0x5ad45a, `${I.name} ${t ? '→ ' + (MG.pname(t) || m.name(t)) : ''}  ${Math.ceil(U.left)} s`); }
     else if (G.rv) { const t = m.chairs[G.rvk]; txt = bar(G.rv, 0x7dff6a, `REVIVING ${t ? MG.up(MG.pname(t) || m.name(t)) : ''}`); }
     else if (G.rz > 0) txt = bar(G.rz / BR.rezTime, 0x7dff6a, `BRINGING BACK ${G.cards.map(k => MG.up(MG.pname(m.chairs[k]) || m.name(m.chairs[k]))).join(' + ')}  stay inside`);

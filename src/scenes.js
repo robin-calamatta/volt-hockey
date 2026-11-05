@@ -183,7 +183,7 @@ class ListMenuScene extends Phaser.Scene {
     /* v13: menus are boxed. A menu of plain choices is a grid of big tiles; a menu with ◀ ▶ options has a box per row. The settings pages stay a list. */
     const listy = opts.list || ['Settings', 'SettingsPage', 'CameraPage', 'ControlsGuide'].includes(this.scene.key);
     this.boxG = listy ? null : this.add.graphics(); this.tiles = null; this.rowBox = null;
-    if (!listy && items.length >= 2 && items.every(it => !it.change)) return this.buildTiles(items, top, opts, cx);
+    this.see = !!opts.translucent; if (!listy && !opts.rows && items.length >= 2 && items.every(it => !it.change)) return this.buildTiles(items, top, opts, cx);
     if (listy) panel(this, cx - w / 2, top - gap * 0.75, w, gap * items.length + gap * 0.5); else this.rowBox = { w, gap };
     this.panelBox = { x: cx - w / 2, w };                              // rows are shrunk to fit inside it (fitRow)
     this.bar = new SelectionBar(this, cx, w - 24, gap - 6);
@@ -213,7 +213,7 @@ class ListMenuScene extends Phaser.Scene {
   drawBoxes() {                                                         // the boxes behind the rows / tiles (the chosen one glows)
     const g = this.boxG; if (!g) return; g.clear();
     if (this.tiles) { const { tw, th, rects } = this.tiles; rects.forEach((R, i) => { const on = i === this.cursor; g.fillStyle(on ? 0x1d3a55 : 0x0f1c27, on ? 0.97 : 0.88).fillRoundedRect(R.x, R.y, tw, th, 14).lineStyle(on ? 4 : 2, on ? THEME.gold : 0x2d5068, 1).strokeRoundedRect(R.x, R.y, tw, th, 14); if (on) g.fillStyle(THEME.gold, 1).fillRect(R.x + 14, R.y + th - 8, tw - 28, 4); }); return; }
-    if (this.rowBox) { const { w, gap } = this.rowBox; this.rows.forEach((row, i) => { const on = i === this.cursor, x = row.x - w / 2, y = row.y - gap / 2 + 3; g.fillStyle(on ? 0x1d3a55 : 0x0f1c27, on ? 0.97 : 0.85).fillRoundedRect(x, y, w, gap - 6, 10).lineStyle(on ? 3 : 1.5, on ? THEME.gold : 0x2d5068, 1).strokeRoundedRect(x, y, w, gap - 6, 10); }); }
+    if (this.rowBox) { const { w, gap } = this.rowBox; this.rows.forEach((row, i) => { const on = i === this.cursor, x = row.x - w / 2, y = row.y - gap / 2 + 3; g.fillStyle(on ? 0x1d3a55 : 0x0f1c27, this.see ? (on ? 0.8 : 0.6) : on ? 0.97 : 0.85).fillRoundedRect(x, y, w, gap - 6, 10).lineStyle(on ? 3 : 1.5, on ? THEME.gold : 0x2d5068, 1).strokeRoundedRect(x, y, w, gap - 6, 10); }); }
   }
   update() {
     Controls.update(this.game.loop.frame);

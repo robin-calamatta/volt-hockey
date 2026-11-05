@@ -21,6 +21,16 @@ const SFX = {
   gun_rocket:  s => { s.shot({ vol: 0.35, crack: 0.01, body: 0.2, bodyF: 500, low: 0.2, lowF: 110, tail: 0.3 }); s.noise({ dur: 0.7, vol: 0.18, from: 1400, to: 300, q: 0.8 }); },
   gun_paint:   s => s.shot({ vol: 0.22, crack: 0.012, crackF: 2400, body: 0.05, bodyF: 1800, low: 0.05, lowF: 240, tail: 0.08 }),   // a paintball marker: a soft pop
   boom:        s => { s.shot({ vol: 0.8, crack: 0.04, body: 0.6, bodyF: 420, low: 0.7, lowF: 60, tail: 1.4 }); },
+  /* reloads: a different sequence of clicks, slides and clunks for every gun, spread over its reload time */
+  rl_pistol:   s => s.mech([['click', 0.04], ['slideOut', 0.12], ['magIn', 0.62], ['rack', 0.9]], 1.1),
+  rl_smg:      s => s.mech([['click', 0.05], ['slideOut', 0.2], ['magIn', 1.0], ['bolt', 1.42]], 1.7),
+  rl_rifle:    s => s.mech([['click', 0.06], ['slideOut', 0.28], ['magInHeavy', 1.12], ['rack', 1.55], ['bolt', 1.66]], 1.9),
+  rl_sniper:   s => s.mech([['boltUp', 0.15], ['boltBack', 0.42], ['magIn', 1.3], ['boltFwd', 1.95], ['boltDown', 2.2]], 2.5),
+  rl_rocket:   s => s.mech([['clank', 0.25], ['slideIn', 1.0], ['clank', 2.05], ['beep', 2.35]], 2.6),
+  rl_shotgun:  s => s.mech([['shell', 0.3]], 0.55),
+  rl_shell:    s => s.mech([['shell', 0.3]], 0.55),
+  rl_pump:     s => s.mech([['pumpBack', 0.02], ['pumpFwd', 0.16]], 0.3),
+  drift:       s => s.noise({ dur: 0.12, vol: 0.06, from: 2600, to: 2300, q: 5 }),
   reload:      s => { s.noise({ dur: 0.04, vol: 0.18, from: 3000, q: 3 }); s.noise({ dur: 0.05, vol: 0.2, from: 1800, q: 4, at: s.ctx.currentTime + 0.22 }); }
 };
 
@@ -105,6 +115,36 @@ const Sound = {
     const layer = (type, f, v, d, t0 = t, q = 0.7) => { const s = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain(); s.buffer = this.noiseBuffer; fl.type = type; fl.frequency.value = f; fl.Q.value = q; env(g, v, d, t0); s.connect(fl); fl.connect(g); g.connect(out); s.start(t0); s.stop(t0 + d + 0.05); };
     layer('highpass', crackF, vol, crack); layer('lowpass', bodyF, vol * 0.85, body); layer('bandpass', 420, vol * 0.16, tail, t + 0.03, 0.6);
     const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(lowF * 1.7, t); o.frequency.exponentialRampToValueAtTime(lowF * 0.45, t + low); env(g, vol * 0.9, low); o.connect(g); g.connect(out); o.start(t); o.stop(t + low + 0.05);
+  },
+  mech(steps) {                                                          // gun mechanics: each step is a little layered click or slide
+    const t0 = this.ctx.currentTime, N = (at, o) => this.noise({ ...o, at: t0 + at }), T = (at, o) => this.tone({ ...o, at: t0 + at });
+    const K = {
+      click: a => N(a, { dur: 0.03, vol: 0.16, from: 3600, q: 4 }),
+      slideOut: a => { N(a, { dur: 0.12, vol: 0.12, from: 1800, to: 900, q: 2 }); N(a + 0.14, { dur: 0.04, vol: 0.09, from: 500, q: 1.5 }); },
+      magIn: a => { N(a, { dur: 0.05, vol: 0.22, from: 900, q: 1.5 }); N(a + 0.03, { dur: 0.025, vol: 0.22, from: 3200, q: 5 }); },
+      magInHeavy: a => { N(a, { dur: 0.07, vol: 0.26, from: 650, q: 1.2 }); N(a + 0.04, { dur: 0.03, vol: 0.24, from: 2700, q: 5 }); T(a, { wave: 'sine', from: 160, to: 90, dur: 0.06, vol: 0.12 }); },
+      rack: a => { N(a, { dur: 0.06, vol: 0.18, from: 2400, to: 1600, q: 3 }); N(a + 0.1, { dur: 0.04, vol: 0.22, from: 3000, q: 5 }); },
+      bolt: a => { N(a, { dur: 0.05, vol: 0.2, from: 2000, q: 3 }); N(a + 0.07, { dur: 0.035, vol: 0.24, from: 3400, q: 6 }); },
+      boltUp: a => N(a, { dur: 0.04, vol: 0.18, from: 2900, q: 6 }),
+      boltBack: a => N(a, { dur: 0.1, vol: 0.18, from: 1500, to: 2400, q: 3 }),
+      boltFwd: a => N(a, { dur: 0.09, vol: 0.18, from: 2400, to: 1400, q: 3 }),
+      boltDown: a => { N(a, { dur: 0.04, vol: 0.24, from: 3400, q: 6 }); T(a, { wave: 'sine', from: 220, to: 120, dur: 0.05, vol: 0.1 }); },
+      clank: a => { N(a, { dur: 0.1, vol: 0.22, from: 420, q: 2 }); T(a, { wave: 'triangle', from: 380, to: 360, dur: 0.25, vol: 0.08 }); T(a, { wave: 'triangle', from: 910, to: 900, dur: 0.18, vol: 0.04 }); },
+      slideIn: a => { N(a, { dur: 0.45, vol: 0.1, from: 700, to: 1400, q: 1.5 }); N(a + 0.45, { dur: 0.06, vol: 0.24, from: 500, q: 1.2 }); },
+      beep: a => T(a, { wave: 'sine', from: 1760, dur: 0.06, vol: 0.08 }),
+      shell: a => { N(a - 0.08, { dur: 0.06, vol: 0.08, from: 1200, to: 1700, q: 2 }); N(a, { dur: 0.04, vol: 0.2, from: 1400, q: 2.5 }); N(a + 0.02, { dur: 0.02, vol: 0.14, from: 3800, q: 6 }); },
+      pumpBack: a => N(a, { dur: 0.08, vol: 0.26, from: 1100, to: 700, q: 2 }),
+      pumpFwd: a => { N(a, { dur: 0.06, vol: 0.28, from: 800, to: 1300, q: 2 }); N(a + 0.05, { dur: 0.03, vol: 0.26, from: 3000, q: 5 }); }
+    };
+    for (const [k, at] of steps) if (K[k]) K[k](at);
+  },
+  /* the tyre squeal of a drift: one loop per cart, louder and higher as the drift charges */
+  driftLoop(id, on, lvl = 0) {
+    if (!this.ctx) return; const L = this.drifts || (this.drifts = {}); let d = L[id];
+    if (!on) { if (d) { d.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.05); const s = d.s; clearInterval(d.iv); setTimeout(() => { try { s.stop(); } catch (e) {} }, 400); delete L[id]; } return; }
+    if (!d) { const s = this.ctx.createBufferSource(), f = this.ctx.createBiquadFilter(), f2 = this.ctx.createBiquadFilter(), g = this.ctx.createGain(); s.buffer = this.noiseBuffer; s.loop = true; f.type = 'bandpass'; f.Q.value = 7; f2.type = 'lowpass'; f2.frequency.value = 900; f2.Q.value = 0.7;
+      const g2 = this.ctx.createGain(); g2.gain.value = 0.5; s.connect(f); f.connect(g); s.connect(f2); f2.connect(g2); g2.connect(g); g.gain.value = 0; g.connect(this.sfxBus); s.start(); d = L[id] = { s, f, g }; d.iv = setInterval(() => { if (performance.now() - d.at > 300) { clearInterval(d.iv); this.driftLoop(id, false); } }, 150); }   // (stops by itself if nobody keeps it going: you left the match)
+    d.at = performance.now(); const t = this.ctx.currentTime; d.f.frequency.setTargetAtTime(2100 + lvl * 380 + Math.random() * 120, t, 0.05); d.g.gain.setTargetAtTime(0.045 + lvl * 0.012, t, 0.06);
   },
   noise({ dur = 0.1, vol = 0.2, from = 1000, to = from, q = 1, at = null, bus = null }) {
     const t = at ?? this.ctx.currentTime, src = this.ctx.createBufferSource(), f = this.ctx.createBiquadFilter(), g = this.ctx.createGain();

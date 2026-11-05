@@ -7,7 +7,7 @@
 const BR_AMMO = { light: { i: 0, name: 'LIGHT AMMO', icon: '🟡', max: 240, pack: 30 }, shells: { i: 1, name: 'SHELLS', icon: '🔴', max: 40, pack: 8 }, medium: { i: 2, name: 'MEDIUM AMMO', icon: '🟢', max: 200, pack: 30 },
   heavy: { i: 3, name: 'HEAVY AMMO', icon: '🟣', max: 24, pack: 6 }, rockets: { i: 4, name: 'ROCKETS', icon: '🚀', max: 8, pack: 2 } };
 const AMMO_KEYS = Object.keys(BR_AMMO);
-Object.assign(BR_GUNS.pistol, { type: 'light', mag: 12, rl: 1.1 }); Object.assign(BR_GUNS.smg, { type: 'light', mag: 30, rl: 1.7 }); Object.assign(BR_GUNS.shotgun, { type: 'shells', mag: 5, rl: 2.2 });
+Object.assign(BR_GUNS.pistol, { type: 'light', mag: 12, rl: 1.1 }); Object.assign(BR_GUNS.smg, { type: 'light', mag: 30, rl: 1.7 }); Object.assign(BR_GUNS.shotgun, { type: 'shells', mag: 5, rl: 0.55, shell: 1 });   /* (the shotgun loads a shell at a time) */
 Object.assign(BR_GUNS.rifle, { type: 'medium', mag: 25, rl: 1.9 }); Object.assign(BR_GUNS.sniper, { type: 'heavy', mag: 4, rl: 2.5 }); Object.assign(BR_GUNS.rocket, { type: 'rockets', mag: 1, rl: 2.6 });
 for (const g of Object.values(BR_GUNS)) g.ammo = g.mag;                  // (a gun on the ground comes with a full magazine)
 for (const k of Object.keys(BR_ITEMS)) delete BR_ITEMS[k];
@@ -146,13 +146,14 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
     reload(c, m) {
       const G = c.gs, it = gunOf(c); if (!it || G.rl > 0 || G.down || G.use) return; const gun = BR_GUNS[it.k], A = BR_AMMO[gun.type];
       if (it.a >= gun.mag) return; if (G.am[A.i] <= 0) { if (c.player && !(G.noAmmoAt > m.simTime)) { G.noAmmoAt = m.simTime + 2; this.say(m, c, 'NO ' + A.name); m.sfx('back'); } return; }
-      G.rl = gun.rl; G.rlT = gun.rl; G.rlS = G.sel; if (c.player) m.sfx('reload');
+      G.rl = gun.rl; G.rlT = gun.rl; G.rlS = G.sel; G.rlN = 0; if (c.player) m.sfx('rl_' + it.k);
     },
     /* ---- RT: fire, or start using a heal (it takes time); boosts and walls are instant ---- */
     use(c, m) {
       const G = c.gs; if (c.out || G.down || G.use) return; if (G.hol) { this.holster(c, m); return; }
       const it = G.inv[G.sel]; if (!it || G.cd > 0) return; const gun = BR_GUNS[it.k];
-      if (gun) { if (G.rl > 0) return; if (it.a <= 0) { this.reload(c, m); G.cd = 0.25; return; } return M0.use.call(this, c, m); }
+      if (gun) { if (G.rl > 0 && gun.shell && it.a > 0) G.rl = 0;   /* a shotgun can fire part-way through loading */
+        if (G.rl > 0) return; if (it.a <= 0) { this.reload(c, m); G.cd = 0.25; return; } const a0 = it.a, r = M0.use.call(this, c, m); if (it.a < a0) { G.shotT = m.gs.t; G.shotN = (G.shotN || 0) + 1; } return r; }   // (shotT: the recoil)
       const I = BR_ITEMS[it.k]; if (!I) return;
       if (I.heal) { if (!this.helps(c, I)) { if (c.player) this.say(m, c, I.hp && !I.sh ? (G.hp >= (I.cap || 100) ? (I.cap < 100 ? 'BANDAGES ONLY HEAL UP TO 75' : 'HEALTH IS FULL') : '') : 'CART ARMOUR IS FULL'); G.cd = 0.5; return; } G.use = { k: it.k, s: G.sel, left: I.time, tot: I.time, tk: -1 }; m.sfx('blip'); return; }
       if (it.k === 'boost') G.boost = 3; else if (it.k === 'wall') { const p = c.toWorld(1.6, 0); MG.add(m, { t: 'dwall', x: MG.r2(p.x), y: MG.r2(p.y), a: MG.r2(c.heading), lv: G.lv, z: G.z, hp: 150, until: m.gs.t + 25 }); }
@@ -182,20 +183,22 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
       M0.step.call(this, m, h);
       for (const c of m.chairs) {
         const G = c.gs; if (c.out) continue;
-        if (G.rl > 0) { const it = G.inv[G.rlS]; if (!it || G.sel !== G.rlS || G.hol || G.down) G.rl = 0; else if ((G.rl -= h) <= 0) { const gun = BR_GUNS[it.k], A = BR_AMMO[gun.type], n = Math.min(gun.mag - it.a, G.am[A.i]); it.a += n; G.am[A.i] -= n; G.rl = 0; } }
+        if (G.rl > 0) { const it = G.inv[G.rlS]; if (!it || G.sel !== G.rlS || G.hol || G.down) G.rl = 0; else if ((G.rl -= h) <= 0) { const gun = BR_GUNS[it.k], A = BR_AMMO[gun.type], n = Math.min(gun.shell ? 1 : gun.mag - it.a, G.am[A.i]); it.a += n; G.am[A.i] -= n; G.rl = 0;
+          if (gun.shell) { G.rlN = (G.rlN || 0) + 1; if (it.a < gun.mag && G.am[A.i] > 0) { G.rl = G.rlT = gun.rl; if (c.player) m.sfx('rl_shell'); } else { G.pumpT = m.gs.t; if (c.player) m.sfx('rl_pump'); } } } }   // shell by shell, then a pump
         if (G.use) { const U = G.use, it = G.inv[U.s], t = U.tk >= 0 ? m.chairs[U.tk] : c;   // a heal in progress (on you or a team-mate)
-          if (!it || it.k !== U.k || G.sel !== U.s || G.hol || G.down || !t || t.out || t.gs.down || (t !== c && (MH.dist(c, t) > BR.mateRange + 0.5 || (c.player && U.tk >= 0 && !G.ads)))) G.use = null;
-          else if ((U.left -= h) <= 0) { const I = BR_ITEMS[U.k], T = t.gs; if (I.hp) T.hp = Math.max(T.hp, Math.min(I.cap || 100, T.hp + I.hp)); if (I.sh) T.sh = Math.min(BR.maxShield, T.sh + I.sh); this.spend(c, U.s); G.use = null; m.sfx('select'); if (t !== c && c.player && !c.player.remote) Progress.ev('healMate'); }
-          else U.left = MG.r2(U.left); }
+          if (!it || it.k !== U.k || G.sel !== U.s || G.hol || G.down || !t || t.out || t.gs.down || (t !== c && (MH.dist(c, t) > BR.mateRange + 0.5 || (c.player && U.tk >= 0 && !G.ads)))) { if (it && it.k === U.k && U.left < U.tot * 0.9) this.spend(c, U.s); G.use = null; }   // stopped part-way: what went on stays on, and the item is used up
+          else { const I = BR_ITEMS[U.k], T = t.gs, f = Math.min(h, U.left) / U.tot;   // health and armour go on bit by bit while you apply it
+            if (I.hp && T.hp < (I.cap || 100)) T.hp = Math.min(I.cap || 100, T.hp + I.hp * f); if (I.sh) T.sh = Math.min(BR.maxShield, T.sh + I.sh * f);
+            if ((U.left -= h) <= 0) { T.hp = Math.round(T.hp); T.sh = Math.round(T.sh); this.spend(c, U.s); G.use = null; m.sfx('select'); if (t !== c && c.player && !c.player.remote) Progress.ev('healMate'); } } }
         else if (G.ads && !c.wantAdsUsed) { const it = G.inv[G.sel]; if (it && BR_ITEMS[it.k] && BR_ITEMS[it.k].heal) { c.wantAdsUsed = true; this.healMate(c, m); } }
         if (!G.ads) c.wantAdsUsed = false;
-        if (G.down) { G.dhp -= BR.downHp / BR.bleed * h; G.dhp = MG.r2(G.dhp); if (G.dhp <= 0) this.finish(m, c, m.chairs[G.kb] || null); continue; }
+        if (G.down) { G.dhp -= BR.downHp / BR.bleed * h; if (G.dhp <= 0) this.finish(m, c, m.chairs[G.kb] || null); continue; }
         const rt = c.wantInt ? this.reviveTarget(m, c) : null;           // reviving: hold B next to a downed team-mate
-        if (rt) { if (G.rvk !== rt.k) { G.rvk = rt.k; G.rv = 0; } G.rv = MG.r2(G.rv + h / BR.reviveTime); if (G.rv >= 1) { Object.assign(rt.gs, { down: 0, dhp: 0, hp: BR.reviveHp }); G.rv = 0; G.rvk = -1; m.sfx('select'); MG.notice(m, `${MG.up(m.name(c))} REVIVED ${MG.up(m.name(rt))}`, 1.8); if (c.player && !c.player.remote) Progress.ev('revive'); } }
+        if (rt) { if (G.rvk !== rt.k) { G.rvk = rt.k; G.rv = 0; } G.rv += h / BR.reviveTime; if (G.rv >= 1) { Object.assign(rt.gs, { down: 0, dhp: 0, hp: BR.reviveHp }); G.rv = 0; G.rvk = -1; m.sfx('select'); MG.notice(m, `${MG.up(m.name(c))} REVIVED ${MG.up(m.name(rt))}`, 1.8); if (c.player && !c.player.remote) Progress.ev('revive'); } }
         else { G.rv = 0; G.rvk = -1; }
         if (G.cards.length) {                                             // carrying rez cards: sit in a ready rez garage to bring them back
           const i = (M.rez || []).findIndex(q => c.x > q.x0 && c.x < q.x1 && c.y > q.y0 && c.y < q.y1 && G.lv === 0);
-          if (i >= 0 && g.gar[i] <= g.t) { G.rz = MG.r2(G.rz + h); if (G.rz >= BR.rezTime) this.rez(m, c, i); } else G.rz = 0;
+          if (i >= 0 && g.gar[i] <= g.t) { G.rz += h; if (G.rz >= BR.rezTime) this.rez(m, c, i); } else G.rz = 0;
         } else G.rz = 0;
       }
       for (const L of g.L) if (L[1] === 'card' && L[8] && g.t > L[8]) { L[8] = -1; const o = m.chairs[L[5]]; if (o) MG.notice(m, `${MG.up(m.name(o))}'S REZ CARD HAS EXPIRED`, 1.6); }
@@ -212,9 +215,10 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
     /* ---- getting hurt: a team-mate left standing means you go DOWN first (last stand) ---- */
     hurt(m, c, dmg, by, storm) {
       const G = c.gs; if (c.out || (!storm && m.gs.t < BR.grace)) return;
-      if (G.down) { G.dhp = MG.r2(G.dhp - dmg); if (by && by !== c) { by.gs.dmg += dmg; by.gs.hm = MG.r2(m.gs.t); G.kb = by.k; } G.hitT = 0.25; if (G.dhp <= 0) this.finish(m, c, by && by !== c ? by : m.chairs[G.kb] || null); return; }
+      if (storm) { G.sacc = (G.sacc || 0) + dmg; if (G.sacc < 1) return; dmg = G.sacc; G.sacc = 0; }   /* the storm hurts health only (never armour), a point at a time */
+      if (G.down) { G.dhp -= dmg; if (by && by !== c) { by.gs.dmg += dmg; by.gs.hm = MG.r2(m.gs.t); G.kb = by.k; } G.hitT = 0.25; if (G.dhp <= 0) this.finish(m, c, by && by !== c ? by : m.chairs[G.kb] || null); return; }
       if (!storm) { const s = Math.min(G.sh, dmg); G.sh -= s; dmg -= s; } G.hp -= dmg; G.hitT = 0.25; if (by && by !== c) { by.gs.dmg += dmg; by.gs.hm = MG.r2(m.gs.t); }
-      G.sh = Math.round(G.sh * 10) / 10; G.hp = Math.round(G.hp * 10) / 10; if (G.hp > 0) return;
+      if (G.hp > 0) return; G.hp = 0;
       const standing = mates(m, c).filter(o => !o.gs.down);
       if ((m.mini.squad || 1) > 1 && standing.length) {                   // DOWN: crawl, can't fire or use things; a team-mate can revive you (hold B); bleed out in 30 s
         Object.assign(G, { down: 1, dhp: BR.downHp, hp: 0, sh: 0, use: null, rl: 0, rv: 0, rvk: -1, hol: 1, kb: by && by !== c ? by.k : -1 }); G.last = G.sel; c.wantUse = false;

@@ -3,6 +3,18 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v13.1: storm, heals, recoil, reloads, drift feel, minigame menus
+
+- **Storm** now hurts health (never cart armour), a point at a time, more every stage. At 0 health you go down like any other hit (with a teammate still up), and a downed player in the storm bleeds out faster. Before, the damage was rounded away each step.
+- **Heals and cart armour** go on gradually while you apply them, and the progress bar fills. If you stop part-way you keep what went on and the item is used up. The same rounding bug had frozen heals, revives and rez garages; all three now progress.
+- **Recoil**: every shot kicks the gun back and your view up. Pistol and SMG kick a little; shotgun, sniper and rocket kick hard.
+- **Reloads**: each gun has its own hand animation (magazine out and in, bolt, tube) and its own reload sound. The **shotgun loads shell by shell** ("LOADING SHELLS 2/5"), then pumps, and you can fire part-way through.
+- **Drifting**:
+  - It now starts in first and third person (it couldn't before: those views only lead the cart a little).
+  - The back of the cart swings out, the tyres smoke, the sparks are bigger and the tyres squeal (louder as it charges).
+  - In first and third person the screen edges glow in the drift colour with speed streaks, and in first person the view leans into the drift.
+- **Minigame menus**: the demo plays full screen behind the menu. The menu boxes are see-through, and the goal and rules sit in a see-through panel at the bottom right. The game list no longer breaks into a grid.
+
 ## v13: Battle Royale squads, revives and the storm, drifting, hair, bigger maps
 
 **Battle Royale**

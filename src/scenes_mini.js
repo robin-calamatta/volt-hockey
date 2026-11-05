@@ -3,20 +3,20 @@
    plus the minigame scoreboard, the item you are holding and the results. The rules are in minigames.js. */
 
 /* A live demo of a game in a window on a menu, the goal and rules under it and a caption along the bottom of the "video". */
-const DEMO_WIN = { x: 462, y: 64, w: 796, h: 448 };
+const DEMO_WIN = { x: 0, y: 0, w: 1280, h: 720 };                     // v13.1: the demo fills the screen and the menu sits over it
+const DEMO_INFO = { x: 484, w: 776 };                                 // the goal and rules: a see-through panel at the bottom right
 const HOWTO_WIN = { x: 596, y: 96, w: 664, h: 374 };                    // How to play: the video beside the rules panel (16:9)
-const MENU_SIDE = { x: 232, panelWidth: 430, size: 28, noBackdrop: true, noFooter: true, hintX: 232, hintY: 692, hintWidth: 410, hintSize: '17px', hintBg: '#0d151bd0' };
+const MENU_SIDE = { x: 232, panelWidth: 430, size: 28, noBackdrop: true, noFooter: true, hintX: 232, hintY: 692, hintWidth: 410, hintSize: '17px', hintBg: '#0d151bb0', rows: true, translucent: true };
 const cartsFor = kind => (kind && MODES[kind] && modeOpts(kind).carts) || miniOpts().carts;   // a game can have its own number of carts (Battle Royale)
 function sideTitle(sc, name) {                                          // the page title, clear of the Log in button at the top left
-  const t = sc.add.text(124, 40, name.toUpperCase(), { ...STYLE.title, fontSize: '40px' }).setOrigin(0, 0.5);
-  if (t.width > 330) t.setScale(330 / t.width); return t;
+  const t = sc.add.text(124, 40, name.toUpperCase(), { ...STYLE.title, fontSize: '40px' }).setOrigin(0, 0.5).setDepth(6);
+  if (t.width > 330) t.setScale(330 / t.width); sc.add.graphics().setDepth(5).fillStyle(0x0d151b, 0.8).fillRoundedRect(114, 16, t.displayWidth + 22, 48, 10); return t;   // (on a dark plate: the demo plays behind)
 }
 class DemoWindow {
   constructor(sc) {
     this.sc = sc; this.kind = null; this.key = ''; this.capI = 0; this.capAt = 0; this.overFor = 0; const W = DEMO_WIN;
-    sc.add.graphics().lineStyle(3, 0x2f4a5c, 1).strokeRoundedRect(W.x - 2, W.y - 2, W.w + 4, W.h + 4, 8);
-    this.tag = sc.add.text(W.x + 10, W.y + 8, 'DEMO', { fontFamily: FONT, fontSize: '15px', fontStyle: 'bold', color: '#ffe27a', backgroundColor: '#0d151bcc', padding: { x: 6, y: 2 } }).setDepth(5);
-    this.cap = sc.add.text(W.x + W.w / 2, W.y + W.h - 24, '', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#ffffff', backgroundColor: '#0d151bdd', padding: { x: 10, y: 5 }, align: 'center', wordWrap: { width: W.w - 60 } }).setOrigin(0.5).setDepth(5);
+    this.tag = sc.add.text(W.x + W.w - 150, W.y + 104, 'DEMO', { fontFamily: FONT, fontSize: '15px', fontStyle: 'bold', color: '#ffe27a', backgroundColor: '#0d151bcc', padding: { x: 6, y: 2 } }).setDepth(5);
+    this.cap = sc.add.text(DEMO_INFO.x + DEMO_INFO.w / 2, W.y + W.h - 24, '', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#ffffff', backgroundColor: '#0d151bdd', padding: { x: 10, y: 5 }, align: 'center', wordWrap: { width: DEMO_INFO.w - 40 } }).setOrigin(0.5).setDepth(5);
     this.info = []; this.infoBg = sc.add.graphics().setDepth(-1);
     sc.events.once('shutdown', () => this.stop());
   }
@@ -29,8 +29,8 @@ class DemoWindow {
     this.sc.scene.bringToTop(); this.capI = 0; this.capAt = 0; this.writeInfo();
   }
   writeInfo() {                                                          // the goal and the rules, under the video (smaller text until it fits)
-    const I = GAME_INFO[this.kind], W = DEMO_WIN, top = W.y + W.h + 12, room = CONFIG.view.height - top - 6; this.info.forEach(t => t.destroy()); this.info = []; this.rules = [];
-    for (let size = 18; size >= 12; size--) {
+    const I = GAME_INFO[this.kind], W = { x: DEMO_INFO.x, w: DEMO_INFO.w }, room = 180; let top = 0; this.info.forEach(t => t.destroy()); this.info = []; this.rules = [];
+    for (let size = 17; size >= 12; size--) {
       this.info.forEach(t => t.destroy()); this.info = []; this.rules = [];
       const g = this.sc.add.text(W.x, top, 'GOAL:  ' + I.goal, { fontFamily: FONT, fontSize: (size + 1) + 'px', fontStyle: 'bold', color: THEME.gold_css, wordWrap: { width: W.w } }); this.info.push(g);
       const half = Math.ceil(I.rules.length / 2), colW = W.w / 2 - 12; let bottom = 0;
@@ -38,8 +38,9 @@ class DemoWindow {
       if (bottom - top <= room) { this.fitBottom = bottom; break; }
       this.fitBottom = bottom;
     }
-    this.infoBg.clear().fillStyle(0x0d151b, 0.82).fillRoundedRect(W.x - 10, top - 6, W.w + 20, Math.min(CONFIG.view.height - 2, this.fitBottom + 6) - (top - 6), 8);
-    this.infoBg.lineStyle(2, 0x2f4a5c, 1).strokeRoundedRect(W.x - 10, top - 6, W.w + 20, Math.min(CONFIG.view.height - 2, this.fitBottom + 6) - (top - 6), 8);
+    if (this.fitBottom - top > room) { this.info = this.info.filter(t => { if (t.y + t.height <= room) return true; t.destroy(); return false; }); this.rules = this.rules.filter(t => t.active); this.fitBottom = Math.max(...this.info.map(t => t.y + t.height)); }   // too many rules: the ones that fit (the caption cycles through them all)
+    const hgt = Math.min(room, this.fitBottom - top), y0 = CONFIG.view.height - 10 - hgt; this.info.forEach(t => { t.y += y0; t.setDepth(4); }); this.cap.setVisible(false);   // (the panel highlights the rule the caption would show)   // (built from 0, then moved to the bottom)
+    this.infoBg.setDepth(3).clear().fillStyle(0x0d151b, 0.62).fillRoundedRect(W.x - 10, y0 - 6, W.w + 20, hgt + 12, 8).lineStyle(2, 0x2f4a5c, 0.8).strokeRoundedRect(W.x - 10, y0 - 6, W.w + 20, hgt + 12, 8);
   }
   update(time, delta) {
     if (!this.kind) return; const I = GAME_INFO[this.kind], lines = [I.goal, ...I.rules];
