@@ -280,7 +280,7 @@ class View3D {
   cartGeometry() {
     const key = Settings.stickLength; if (this.cartGeo && this.cartGeoKey === key) return this.cartGeo;
     const cup = CONFIG.cup, K3 = CONFIG.view3d.cart, B = G3.box, L = G3.limb, mirror = pts => pts.map(([x, y, z]) => [x, y, -z]).reverse();
-    const P = { wood: [], woodEdge: [], black: [], grey: [], plastic: [], team: [], white: [], selfTeam: [], selfWhite: [], selfSkin: [], selfHair: [], selfPants: [], selfBlack: [], selfWood: [] };
+    const P = { wood: [], woodEdge: [], black: [], grey: [], plastic: [], team: [], white: [], selfTeam: [], selfWhite: [], selfSkin: [], selfHair: [], selfPants: [], selfBlack: [], selfWood: [], pants: [], shoes: [] };
     // The chair is long, like the real ones: the seat sits well back and the legs reach forward to a footrest near the nose.
     // (Only the look is longer: the cart still collides as the same circle, and the stick is where it always was.)
     const sx = K3.seatX;                                                                                                   // centre of the seat, behind the cart's centre
@@ -307,17 +307,17 @@ class View3D {
     }
     P.black.push(B(0.1, 0.05, 0.1, px + 0.12, 0.655, 0.25), L([px + 0.13, 0.68, 0.25], [px + 0.13, 0.74, 0.25], 0.012), G3.sphere(0.024, px + 0.13, 0.75, 0.25));
     // footrest inside the bow, on a bar from the battery box
-    P.selfWood.push(B(0.16, 0.025, 0.3, 0.27, 0.17, 0)); P.black.push(L([sx + 0.22, 0.2, 0], [0.2, 0.16, 0], 0.022));   // (hidden from your own seat, like your legs)
+    P.wood.push(B(0.16, 0.025, 0.3, 0.27, 0.17, 0)); P.black.push(L([sx + 0.22, 0.2, 0], [0.2, 0.16, 0], 0.022));   // (hidden from your own seat, like your legs)
     // the white plastic stick: a mount under the nose, the flat "c" blade and the stem, down at ball height
     const cupY = 0.045, crossX = cup.frontX - cup.recess - 0.02, tipX = cup.frontX - cup.recess + Settings.stickLength;
     P.plastic.push(B(0.06, 0.08, 0.06, 0.39, 0.08, 0), G3.ribbon(CUP_POINTS.map(p => [p.x, cupY, p.y]), 0.07, 0.03), B(0.035, 0.06, 0.3, crossX, cupY, 0), B(tipX - crossX, 0.055, cup.stickColliderRadius * 2, (crossX + tipX) / 2, cupY, 0));
     // the driver: legs out along the chair to the footrest, arms on the pods, harness straps, head and hair
     const tx = sx - 0.07;                                                                                                  // torso
     for (const sd of [-1, 1]) {
-      P.selfPants.push(L([tx + 0.02, 0.53, sd * 0.1], [sx + 0.36, 0.56, sd * 0.1], 0.07), L([sx + 0.38, 0.55, sd * 0.1], [0.23, 0.22, sd * 0.1], 0.055));
-      P.selfWhite.push(B(0.17, 0.07, 0.09, 0.27, 0.215, sd * 0.1));
+      P.pants.push(L([tx + 0.02, 0.53, sd * 0.1], [sx + 0.36, 0.56, sd * 0.1], 0.07), L([sx + 0.38, 0.55, sd * 0.1], [0.23, 0.22, sd * 0.1], 0.055));   // (your legs show in first person, down in front of you)
+      P.shoes.push(B(0.17, 0.07, 0.09, 0.27, 0.215, sd * 0.1));
       const shd = [tx, 0.96, sd * 0.18], el = [tx + 0.15, 0.74, sd * 0.24], hand = sd > 0 ? [px + 0.1, 0.71, 0.25] : [px + 0.05, 0.67, -0.25];
-      P.selfTeam.push(L(shd, el, 0.055, 0.05)); P.selfSkin.push(L(el, hand, 0.04, 0.035), G3.sphere(0.042, ...hand));
+      if (typeof Rig === 'undefined') { P.selfTeam.push(L(shd, el, 0.055, 0.05)); P.selfSkin.push(L(el, hand, 0.04, 0.035), G3.sphere(0.042, ...hand)); }   // (the arms are separate and move: rig3d.js)
       P.selfBlack.push(B(0.012, 0.3, 0.045, tx + 0.128, 0.83, sd * 0.07, 0, 0, -0.1));                             // harness straps
     }
     P.selfBlack.push(B(0.015, 0.045, 0.2, tx + 0.13, 0.75, 0), B(0.015, 0.05, 0.05, tx + 0.135, 0.75, 0));
@@ -325,7 +325,7 @@ class View3D {
     P.selfWhite.push(B(0.06, 0.04, 0.4, tx, 0.98, 0));
     const hx = tx + 0.02, hy = 1.15;                                                                                       // head centre
     P.selfSkin.push(L([tx + 0.01, 0.97, 0], [hx - 0.005, 1.07, 0], 0.045), G3.sphere(0.1, hx, hy, 0, 0.95, 1.1, 0.9), G3.sphere(0.022, hx - 0.01, hy, 0.09), G3.sphere(0.022, hx - 0.01, hy, -0.09));
-    P.selfHair.push(G3.cap(0.106, 0, 0, 0, 0.98, 0.95, 0.94).rotateZ(0.45).translate(hx - 0.012, hy + 0.01, 0));      // tipped back over the crown (turned before it is moved onto the head)
+    P.selfHair.push(typeof hairGeometry === 'function' ? hairGeometry('short').translate(hx, hy, 0) : G3.cap(0.106, 0, 0, 0, 0.98, 0.95, 0.94).rotateZ(0.45).translate(hx - 0.012, hy + 0.01, 0));      // short hair down to a hairline (no bald patch at the front)
     // drive wheels are separate meshes so they can turn
     const wheelR = 0.135, tyre = new THREE.CylinderGeometry(wheelR, wheelR, 0.07, 24).rotateX(Math.PI / 2);
     const hub = G3.merge([new THREE.CylinderGeometry(0.06, 0.06, 0.08, 14).rotateX(Math.PI / 2), ...[0, 1, 2].map(i => B(0.2, 0.022, 0.075, 0, 0, 0, 0, 0, i * Math.PI / 3))]);
@@ -337,7 +337,7 @@ class View3D {
     const G = this.cartGeometry(), num = this.numberTextures || (this.numberTextures = {});
     this.carts = this.m.chairs.map((ch, i) => {
       const team = this.teamColor(ch.side), k = ch.index + ch.side * 3, skin = CROWD_SKIN[(k * 2 + 1) % CROWD_SKIN.length], hair = CROWD_HAIR[(k * 3 + 2) % CROWD_HAIR.length];
-      const cols = { wood: [0xd8a46c, 0.55], woodEdge: [0xb07a45, 0.6], black: [0x1b1d20, 0.6], grey: [0x9aa1a7, 0.85], plastic: [0xf4f4f2, 0.35], team: [team, 0.45], white: [0xf0f0f0, 0.5], selfTeam: [team, 0.6], selfWhite: [0xffffff, 0.6], selfSkin: [skin, 0.7], selfHair: [hair, 0.9], selfPants: [0x2f3b55, 0.8], selfBlack: [0x15171a, 0.7], selfWood: [0xd8a46c, 0.55] };
+      const cols = { wood: [0xd8a46c, 0.55], woodEdge: [0xb07a45, 0.6], black: [0x1b1d20, 0.6], grey: [0x9aa1a7, 0.85], plastic: [0xf4f4f2, 0.35], team: [team, 0.45], white: [0xf0f0f0, 0.5], selfTeam: [team, 0.6], selfWhite: [0xffffff, 0.6], selfSkin: [skin, 0.7], selfHair: [hair, 0.9], pants: [0x2f3b55, 0.8], shoes: [0xffffff, 0.6], selfPants: [0x2f3b55, 0.8], selfBlack: [0x15171a, 0.7], selfWood: [0xd8a46c, 0.55] };
       const group = new THREE.Group(), self = 1 + i;                 // layer 1 + i: this cart's driver, hidden from their own first-person view
       for (const [k2, geo] of Object.entries(G.parts)) {
         const [col, rough, metal] = cols[k2], mesh = new THREE.Mesh(geo, this.mat(col, { rough, metal })); mesh.castShadow = true;

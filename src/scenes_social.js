@@ -147,7 +147,8 @@ const Forms = {
 };
 
 /* ---------------- Friends and party ---------------- */
-const statusText = f => !f.online ? 'offline' : !f.status ? 'online' : f.status.where === 'game' ? 'in a match' : f.status.where === 'room' ? 'in room ' + f.status.room : f.status.where === 'party' ? 'in a party' : 'in the menus';
+const agoText = ms => { const m = Math.floor(ms / 60000), h = Math.floor(m / 60), d = Math.floor(h / 24); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : h < 24 ? h + (h === 1 ? ' hour ago' : ' hours ago') : d < 30 ? d + (d === 1 ? ' day ago' : ' days ago') : 'over a month ago'; };
+const statusText = f => !f.online ? (f.ago != null ? 'last online ' + agoText(f.ago) : 'offline') : !f.status ? 'online' : f.status.where === 'game' ? 'in a match' : f.status.where === 'room' ? 'in room ' + f.status.room : f.status.where === 'party' ? 'in a party' : 'in the menus';
 /* ---------------- global leaderboard ---------------- */
 class LeaderboardScene extends Phaser.Scene {
   constructor() { super('Leaderboard'); }

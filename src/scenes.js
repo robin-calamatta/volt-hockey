@@ -12,7 +12,7 @@ const STYLE = {
 };
 // The controls guide (Settings > Controls and screen > Controls guide). Edit freely: one block per device.
 const CONTROLS_GUIDE = [
-  ['GAMEPAD', ['Left stick   drive  (1st / 3rd person: up = go, ◀ ▶ = turn)', 'Right stick   look around (springs back)', 'L3 (hold)   push to talk      D-pad ▲   tap: quick chat, hold: emoji wheel', 'D-pad ▼   camera      Select (View)   friends and party', 'RT / LT   spin clockwise / counter-clockwise', 'RB / LB   half spin (half a trigger)', 'D-pad ◀ ▶   speed down / up', 'X   full press on / off  (minigames: A or X uses a power-up)', 'Y   switch cart', 'Start   pause      A / B   select / back']],
+  ['GAMEPAD', ['Left stick   drive  (1st / 3rd person: up = go, ◀ ▶ = turn)', 'A (hold, while turning)   drift: let go for a boost (bigger when the bar is purple)', 'Right stick   look around (springs back)', 'L3 (hold)   push to talk      D-pad ▲   tap: quick chat, hold: emoji wheel', 'D-pad ▼   camera      Select (View)   friends and party', 'RT / LT   spin clockwise / counter-clockwise', 'RB / LB   half spin (half a trigger)', 'D-pad ◀ ▶   speed down / up', 'X   full press on / off  (minigames: A or X uses a power-up)', 'Y   switch cart', 'Start   pause      A / B   select / back']],
   ['KEYBOARD 1', ['WASD   drive', 'T   camera view', 'Tab chat   1-9 quick chat   G (hold) talk   ` friends   H (hold) emoji wheel', 'E / Q   spin', 'R / Z   half spin', 'X   full press  (minigames: Space or X = power-up)', 'V / C   speed up / down', 'F   switch cart', 'Esc   pause', 'Space / Backspace   select / back']],
   ['KEYBOARD 2', ['Arrows   drive', 'P   camera view', 'L (hold)   push to talk', '. / ,   spin', '] / [   half spin', '\\   full press  (minigames: Right Shift or \\ = power-up)', "' / ;   speed up / down", '/   switch cart', 'Right Shift / Right Ctrl   select / back']],
   ['TOUCH', ['Stick   drive', 'VIEW   camera view', '💬   chat      🎙   talk (hold) / mic on-off (tap)', 'Spin buttons   spin', 'Small spin buttons   half spin', 'PRESS   full press  (minigames: A = power-up)', '+ / -   speed up / down', 'Cart button   switch cart', 'II   pause', 'Settings > Touch and screen   move the buttons']]
@@ -132,19 +132,21 @@ class TitleScene extends Phaser.Scene {
     const y = 600, mk = (x, w, label, fn) => {
       const bg = panel(this, x - w / 2, y - 24, w, 48, { radius: 24, depth: -20 }), t = this.add.text(x, y, '', { ...STYLE.hint, fontSize: '22px', color: '#ffffff' }).setOrigin(0.5);
       const hit = this.add.zone(x, y, w, 56).setInteractive({ useHandCursor: true }); hit.on('pointerdown', (p, lx, ly, ev) => { if (ev) ev.stopPropagation(); Sound.resume(); Sound.play('select'); fn(); });
-      return { bg, t, label };
+      return { bg, t, label, fn, x, w, y };
     };
     this.pills = [
       mk(CX - 300, 330, () => `TOUCH CONTROLS: ${Settings.touch ? 'ON' : 'OFF'}`, () => TouchPad.toggle()),
       mk(CX + 40, 330, () => 'ADJUST BUTTONS', () => TouchPad.edit()),
       mk(CX + 330, 220, () => 'FULLSCREEN', () => toggleFullscreen())
     ];
+    this.focus = -1; this.ring = this.add.graphics().setDepth(5);                // a controller can reach these too: ▼ onto them, ◀ ▶ along, A presses, ▲ back to START
   }
   update(time, delta) {
     Controls.update(this.game.loop.frame); const dt = Math.min(0.05, delta / 1000);
     this.prompt.setAlpha(0.55 + 0.45 * Math.sin(time / 260));
     this.pills.forEach(p => p.t.setText(p.label()));
     const e = Controls.menu();
+    this.ring.clear(); const fp = this.pills[this.focus]; if (fp) this.ring.lineStyle(4, THEME.gold, 1).strokeRoundedRect(fp.x - fp.w / 2 - 4, fp.y - 28, fp.w + 8, 56, 28); else this.ring.lineStyle(4, THEME.gold, 0.5 + 0.5 * Math.sin(time / 260)).strokeRoundedRect(CX - 214, 496, 428, 76, 38);
     if (this.intro) {
       if (this.intro.running && (e.start || e.a || e.b || Controls.escPressed)) return this.intro.skip();
       this.intro.update(dt); if (this.intro.done) this.intro = null; if (this.intro && this.intro.running) return;
@@ -154,7 +156,12 @@ class TitleScene extends Phaser.Scene {
       this.fizz.burst(b.x + 10 + Math.random() * (b.width - 20), b.y + 18 + Math.random() * (b.height - 36), 14, 0.55);
     }
     this.fizz.update(dt);
-    if (e.start || e.a) this.begin();
+    if (!this.intro || !this.intro.running) {
+      if (e.down && this.focus < 0) { this.focus = 0; Sound.play('blip'); } else if (e.up && this.focus >= 0) { this.focus = -1; Sound.play('blip'); }
+      else if (this.focus >= 0 && (e.left || e.right)) { this.focus = (this.focus + (e.right ? 1 : this.pills.length - 1)) % this.pills.length; Sound.play('blip'); }
+      if (e.a && this.focus >= 0) { Sound.resume(); Sound.play('select'); const p = this.pills[this.focus]; if (p.label() === 'FULLSCREEN' && !Controls.anyKeyboardActive) { toggleFullscreen(); setTimeout(() => { if (!isFullscreen()) toast('Your browser only allows fullscreen from a click, a tap or a key: click FULLSCREEN, or press F11.'); }, 400); } else p.fn(); return; }
+    }
+    if (e.start || (e.a && this.focus < 0)) this.begin();
   }
 }
 
@@ -173,7 +180,11 @@ class ListMenuScene extends Phaser.Scene {
       this.add.rectangle(CX, long ? 80 : 142, 150, 4, THEME.gold, 0.95);
     }
     const gap = Math.min(58, (V.height - top - 60) / items.length), size = Math.min(opts.size || 40, Math.floor(gap * 0.7)), cx = opts.x || CX, w = opts.panelWidth || Math.min(900, Math.max(560, 40 + (opts.size ? 600 : 640)));
-    panel(this, cx - w / 2, top - gap * 0.75, w, gap * items.length + gap * 0.5);
+    /* v13: menus are boxed. A menu of plain choices is a grid of big tiles; a menu with ◀ ▶ options has a box per row. The settings pages stay a list. */
+    const listy = opts.list || ['Settings', 'SettingsPage', 'CameraPage', 'ControlsGuide'].includes(this.scene.key);
+    this.boxG = listy ? null : this.add.graphics(); this.tiles = null; this.rowBox = null;
+    if (!listy && items.length >= 2 && items.every(it => !it.change)) return this.buildTiles(items, top, opts, cx);
+    if (listy) panel(this, cx - w / 2, top - gap * 0.75, w, gap * items.length + gap * 0.5); else this.rowBox = { w, gap };
     this.panelBox = { x: cx - w / 2, w };                              // rows are shrunk to fit inside it (fitRow)
     this.bar = new SelectionBar(this, cx, w - 24, gap - 6);
     this.rows = items.map((_, i) => this.add.text(cx, top + i * gap, '', { ...STYLE.row, fontSize: size + 'px' }).setOrigin(0.5));
@@ -190,9 +201,33 @@ class ListMenuScene extends Phaser.Scene {
     this.hintText = items.some(it => it.hint) ? this.add.text(opts.hintX || CX, opts.hintY || V.height - 58, '', { fontFamily: FONT, fontSize: opts.hintSize || '22px', color: '#9fb2bf', align: 'center', wordWrap: opts.hintWidth ? { width: opts.hintWidth } : undefined, ...(opts.hintBg ? { backgroundColor: opts.hintBg, padding: { x: 8, y: 4 } } : {}) }).setOrigin(0.5) : null;   // a line saying what the highlighted item is for
     if (!opts.noFooter) this.add.text(CX, V.height - 22, '▲ ▼  choose        ◀ ▶  change        A  select        B  back', { fontFamily: FONT, fontSize: '19px', color: THEME.dim }).setOrigin(0.5);
   }
+  buildTiles(items, top, opts, cx) {                                   // a grid of big boxed tiles (plain choices)
+    const V = CONFIG.view, n = items.length, cols = n <= 3 ? n : n === 4 ? 2 : n <= 6 ? 3 : 4, rows = Math.ceil(n / cols), tw = Math.min(330, (V.width - 120) / cols - 18), th = Math.max(70, Math.min(140, (V.height - top - 110) / rows - 16)), gx = tw + 18, gy = th + 16;
+    const x0 = cx - (cols * gx - 18) / 2, y0 = top - 20; this.tiles = { cols, tw, th, rects: [] };
+    this.rows = items.map((_, i) => { const c = i % cols, r = Math.floor(i / cols), inRow = Math.min(cols, n - r * cols), x = x0 + c * gx + (cols - inRow) * gx / 2, y = y0 + r * gy; this.tiles.rects.push({ x, y }); return this.add.text(x + tw / 2, y + th / 2, '', { ...STYLE.row, fontSize: Math.min(32, Math.floor(th * 0.3)) + 'px', align: 'center', wordWrap: { width: tw - 24 } }).setOrigin(0.5); });
+    items.forEach((item, i) => { const R = this.tiles.rects[i], z = this.add.zone(R.x + tw / 2, R.y + th / 2, tw, th).setInteractive({ useHandCursor: true }); z.on('pointerdown', () => { this.cursor = i; if (item.select) { Sound.play('select'); item.select(); } }); });
+    this.bar = { moveTo() {} }; this.panelBox = { x: x0, w: tw };
+    this.hintText = items.some(it => it.hint) ? this.add.text(opts.hintX || CX, opts.hintY || V.height - 58, '', { fontFamily: FONT, fontSize: opts.hintSize || '22px', color: '#9fb2bf', align: 'center', wordWrap: { width: V.width - 160 } }).setOrigin(0.5) : null;
+    if (!opts.noFooter) this.add.text(CX, V.height - 22, '◀ ▶ ▲ ▼  choose        A  select        B  back', { fontFamily: FONT, fontSize: '19px', color: THEME.dim }).setOrigin(0.5);
+  }
+  drawBoxes() {                                                         // the boxes behind the rows / tiles (the chosen one glows)
+    const g = this.boxG; if (!g) return; g.clear();
+    if (this.tiles) { const { tw, th, rects } = this.tiles; rects.forEach((R, i) => { const on = i === this.cursor; g.fillStyle(on ? 0x1d3a55 : 0x0f1c27, on ? 0.97 : 0.88).fillRoundedRect(R.x, R.y, tw, th, 14).lineStyle(on ? 4 : 2, on ? THEME.gold : 0x2d5068, 1).strokeRoundedRect(R.x, R.y, tw, th, 14); if (on) g.fillStyle(THEME.gold, 1).fillRect(R.x + 14, R.y + th - 8, tw - 28, 4); }); return; }
+    if (this.rowBox) { const { w, gap } = this.rowBox; this.rows.forEach((row, i) => { const on = i === this.cursor, x = row.x - w / 2, y = row.y - gap / 2 + 3; g.fillStyle(on ? 0x1d3a55 : 0x0f1c27, on ? 0.97 : 0.85).fillRoundedRect(x, y, w, gap - 6, 10).lineStyle(on ? 3 : 1.5, on ? THEME.gold : 0x2d5068, 1).strokeRoundedRect(x, y, w, gap - 6, 10); }); }
+  }
   update() {
     Controls.update(this.game.loop.frame);
     if (!this.items || (typeof PadNav !== 'undefined' && PadNav.stack.some(x => x.modal))) return;      // a pop-up (form, friends) has the controls
+    if (this.tiles) {                                                   // the tile grid: move in two directions
+      const e = Controls.menu(), n = this.items.length, C = this.tiles.cols, item = this.items[this.cursor];
+      if (Controls.escPressed) { if (this.onBack) { Sound.play('back'); this.onBack(); } return; }
+      let c = this.cursor; if (e.left) c = (c + n - 1) % n; if (e.right) c = (c + 1) % n; if (e.up) c = c - C >= 0 ? c - C : c; if (e.down) c = c + C < n ? c + C : c; if (c !== this.cursor) { this.cursor = c; Sound.play('blip'); }
+      if ((e.a || e.start) && item.select) { Sound.play('select'); item.select(); return; }
+      if (e.b && this.onBack) { Sound.play('back'); this.onBack(); return; }
+      this.rows.forEach((row, i) => row.setText(this.items[i].label()).setColor(i === this.cursor ? STYLE.colorSelected : STYLE.colorIdle).setScale(i === this.cursor ? 1.04 : 1));
+      this.drawBoxes(); if (this.hintText) this.hintText.setText(this.items[this.cursor] && this.items[this.cursor].hint ? (typeof this.items[this.cursor].hint === 'function' ? this.items[this.cursor].hint() : this.items[this.cursor].hint) : '');
+      return;
+    }
     const e = Controls.menu(), n = this.items.length, item = this.items[this.cursor];
     if (Controls.escPressed) { if (this.onBack) { Sound.play('back'); this.onBack(); } return; }   // Esc on a keyboard: back (it is also Start, which would select)
     if (e.up) { this.cursor = (this.cursor + n - 1) % n; Sound.play('blip'); }
@@ -202,7 +237,7 @@ class ListMenuScene extends Phaser.Scene {
     if ((e.a || e.start) && item.select) { Sound.play('select'); item.select(); return; }
     if (e.b && this.onBack) { Sound.play('back'); this.onBack(); return; }
     this.rows.forEach((row, i) => { row.setText(this.items[i].label()).setColor(i === this.cursor ? STYLE.colorSelected : STYLE.colorIdle); this.fitRow(row, i === this.cursor ? 1.04 : 1); });
-    this.bar.moveTo(this.rows[this.cursor].y);
+    this.bar.moveTo(this.rows[this.cursor].y); this.drawBoxes();
     if (this.hintText) this.hintText.setText(item && item.hint ? (typeof item.hint === 'function' ? item.hint() : item.hint) : '');
   }
 }
@@ -392,6 +427,9 @@ class LobbyScene extends Phaser.Scene {
     return Settings.nextName(CONFIG.playerNames[this.players.length % CONFIG.playerNames.length], 0, taken.concat(mine));
   }
   rename(p, name) { if (name && !this.players.some(q => q !== p && q.name === name)) { p.name = name; if (this.players[0] === p) Settings.setMyName(name); } }
+  get br() { return this.mini && this.mini.kind === 'br' && (this.mini.squad || 1) > 1; }   // Battle Royale with squads: pick your squad, not a team
+  squadCount() { return Math.max(1, Math.ceil((this.sizes[0] + this.sizes[1]) / (this.mini.squad || 1))); }
+  openSquad(from = 0, d = 1) { const n = this.squadCount(); for (let i = 1; i <= n; i++) { const s = ((from - 1 + d * i) % n + n) % n + 1; if (this.players.filter(q => q.squad === s).length < (this.mini.squad || 1)) return s; } return from || 1; }
   openSide() {                                              // side with room and the fewest players, or null when both are full
     const open = [0, 1].filter(s => this.count(s) < this.sizes[s] && (!this.season || s === this.season.side));      // a season game: every person plays for your team
     return open.length ? open.reduce((a, b) => (this.count(b) < this.count(a) ? b : a)) : null;
@@ -403,13 +441,14 @@ class LobbyScene extends Phaser.Scene {
       const p = this.playerOf(src);
       if (!p) {
         if (src.pressed.a && this.openSide() !== null) {
-          this.players.push({ src, side: this.openSide(), chair: null, spinQueued: 0, speedLevel: Settings.speedLevel, name: this.firstName() }); Sound.play('select');
+          this.players.push({ src, side: this.openSide(), chair: null, spinQueued: 0, speedLevel: Settings.speedLevel, name: this.firstName(), squad: this.br ? this.openSquad(0, 1) : 0 }); Sound.play('select');
         } else if (src.pressed.start && this.ready > 12 && this.players.length === 0) { Sound.play('select'); Controls.owner = null; return this.scene.start('Game', { players: [], sizes: this.sizes, practice: this.practice, season: this.season, mini: this.mini }); }   // nobody joined: watch CPU v CPU, people can jump in with Start
         else if (src.pressed.b && this.players.length === 0) { Sound.play('back'); return this.scene.start(this.season ? 'SeasonHub' : 'Setup', { practice: this.practice }); }
         continue;
       }
-      const want = this.season ? p.side : src.pressed.left ? 0 : src.pressed.right ? 1 : p.side;
-      if (want !== p.side && this.count(want) < this.sizes[want]) { p.side = want; Sound.play('blip'); }
+      if (this.br) { if (src.pressed.left || src.pressed.right) { p.squad = this.openSquad(p.squad, src.pressed.left ? -1 : 1); Sound.play('blip'); } }   // ◀ ▶: your squad
+      else { const want = this.season ? p.side : src.pressed.left ? 0 : src.pressed.right ? 1 : p.side;
+      if (want !== p.side && this.count(want) < this.sizes[want]) { p.side = want; Sound.play('blip'); } }
       if (src.pressed.up || src.pressed.down) { this.rename(p, Settings.nextName(p.name, src.pressed.down ? 1 : -1, this.players.filter(q => q !== p).map(q => q.name))); Sound.play('blip'); }   // up / down: step through preset names
       if (src.pressed.x) { p.locked = !p.locked; Sound.play('blip'); }                                                                                                    // X: lock to one cart for the whole game
       if (src.pressed.y) Settings.askName(p.name, t => this.rename(p, t), src);                                                                                         // Y: type your own
@@ -417,7 +456,8 @@ class LobbyScene extends Phaser.Scene {
       else if (src.pressed.start) { Sound.play('select'); Controls.owner = null; return this.scene.start('Game', { players: this.players, sizes: this.sizes, practice: this.practice, season: this.season, mini: this.mini }); }
     }
     const names = side => this.players.map((p, i) => ({ p, i })).filter(o => o.p.side === side).map(o => `${o.p.name}  (${o.p.src.label})${o.p.locked ? '   🔒 ONE CART' : ''}`).join('\n');
-    this.colA.setText(names(0)).setColor(teamColorHex(this.teams[0])); this.colB.setText(names(1)).setColor(teamColorHex(this.teams[1]));
+    if (this.br) { const n = this.squadCount(), lines = []; for (let s = 1; s <= n; s++) { const ps = this.players.filter(p => p.squad === s); if (ps.length) lines.push(`SQUAD ${s}:  ` + ps.map(p => `${p.name} (${p.src.label})`).join(',  ')); } this.colA.setText(lines.join('\n') + (lines.length ? '\n\n◀ ▶ change squad.  Empty spots in a squad get a CPU team-mate.' : '')).setColor('#ffffff').setX(CX); this.colB.setText(''); this.brHide = this.brHide || this.children.list.filter(o => o.type === 'Image' || (o.text && /^[A-Z ]+$/.test(o.text) && o.y === 222)).forEach(o => o.setVisible(false)) || true; }
+    else { this.colA.setText(names(0)).setColor(teamColorHex(this.teams[0])); this.colB.setText(names(1)).setColor(teamColorHex(this.teams[1])); }
     this.idle.setText(this.players.length ? '' : 'Press A on a gamepad, Space / Right Shift on a keyboard, or the A button on the touch controller to join.\nOr press Start to watch CPU v CPU: anyone can jump in later with Start.').setY(this.players.length ? 270 : 340);
   }
 }
@@ -498,15 +538,15 @@ class GameScene extends Phaser.Scene {
       const locals = [[o.me, Controls.mine], ...guests.map(([id, src]) => [o.players.find(q => q.id === id), src])];
       for (const [me, src] of locals) {
         if (!me) continue; const input = menuOpen ? idle : src; me.src = menuOpen ? o.idle : src;
-        const SP = m.mini && modeOf(m) && modeOf(m).shooterPad;
-        if (SP && me.chair) { me.brAds = !me.chair.out && !me.invOpen && input.held && input.held.spinCCW ? 1 : 0; me.chair.gs.ads = me.brAds; }
-        if (SP) { if (me.chair && !me.chair.out && !me.invOpen && (input.pressed.halfCW || input.pressed.halfCCW)) modeOf(m).cycle(me.chair, m, input.pressed.halfCCW ? -1 : 1); }
-        else { if (input.pressed.halfCW) me.spinQueued = 0.5; if (input.pressed.halfCCW) me.spinQueued = -0.5;
-        if (input.pressed.spinCW) me.spinQueued = 1; if (input.pressed.spinCCW) me.spinQueued = -1; }
-        const MJ = m.mini && modeOf(m) && modeOf(m).jump; if (MJ && me.chair && !me.invOpen) { brAimInput(me, input, dt); me.chair.gs.ap = MG.r2(me.brAp || 0); if (input.pressed.x) modeOf(m).jump(me.chair, m); }
-        if (me.invOpen) continue;
-        if (m.mini && (input.pressed.a || (SP && input.pressed.spinCW) || (input.pressed.x && !MJ) || (modeOf(m) && modeOf(m).holdFire && input.held && (input.held.a || (SP && input.held.spinCW))))) m.useBy(me); else if (input.pressed.x && !MJ) m.togglePress(me.side);
-        if (input.pressed.y) m.switchChair(me);
+        if (me.invOpen) continue; const MD = m.mini && modeOf(m);
+        if (MD && MD.jumpOnA) brPadInput(this, m, me, input, dt);
+        else {
+          if (me.chair) me.chair.driftHeld = !!(input.held && input.held.a);
+          if (input.pressed.halfCW) me.spinQueued = 0.5; if (input.pressed.halfCCW) me.spinQueued = -0.5;
+          if (input.pressed.spinCW) me.spinQueued = 1; if (input.pressed.spinCCW) me.spinQueued = -1;
+          if (m.mini && (input.pressed.x || (MD && MD.holdFire && input.held && input.held.x))) m.useBy(me); else if (input.pressed.x) m.togglePress(me.side);
+          if (input.pressed.y) m.switchChair(me);
+        }
         if (input.pressed.speedUp && me.speedLevel < Settings.speedCap) { me.speedLevel++; Sound.play('blip'); }
         if (input.pressed.speedDown && me.speedLevel > 1) { me.speedLevel--; Sound.play('blip'); }
       }
@@ -754,18 +794,18 @@ class GameScene extends Phaser.Scene {
     Progress.tick(this, Math.min(delta / 1000, 0.05)); Emotes.frame(this);         // quests and XP; the emoji wheel
     if (this.online) return this.updateOnline(delta);
     const m = this.match;
+    for (const c of m.chairs) if (!c.player) c.driftHeld = false;
     for (const p of this.setup.players) {
       if (p.invOpen) continue;                                                       // (their inventory screen has their buttons)
-      if (m.mini && modeOf(m) && modeOf(m).invAct && p.src.pressed.b && p.chair && !p.chair.out && m.state === 'play') { this.openInventory(p); continue; }   // B: the inventory
-      const SP = m.mini && modeOf(m) && modeOf(m).shooterPad;                         // Battle Royale: RT fires, LB / RB step through your items, no spins
-      if (SP && p.chair) { p.brAds = !p.chair.out && p.src.held && p.src.held.spinCCW ? 1 : 0; p.chair.gs.ads = p.brAds; }
-      if (SP) { if (p.chair && !p.chair.out && (p.src.pressed.halfCW || p.src.pressed.halfCCW)) modeOf(m).cycle(p.chair, m, p.src.pressed.halfCCW ? -1 : 1); }
-      else { if (p.src.pressed.halfCW) p.spinQueued = 0.5; if (p.src.pressed.halfCCW) p.spinQueued = -0.5;
-      if (p.src.pressed.spinCW) p.spinQueued = 1; if (p.src.pressed.spinCCW) p.spinQueued = -1; }
-      const MJ = m.mini && modeOf(m) && modeOf(m).jump;                                // Battle Royale: X jumps, the right stick (or I / K) aims up and down
-      if (MJ && p.chair) { brAimInput(p, p.src, Math.min(delta / 1000, 0.05)); p.chair.gs.ap = MG.r2(p.brAp || 0); if (p.src.pressed.x) modeOf(m).jump(p.chair, m); }
-      if (m.mini && (p.src.pressed.a || (SP && p.src.pressed.spinCW) || (p.src.pressed.x && !MJ) || (modeOf(m) && modeOf(m).holdFire && p.src.held && (p.src.held.a || (SP && p.src.held.spinCW) || (p.src.held.x && !MJ))))) m.useBy(p); else if (p.src.pressed.x && !MJ) m.togglePress(p.side);   // (some games: hold to keep firing)
-      if (p.src.pressed.y) m.switchChair(p);
+      const MD = m.mini && modeOf(m);
+      if (MD && MD.jumpOnA) brPadInput(this, m, p, p.src, Math.min(delta / 1000, 0.05));      // Battle Royale has its own buttons (modes_br2.js)
+      else {
+        if (p.chair) p.chair.driftHeld = !!(p.src.held && p.src.held.a);               // A (hold, while turning): drift
+        if (p.src.pressed.halfCW) p.spinQueued = 0.5; if (p.src.pressed.halfCCW) p.spinQueued = -0.5;
+        if (p.src.pressed.spinCW) p.spinQueued = 1; if (p.src.pressed.spinCCW) p.spinQueued = -1;
+        if (m.mini && (p.src.pressed.x || (MD && MD.holdFire && p.src.held && p.src.held.x))) m.useBy(p); else if (p.src.pressed.x) m.togglePress(p.side);   // X: use / fire (some games: hold to keep firing)
+        if (p.src.pressed.y) m.switchChair(p);
+      }
       if (p.src.pressed.speedUp && p.speedLevel < Settings.speedCap) { p.speedLevel++; Sound.play('blip'); }   // RB
       if (p.src.pressed.speedDown && p.speedLevel > 1) { p.speedLevel--; Sound.play('blip'); }                      // LB
       if (p.src.pressed.start && m.state !== 'over') { Sound.play('select'); Controls.owner = p.src; this.scene.launch('Pause', { game: this }); return this.scene.pause(); }

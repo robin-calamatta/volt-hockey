@@ -58,6 +58,14 @@ const Avatar = {
     if (opts.layer !== undefined) G.traverse(o => { if (o.isMesh && o.userData.self) o.layers.set(opts.layer); });
     group.add(G);
   },
+  /* what a driver's arms are doing: an action (wave, cheer...), healing, reviving, down, holding a gun or an item, or just driving */
+  poseFor(ch, m, now) {
+    const a = ch.act, A = a && typeof ACTIONS !== 'undefined' && ACTIONS[a.id]; if (A && now - a.t < A.dur && !ch.out) return { name: a.id, t: now - a.t };
+    if (m && m.kind === 'br' && ch.gs) { const G = ch.gs, it = G.inv && G.inv[G.sel];
+      if (G.down) return { name: 'downed', t: now }; if (G.use) return { name: 'heal', t: now, item: G.use.k }; if (G.rv) return { name: 'revive', t: now };
+      if (it && !G.hol) return BR_GUNS[it.k] ? { name: 'gun', t: now, item: it.k, pitch: typeof brPitch === 'function' ? brPitch(ch) : 0 } : { name: 'item', t: now, item: it.k }; }
+    return { name: 'drive', t: now };
+  },
   /* whose look a cart shows: you (your profile), people online (what they sent), nobody else */
   lookFor(ch, sc) {
     const p = ch && ch.player; if (!p) return null; if (p.look) return p.look;
@@ -66,12 +74,12 @@ const Avatar = {
   },
   cleanLook(L) {                                                         // a look that came over the network: only known items and colours
     if (!L || typeof L !== 'object') return null; const col = v => /^#[0-9a-fA-F]{6}$/.test(v) ? v : null, id = (v, list) => list.some(x => x.id === v) ? v : list[0].id;
-    return { outfit: id(L.outfit, COS.outfits), shirt: col(L.shirt) || LOOK0.shirt, hat: id(L.hat, COS.hats), hatCol: col(L.hatCol) || LOOK0.hatCol, face: id(L.face, COS.faces), hair: col(L.hair) || LOOK0.hair, skin: col(L.skin) || LOOK0.skin, decal: id(L.decal, COS.decals) };
+    return { outfit: id(L.outfit, COS.outfits), shirt: col(L.shirt) || LOOK0.shirt, hat: id(L.hat, COS.hats), hatCol: col(L.hatCol) || LOOK0.hatCol, face: id(L.face, COS.faces), hair: col(L.hair) || LOOK0.hair, hairStyle: id(L.hairStyle, COS.hairStyles), skin: col(L.skin) || LOOK0.skin, decal: id(L.decal, COS.decals), title: id(L.title, COS.titles) };
   },
   /* a whole cart with its driver, for the lobby (the same model as in a match) */
   cart(look) {
     const ctx = { mats: {} }, G = View3D.prototype.cartGeometry.call(ctx), mat = (c, r, m) => this.mat('#' + new THREE.Color(c).getHexString(), r, m || 0), group = new THREE.Group(), accent = 0x29b6f6;
-    const cols = { wood: [0xd8a46c, 0.55], woodEdge: [0xb07a45, 0.6], black: [0x1b1d20, 0.6], grey: [0x9aa1a7, 0.85], plastic: [0xf4f4f2, 0.35], team: [accent, 0.45], white: [0xf0f0f0, 0.5], selfTeam: [accent, 0.6], selfWhite: [0xffffff, 0.6], selfSkin: [0xe8b48a, 0.7], selfHair: [0x3b2a1e, 0.9], selfPants: [0x2f3b55, 0.8], selfBlack: [0x1b1d20, 0.6], selfWood: [0xd8a46c, 0.55] };
+    const cols = { wood: [0xd8a46c, 0.55], woodEdge: [0xb07a45, 0.6], black: [0x1b1d20, 0.6], grey: [0x9aa1a7, 0.85], plastic: [0xf4f4f2, 0.35], team: [accent, 0.45], white: [0xf0f0f0, 0.5], selfTeam: [accent, 0.6], selfWhite: [0xffffff, 0.6], selfSkin: [0xe8b48a, 0.7], selfHair: [0x3b2a1e, 0.9], pants: [0x2f3b55, 0.8], shoes: [0xffffff, 0.6], selfPants: [0x2f3b55, 0.8], selfBlack: [0x1b1d20, 0.6], selfWood: [0xd8a46c, 0.55] };
     for (const [k, geo] of Object.entries(G.parts)) { const [col, rough] = cols[k] || [0x888888, 0.6], me = new THREE.Mesh(geo, mat(col, rough)); me.castShadow = me.receiveShadow = true; me.userData.part = k; group.add(me); }
     for (const sd of [-1, 1]) { const w = new THREE.Group(); w.add(new THREE.Mesh(G.tyre, mat(0x2a2d31, 0.85)), new THREE.Mesh(G.hub, mat(0x9aa1a7, 0.35, 0.6))); w.position.set(G.wheelX, G.wheelR, sd * G.wheelZ); w.children.forEach(x => { x.castShadow = true; }); group.add(w); }
     this.dress(group, look); return group;
@@ -87,6 +95,7 @@ const Avatar = {
       if (key === c.cosKey) continue; c.cosKey = key;
       if (look) Avatar.dress(c.group, look, { layer: c.layer, shirt: hockey ? '#' + new THREE.Color(this.teamColor(c.ch.side)).getHexString() : undefined });   // (Volt Hockey: your shirt is in your team's colour)
       else { const old = c.group.getObjectByName('cosmetics'); if (old) c.group.remove(old); } }
+    if (typeof Rig !== 'undefined') { const now = performance.now() / 1000; for (const c of this.carts || []) { const p = Avatar.poseFor(c.ch, this.m, now); Rig.update(c.group, p.name, p.t, { layer: c.layer, item: p.item, pitch: p.pitch, sleeves: c.group.userData.sleeves, hide: c.ch.out }); const pr = c.group.getObjectByName('propeller'); if (pr) pr.rotation.y = now * 14; } }   // the arms (and a propeller cap) move
     return r;
   };
 }
@@ -110,10 +119,14 @@ class LobbyStage {
     const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3)); this.sparks = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0x9fe8ff, size: 0.05, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending })); s.add(this.sparks);
     this.cam = new THREE.PerspectiveCamera(30, 16 / 9, 0.05, 60); this.spin = -0.5; this.spinV = 0; this.offX = 0; this.zoom = 1; this.lookKey = '';
   }
+  play(id) { this.act = { id, t: performance.now() / 1000 }; this.nextAct = this.act.t + 8; }
   setLook(look) { if (!this.ok) return; const k = JSON.stringify(look); if (k === this.lookKey) return; this.lookKey = k; if (this.cart) this.scene.remove(this.cart); this.cart = Avatar.cart(look); this.cart.position.y = 0.14; this.scene.add(this.cart); }
   render(dt, frame) {                                                    // frame: { x: where the character sits across the screen (0..1), zoom }
     if (!this.ok) return; const b = Render3D.sync(); if (!b) return; Render3D.show(true); const r = Render3D.r, w = Render3D.w, h = Render3D.h;
     this.spin += (this.spinV || 0.18) * dt; this.spinV *= Math.exp(-3 * dt); if (this.cart) this.cart.rotation.y = this.spin;
+    if (this.cart && typeof Rig !== 'undefined') { const now = performance.now() / 1000, A = this.act && ACTIONS[this.act.id], on = A && now - this.act.t < A.dur;   // the arms: an action now and then (or the one you are looking at in the Locker)
+      if (!on && now > (this.nextAct || 0)) { const acts = Progress.P.wheel.filter(id => ACTIONS[id]); if (acts.length) this.act = { id: acts[Math.floor(Math.random() * acts.length)], t: now }; this.nextAct = now + 9 + Math.random() * 6; }
+      Rig.update(this.cart, on ? this.act.id : 'drive', on ? now - this.act.t : now, { sleeves: this.cart.userData.sleeves }); }
     const p = this.sparks.geometry.attributes.position; for (let i = 0; i < p.count; i++) { let y = p.getY(i) + dt * (0.15 + (i % 7) * 0.05); if (y > 8) y = 0; p.setY(i, y); } p.needsUpdate = true;
     this.ring.material.color.setHSL(0.53 + 0.06 * Math.sin(performance.now() / 900), 1, 0.65);
     const k = 1 - Math.exp(-6 * dt); this.offX += ((frame.x - 0.5) - this.offX) * k; this.zoom += ((frame.zoom || 1) - this.zoom) * k;

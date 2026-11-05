@@ -5,7 +5,7 @@
 const TOUCH = {
   baseWidth: 900, minUnit: 0.6, maxUnit: 1.5, stickDeadzone: 0.12, stickMenuThreshold: 0.55, edgeMargin: 0.04, opacity: 0.6, opacitySteps: [0.3, 0.45, 0.6, 0.8, 1], scaleStep: 0.15, scaleMin: 0.5, scaleMax: 2,
   /* x, y: centre as a fraction of the screen. size: pixels at the base screen size. button: the logical button it presses (see BUTTONS in input.js). */
-  gameOnly: ['spinCW', 'spinCCW', 'halfCW', 'halfCCW', 'x', 'y', 'speedUp', 'speedDown', 'camera'],     // hidden in menus so they do not cover the menu items
+  gameOnly: ['spinCW', 'spinCCW', 'halfCW', 'halfCCW', 'x', 'y', 'speedUp', 'speedDown', 'camera', 'quick'],     // hidden in menus so they do not cover the menu items
   controls: {
     stick:    { kind: 'stick',  x: 0.14, y: 0.68, size: 176, name: 'Move stick' },
     spinCW:   { kind: 'button', x: 0.93, y: 0.60, size: 104, button: 'spinCW',   label: '↻', sub: 'SPIN',  name: 'Spin clockwise (RT)' },
@@ -19,7 +19,8 @@ const TOUCH = {
     speedUp:  { kind: 'button', x: 0.07, y: 0.13, size: 54,  button: 'speedUp',  label: '+', sub: 'SPEED', name: 'Cart speed up (RB)' },
     speedDown:{ kind: 'button', x: 0.07, y: 0.29, size: 54,  button: 'speedDown',label: '−', sub: 'SPEED', name: 'Cart speed down (LB)' },
     camera:   { kind: 'button', x: 0.93, y: 0.235, size: 50, button: 'camera',   label: '◉', sub: 'VIEW',  name: 'Camera view (1st / 3rd person, broadcast, 2D)' },
-    start:    { kind: 'button', x: 0.50, y: 0.92, size: 50,  button: 'start',    label: 'II', sub: '',     name: 'Pause' }
+    start:    { kind: 'button', x: 0.50, y: 0.92, size: 50,  button: 'start',    label: 'II', sub: '',     name: 'Pause' },
+    quick:    { kind: 'button', x: 0.07, y: 0.61, size: 54,  button: 'quick',    label: '😀', sub: 'EMOTE', name: 'Emotes (hold for the wheel); Battle Royale: tap for your bag' }
   }
 };
 
@@ -78,7 +79,7 @@ const TouchPad = {
       this.inGame = inGame; this.wasEditing = this.editing;
       // only in a match (or while adjusting them): every menu can be tapped, and the buttons would cover its rows
       for (const id of Object.keys(TOUCH.controls)) this.els[id].style.display = (inGame || this.editing) ? (TOUCH.gameOnly.includes(id) ? 'flex' : '') : 'none';
-      if (!inGame && !this.editing) this.clear();
+      if (!inGame && !this.editing) { this.clear(); this.relabel(null); }
     }
   },
   clear() { this.state.held = {}; this.state.ax = this.state.ay = 0; for (const el of Object.values(this.els)) el.classList.remove('down'); const k = this.els.stick.querySelector('.knob'); k.style.transform = ''; },
@@ -131,7 +132,11 @@ const TouchPad = {
     else if (a === 'lock') { this.editing = false; this.selected = null; this.root.classList.remove('editing'); this.bar.style.display = 'none'; Settings.save(); }
     this.place(); this.info();
   },
-  toggle() { Settings.touch = !Settings.touch; Settings.save(); this.sync(); }
+  toggle() { Settings.touch = !Settings.touch; Settings.save(); this.sync(); },
+  relabel(map) {                                                               // a game can rename the buttons (Battle Royale: FIRE, AIM, JUMP...); null puts them back
+    const key = map ? JSON.stringify(map) : ''; if (key === this.lblKey || !this.built) return; this.lblKey = key;
+    for (const id of Object.keys(TOUCH.controls)) { const d = TOUCH.controls[id], el = this.els[id]; if (!el || d.kind === 'stick') continue; const r = (map && map[id]) || [d.label, d.sub], l = el.querySelector('.l'), s = el.querySelector('.s'); if (l) l.textContent = r[0]; if (s) s.textContent = r[1] || ''; }
+  }
 };
 
 /* ---- fullscreen: hides the browser bars (address bar and all) ---- */

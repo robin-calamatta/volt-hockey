@@ -14,7 +14,8 @@ const MODES = {};
 const CTRL = {                                                         // control lines used by the How to play pages
   drive: 'Drive: left stick  /  WASD  /  arrows  /  touch stick',
   spin: 'Spin (a quick turn that whacks things): triggers  /  E Q  /  . ,  /  SPIN buttons',
-  item: 'Use a power-up: A or X  /  Space or X  /  Right Shift or \\  /  touch A',
+  item: 'Use a power-up: X  /  X  /  \\  /  touch X',
+  drift: 'Drift: hold A while turning (Space  /  Right Shift  /  touch A): let go when the bar is purple for the biggest boost',
   speed: 'Cart speed: D-pad ◀ ▶  /  C V  /  ; \'',
   pause: 'Pause: Start  /  Esc  /  II'
 };
@@ -22,19 +23,19 @@ const GAME_INFO = {
   hockey: { name: 'Volt Hockey', cat: 'hockey', blurb: 'The real thing: teams of power carts, a ball and two nets.',
     goal: 'Score more goals than the other team before the clock runs out.',
     rules: ['Carry the ball in the T-stick on the front of your cart and push it into the other team\'s net.', 'Spin your cart to slap the ball hard: a spin shot.', 'Do not drive into the crease you are attacking, and only one cart per team may be in its own crease.', 'A hard hit from behind or head-on is a foul: that cart sits in the sin bin and the other team has a power play.', 'A ball left untouched in a crease is reset to the middle.', 'Level at full time: golden goal overtime.'],
-    controls: [CTRL.drive, CTRL.spin, 'Switch cart: Y  /  F  /  /', 'Full press (goalie joins the attack): X', CTRL.speed, CTRL.pause] },
+    controls: [CTRL.drive, CTRL.drift, CTRL.spin, 'Switch cart: Y  /  F  /  /', 'Full press (goalie joins the attack): X', CTRL.speed, CTRL.pause] },
   balloons: { name: 'Balloon Bash', cat: 'party', blurb: 'Pop the balloons on everyone else\'s back.',
     goal: 'Be the last cart (or team) with balloons left.',
     rules: ['Every cart carries balloons on its back.', 'Hit someone\'s back with the front of your cart: one balloon pops and they restart somewhere safe.', 'A cart that just restarted blinks: it cannot be popped for 2 seconds.', 'No balloons left: you are out and watch from the sin bin.', 'When the clock runs out, the most balloons left wins.', 'Power-ups: BOOST, ZAP (pops a balloon from range) and OIL.'],
-    controls: [CTRL.drive, CTRL.spin, CTRL.item, CTRL.pause] },
+    controls: [CTRL.drive, CTRL.drift, CTRL.spin, CTRL.item, CTRL.pause] },
   race: { name: 'Race', cat: 'racing', blurb: 'Laps of seven tracks, from the rink oval to a kilometre marathon.',
     goal: 'Finish the laps first.',
     rules: ['Follow the track; the walls keep you on it and there are no short cuts.', 'Laps and positions are counted for you (top of the screen).', 'When the winner crosses the line, everyone else has 20 seconds to finish.', 'Obstacles: rocks, cones, bumpers that throw you back, spinning arms, sliding blocks.', 'Drive over the blue arrows for a boost.', 'Power-ups: BOOST, ZAP (spins a cart out) and OIL (reverses their steering).'],
-    controls: [CTRL.drive, CTRL.spin, CTRL.item, CTRL.pause] },
+    controls: [CTRL.drive, CTRL.drift, CTRL.spin, CTRL.item, CTRL.pause] },
   hunt: { name: 'Manhunt', cat: 'party', blurb: 'One cart is IT. Get caught and you are IT too.',
     goal: 'Runners: still be free when the clock runs out. IT: catch everyone.',
     rules: ['One random cart starts as IT (the red ring and the other team\'s colours).', 'IT catches a runner just by touching them.', 'A caught runner becomes IT, and freezes for 2 seconds first.', 'IT wins when everyone has been caught.', 'Anyone still free when the clock runs out wins.'],
-    controls: [CTRL.drive, CTRL.spin, CTRL.item, CTRL.pause] }
+    controls: [CTRL.drive, CTRL.drift, CTRL.spin, CTRL.item, CTRL.pause] }
 };
 const GAME_CATS = [
   { id: 'party', name: 'Party chaos', blurb: 'Free-for-all mayhem: popping, tagging, bombs and lava' },

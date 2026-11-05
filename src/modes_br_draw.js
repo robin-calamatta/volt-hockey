@@ -164,6 +164,11 @@ function brDrawIcon(c, k) {
   else if (k === 'rifle') { R(22, 26, 76, 12, metal); R(98, 29, 24, 4, dark); P([[54, 38], [64, 38], [68, 58], [58, 60]], dark); P([[30, 38], [42, 38], [38, 54], [28, 54]], dark); P([[2, 28], [22, 26], [22, 40], [4, 44]], dark); R(44, 18, 22, 7, dark); R(46, 20, 18, 3, acc); shine(22, 27, 76); }
   else if (k === 'sniper') { R(16, 30, 64, 10, metal); R(80, 32, 46, 4, dark); P([[0, 30], [16, 30], [16, 44], [2, 48]], '#4a5a3a'); R(30, 18, 40, 9, dark); c.fillStyle = acc; c.beginPath(); c.arc(30, 22, 5, 0, 7); c.fill(); c.beginPath(); c.arc(70, 22, 4, 0, 7); c.fill(); R(40, 40, 7, 14, dark); c.strokeStyle = dark; c.lineWidth = 3; c.beginPath(); c.moveTo(100, 36); c.lineTo(94, 56); c.moveTo(100, 36); c.lineTo(108, 56); c.stroke(); shine(16, 31, 64); }
   else if (k === 'rocket') { R(10, 22, 96, 20, '#4a5a3a'); P([[106, 22], [122, 32], [106, 42]], acc); R(4, 20, 8, 24, dark); R(50, 42, 9, 16, dark); R(36, 14, 14, 8, dark); R(80, 22, 4, 20, '#3a4a2a'); shine(10, 23, 96); }
+  else if (k === 'band') { c.fillStyle = '#f4f1ea'; c.beginPath(); c.arc(58, 36, 22, 0, 7); c.fill(); c.fillStyle = '#d9d2c3'; c.beginPath(); c.arc(58, 36, 9, 0, 7); c.fill(); R(58, 50, 50, 10, '#e8e1d1'); c.strokeStyle = '#c9bfa8'; c.lineWidth = 2; c.beginPath(); c.arc(58, 36, 16, 0, 7); c.stroke(); }
+  else if (k === 'medkit') { R(30, 18, 68, 44, '#c0392b'); R(30, 18, 68, 7, '#9e2b20'); R(58, 28, 12, 28, '#fff'); R(50, 36, 28, 12, '#fff'); R(54, 10, 20, 8, '#22262b'); }
+  else if (k === 'plate') { P([[44, 8], [84, 8], [92, 20], [90, 50], [64, 66], [38, 50], [36, 20]], '#4a7fd8'); P([[52, 16], [76, 16], [80, 24], [78, 46], [64, 56], [50, 46], [48, 24]], '#bfd7ff'); }
+  else if (k === 'armour') { R(26, 14, 76, 48, '#1e3f8a'); R(26, 54, 76, 8, '#6fb6ff'); P([[64, 20], [82, 26], [80, 42], [64, 52], [48, 42], [46, 26]], '#6fb6ff'); R(52, 6, 24, 8, '#15181c'); }
+  else if (k === 'fullkit') { R(20, 14, 88, 50, '#f4f4f2'); R(20, 34, 88, 9, '#2ecc71'); R(36, 20, 8, 22, '#e74c3c'); R(29, 27, 22, 8, '#e74c3c'); P([[84, 18], [98, 22], [97, 34], [84, 42], [72, 34], [71, 22]], '#3d8bff'); R(50, 6, 28, 8, '#15181c'); }
   else if (k === 'med') { R(36, 14, 56, 46, '#f4f4f2'); R(36, 14, 56, 8, '#d0d0d0'); R(58, 24, 12, 30, '#e0283a'); R(49, 33, 30, 12, '#e0283a'); }
   else if (k === 'pot') { c.fillStyle = '#3d8bff'; c.beginPath(); c.arc(64, 44, 20, 0, 7); c.fill(); R(56, 10, 16, 18, '#3d8bff'); R(54, 6, 20, 6, '#8a6a3a'); c.fillStyle = 'rgba(255,255,255,0.5)'; c.beginPath(); c.arc(56, 38, 6, 0, 7); c.fill(); }
   else if (k === 'boost') { P([[30, 36], [86, 26], [104, 36], [86, 46]], '#d0d4da'); P([[86, 26], [104, 36], [86, 46]], '#e0283a'); P([[30, 36], [14, 26], [6, 36], [14, 46]], '#ff9f1c'); P([[24, 36], [14, 30], [12, 36], [14, 42]], '#ffe27a'); }
@@ -234,7 +239,7 @@ Object.assign(GameScene.prototype, {
   P.updateMiniHud = function (m) { hud.call(this, m); if (m.kind === 'br') this.brExtras(m); };
   P.updateOnline = function (delta) {                                       // online: B opens your inventory too
     const m = this.match, o = this.online, src = Controls.mine;
-    if (m && m.kind === 'br' && m.state === 'play' && src && src.pressed && src.pressed.b && !this.scene.isActive('BRInv') && !this.scene.isActive('Pause')) { const chair = this.brMyChair(); if (chair && !chair.out) this.openInventory({ chair, src, id: chair.player.id, get invOpen() { return chair.player.invOpen; }, set invOpen(v) { chair.player.invOpen = v; } }); }
+    if (m && m.kind === 'br' && m.state === 'play' && src && src.bagTap && (src.bagTap = false, true) && !this.scene.isActive('BRInv') && !this.scene.isActive('Pause')) { const chair = this.brMyChair(); if (chair && !chair.out) this.openInventory({ chair, src, id: chair.player.id, get invOpen() { return chair.player.invOpen; }, set invOpen(v) { chair.player.invOpen = v; } }); }
     return onl.call(this, delta);
   };
   P.viewports3d = function (LP) {                                           // eliminated in Battle Royale: watch a team-mate (or whoever got you, or anyone still in)

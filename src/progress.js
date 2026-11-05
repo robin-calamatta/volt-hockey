@@ -1,25 +1,42 @@
 /* Your profile (v12): the look of your character and cart, XP and level, the Season 1 pass ("The Beginning", free rewards only for now),
    and daily / weekly quests that reset. Everything lives in Settings.profile, so it is saved like the rest of your settings (and online
    when you are logged in). Matches report what happened through Progress.tick() (every frame) and Progress.ev() (events). */
+/* actions: things your driver does with their arms, from the emoji wheel (rig3d.js animates them) */
+const ACTIONS = {                                                         // hand targets over time (s): R right hand, L left hand, and how long the action lasts
+  a_thumbs: { name: 'Thumbs Up', icon: '👍', dur: 2.2 }, a_wave: { name: 'Wave', icon: '👋', dur: 2.4 }, a_cheer: { name: 'Cheer', icon: '🙌', dur: 2.6 }, a_clap: { name: 'Clap', icon: '👏', dur: 2.4 },
+  a_pump: { name: 'Fist Pump', icon: '✊', dur: 2.2 }, a_salute: { name: 'Salute', icon: '🫡', dur: 2.2 }, a_point: { name: 'Point', icon: '👉', dur: 2.0 }, a_flex: { name: 'Flex', icon: '💪', dur: 2.6 },
+  a_shrug: { name: 'Shrug', icon: '🤷', dur: 2.0 }, a_facepalm: { name: 'Facepalm', icon: '🤦', dur: 2.4 }, a_dance: { name: 'Seat Dance', icon: '💃', dur: 4.0 }, a_drum: { name: 'Drum Roll', icon: '🥁', dur: 3.0 },
+  a_heart: { name: 'Heart Hands', icon: '🫶', dur: 2.4 }, a_robot: { name: 'Robot Arms', icon: '🤖', dur: 3.2 }, a_conductor: { name: 'Conductor', icon: '🎼', dur: 3.2 }, a_muscle: { name: 'Big Muscles', icon: '🏋️', dur: 2.8 }
+};
 const COS = {
-  outfits: [{ id: 'tee', name: 'Rookie Tee', icon: '👕', tier: 0 }, { id: 'jersey', name: 'Team Jersey', icon: '🎽', tier: 4 }, { id: 'hoodie', name: 'Cozy Hoodie', icon: '🧥', tier: 12 }],
-  hats: [{ id: 'none', name: 'No hat', icon: '🚫', tier: 0 }, { id: 'cap', name: 'Ball Cap', icon: '🧢', tier: 0 }, { id: 'beanie', name: 'Beanie', icon: '🧶', tier: 2 }, { id: 'bucket', name: 'Bucket Hat', icon: '👒', tier: 6 },
-    { id: 'headband', name: 'Sweatband', icon: '🎗️', tier: 9 }, { id: 'tophat', name: 'Top Hat', icon: '🎩', tier: 15 }, { id: 'crown', name: 'Volt Crown', icon: '👑', tier: 20, fixed: true }],
-  faces: [{ id: 'smile', name: 'Smile', icon: '🙂', tier: 0 }, { id: 'grin', name: 'Big Grin', icon: '😁', tier: 1 }, { id: 'shades', name: 'Cool Shades', icon: '😎', tier: 3 }, { id: 'wink', name: 'Wink', icon: '😉', tier: 8 },
-    { id: 'focus', name: 'Game Face', icon: '😤', tier: 10 }, { id: 'wow', name: 'Surprised', icon: '😮', tier: 13 }, { id: 'stars', name: 'Star Struck', icon: '🤩', tier: 17 }],
-  decals: [{ id: 'none', name: 'No decal', icon: '🚫', tier: 0 }, { id: 'stripes', name: 'Racing Stripes', icon: '〰️', tier: 0 }, { id: 'bolt', name: 'Lightning', icon: '⚡', tier: 5 }, { id: 'flames', name: 'Flames', icon: '🔥', tier: 10 },
-    { id: 'stars', name: 'Stars', icon: '⭐', tier: 14 }, { id: 'checker', name: 'Checkered', icon: '🏁', tier: 18 }],
-  emojis: [...['😀', '😂', '😎', '👍', '👏', '🔥', '😮', '😢', '😡', '🎉', '🙏', '💯'].map(e => ({ id: e, name: e, icon: e, tier: 0 })),
-    { id: '🤖', name: 'Robot', icon: '🤖', tier: 7 }, { id: '🏆', name: 'Trophy', icon: '🏆', tier: 11 }, { id: '💪', name: 'Flex', icon: '💪', tier: 16 }, { id: '🥶', name: 'Ice cold', icon: '🥶', tier: 19 }],
+  outfits: [['tee', 'Rookie Tee', '👕'], ['jersey', 'Team Jersey', '🎽'], ['tank', 'Tank Top', '🩱'], ['hoodie', 'Cozy Hoodie', '🧥'], ['racing', 'Racing Suit', '🏎️'], ['puffer', 'Puffer Jacket', '🧣'], ['tux', 'Tuxedo', '🤵']],
+  hats: [['none', 'No hat', '🚫'], ['cap', 'Ball Cap', '🧢'], ['beanie', 'Beanie', '🧶'], ['headband', 'Sweatband', '🎗️'], ['bucket', 'Bucket Hat', '👒'], ['visor', 'Visor', '🕶️'], ['bandana', 'Bandana', '🏴'], ['party', 'Party Hat', '🥳'],
+    ['chef', 'Chef Hat', '👨‍🍳'], ['cowboy', 'Cowboy Hat', '🤠'], ['propeller', 'Propeller Cap', '🚁'], ['helmet', 'Race Helmet', '⛑️'], ['viking', 'Viking Helmet', '🪓'], ['tophat', 'Top Hat', '🎩'], ['halo', 'Halo', '😇'], ['crown', 'Volt Crown', '👑']],
+  faces: [['smile', 'Smile', '🙂'], ['grin', 'Big Grin', '😁'], ['freckles', 'Freckles', '😊'], ['wink', 'Wink', '😉'], ['tongue', 'Cheeky', '😛'], ['shades', 'Cool Shades', '😎'], ['sleepy', 'Sleepy', '😴'], ['nerd', 'Big Glasses', '🤓'],
+    ['focus', 'Game Face', '😤'], ['wow', 'Surprised', '😮'], ['stache', 'Moustache', '🥸'], ['angry', 'Fired Up', '😠'], ['hearts', 'Heart Eyes', '😍'], ['robot', 'Robot', '🤖'], ['stars', 'Star Struck', '🤩']],
+  hairStyles: [['short', 'Short', '💇'], ['buzz', 'Buzz Cut', '✂️'], ['bald', 'Bald', '🥚'], ['long', 'Long', '💁'], ['curly', 'Curly', '➰'], ['ponytail', 'Ponytail', '🎀'], ['bun', 'Top Bun', '🍙'], ['quiff', 'Quiff', '🌊'], ['spiky', 'Spiky', '⚡'], ['mohawk', 'Mohawk', '🦔'], ['afro', 'Afro', '☁️']],
+  decals: [['none', 'No decal', '🚫'], ['stripes', 'Racing Stripes', '〰️'], ['waves', 'Waves', '🌊'], ['bolt', 'Lightning', '⚡'], ['hearts', 'Hearts', '💗'], ['notes', 'Music', '🎵'], ['camo', 'Camo', '🪖'], ['stars', 'Stars', '⭐'], ['circuit', 'Circuit', '🔌'], ['tiger', 'Tiger', '🐯'], ['pixel', 'Pixels', '👾'], ['flames', 'Flames', '🔥'], ['checker', 'Checkered', '🏁']],
+  emojis: [...['😀', '😂', '😎', '👍', '👏', '🔥', '😮', '😢', '😡', '🎉', '🙏', '💯'].map(e => [e, e, e]), ['🥳', 'Party', '🥳'], ['🙌', 'Hands up', '🙌'], ['😴', 'Sleepy', '😴'], ['🤖', 'Robot', '🤖'], ['🍕', 'Pizza', '🍕'], ['🎯', 'Bullseye', '🎯'], ['🤯', 'Mind blown', '🤯'], ['❤️', 'Heart', '❤️'],
+    ['💥', 'Boom', '💥'], ['🐐', 'G.O.A.T.', '🐐'], ['🥶', 'Ice cold', '🥶'], ['💪', 'Flex', '💪'], ['💀', 'Skull', '💀'], ['🚀', 'Rocket', '🚀'], ['😇', 'Angel', '😇'], ['🏆', 'Trophy', '🏆']],
+  actions: Object.entries(ACTIONS).map(([id, a]) => [id, a.name, a.icon]),
+  titles: [['t_rookie', 'Rookie', '🏷️'], ['t_wheels', 'Wheel Wizard', '🏷️'], ['t_party', 'Party Starter', '🏷️'], ['t_ramp', 'Ramp Rat', '🏷️'], ['t_sinbin', 'Sin Bin Regular', '🏷️'], ['t_loot', 'Loot Goblin', '🏷️'], ['t_medic', 'Field Medic', '🏷️'],
+    ['t_storm', 'Storm Chaser', '🏷️'], ['t_goals', 'Goal Machine', '🏷️'], ['t_speed', 'Speed Demon', '🏷️'], ['t_wall', 'The Wall', '🏷️'], ['t_sniper', 'Sharpshooter', '🏷️'], ['t_captain', 'Captain', '🏷️'], ['t_clutch', 'Clutch', '🏷️'],
+    ['t_vet', 'Volt Veteran', '🏷️'], ['t_last', 'Last Cart Standing', '🏷️'], ['t_beginning', 'There From The Beginning', '🏷️'], ['t_legend', 'Legend', '🏷️']],
   colors: ['#e74c3c', '#ff8a3d', '#f2c200', '#7ed957', '#2ecc71', '#1abc9c', '#29b6f6', '#2f6fed', '#7b5cff', '#c44dff', '#ff5fa2', '#f4f4f2', '#8a8f96', '#22262b'],
-  hair: ['#1d1611', '#3b2a1e', '#6b4a2b', '#a8743a', '#e0c070', '#c0392b', '#e8e8e8', '#4a6cff'],
+  hair: ['#1d1611', '#3b2a1e', '#6b4a2b', '#a8743a', '#e0c070', '#c0392b', '#e8e8e8', '#4a6cff', '#2ecc71', '#ff5fa2'],
   skin: ['#f6d3b3', '#e8b48a', '#d29a6c', '#b07a4f', '#8a5a36', '#5e3b22']
 };
-const SEASON1 = { name: 'Season 1', title: 'The Beginning', xpPerTier: 1000, tiers: 20, ends: '2027-03-01' };
-const PASS = [];                                                          // tier -> its reward
-for (const [slot, list] of [['outfit', COS.outfits], ['hat', COS.hats], ['face', COS.faces], ['decal', COS.decals], ['emoji', COS.emojis]]) for (const it of list) if (it.tier) PASS[it.tier] = { slot, ...it };
-const LOOK0 = { outfit: 'tee', shirt: '#2f6fed', hat: 'cap', hatCol: '#e74c3c', face: 'smile', hair: '#3b2a1e', skin: '#e8b48a', decal: 'stripes' };
-const WHEEL0 = ['😀', '😂', '👍', '🔥', '😎', '👏', '😮', '🎉'];
+const FREE = { outfits: 1, hats: 2, faces: 1, hairStyles: 3, decals: 2, emojis: 12, actions: 2, titles: 1 };      // how many of each list everyone has from the start
+for (const k of Object.keys(FREE)) COS[k] = COS[k].map(([id, name, icon], i) => ({ id, name, icon, tier: i < FREE[k] ? 0 : null }));
+const SEASON1 = { name: 'Season 1', title: 'The Beginning', xpPerTier: 1000, tiers: 100, ends: '2027-03-01' };
+const PASS = [];                                                          // tier -> its reward: one thing on every tier, the lists taking turns (the best of each list last)
+{ const slot = { outfits: 'outfit', hats: 'hat', faces: 'face', hairStyles: 'hairStyle', decals: 'decal', emojis: 'emoji', actions: 'action', titles: 'title' }, order = ['faces', 'emojis', 'hats', 'actions', 'decals', 'titles', 'hairStyles', 'emojis', 'outfits', 'actions'];
+  const left = Object.fromEntries(Object.keys(slot).map(k => [k, COS[k].filter(it => it.tier === null)])); let t = 1, i = 0, guard = 0;
+  while (t <= SEASON1.tiers && guard++ < 2000) { const k = order[i++ % order.length], it = left[k].shift(); if (!it) continue; it.tier = t; PASS[t++] = { slot: slot[k], ...it }; }
+  for (const k of Object.keys(slot)) for (const it of COS[k]) if (it.tier === null) it.tier = SEASON1.tiers;   // (anything left over: the last tier)
+}
+const LOOK0 = { outfit: 'tee', shirt: '#2f6fed', hat: 'cap', hatCol: '#e74c3c', face: 'smile', hair: '#3b2a1e', hairStyle: 'short', skin: '#e8b48a', decal: 'stripes', title: 't_rookie' };
+const WHEEL0 = ['😀', '😂', 'a_thumbs', '🔥', '😎', 'a_wave', '😮', '🎉'];   // emojis and actions
 
 /* Quests: type = the event that moves them; n = how many. Daily: 3 a day from DAILY_Q. Weekly: 6 a week from WEEKLY_Q. */
 const DAILY_Q = [
@@ -32,7 +49,8 @@ const DAILY_Q = [
   { id: 'd_online', type: 'online', n: 1, xp: 500, text: 'Play an online match' }, { id: 'd_mwin', type: 'miniWin', n: 1, xp: 500, text: 'Win a minigame' },
   { id: 'd_paint', type: 'mini:paintball', n: 1, xp: 400, text: 'Play a game of Paintball' }, { id: 'd_emoji', type: 'emoji', n: 5, xp: 300, text: 'Send 5 emojis during matches' },
   { id: 'd_top3', type: 'brTop3', n: 1, xp: 600, text: 'Finish in the top 3 of a Battle Royale' }, { id: 'd_sgame', type: 'seasonGame', n: 1, xp: 400, text: 'Play a Season game' },
-  { id: 'd_race', type: 'mini:race', n: 1, xp: 300, text: 'Finish a Race' }
+  { id: 'd_race', type: 'mini:race', n: 1, xp: 300, text: 'Finish a Race' }, { id: 'd_revive', type: 'revive', n: 1, xp: 500, text: 'Revive a team-mate in Battle Royale' },
+  { id: 'd_healm', type: 'healMate', n: 1, xp: 400, text: 'Heal a team-mate in Battle Royale' }, { id: 'd_drift', type: 'driftBoost', n: 10, xp: 400, text: 'Get 10 drift boosts (hold A while turning)' }
 ];
 const WEEKLY_Q = [
   { id: 'w_brwin', type: 'brWin', n: 1, xp: 2000, text: 'Win a Battle Royale' }, { id: 'w_br5', type: 'br', n: 5, xp: 1500, text: 'Play 5 Battle Royales' },
@@ -41,7 +59,7 @@ const WEEKLY_Q = [
   { id: 'w_goal15', type: 'goal', n: 15, xp: 1500, text: 'Score 15 goals in Volt Hockey' }, { id: 'w_dmg', type: 'brDmg', n: 1000, xp: 1500, text: 'Deal 1,000 damage in Battle Royale' },
   { id: 'w_dist', type: 'dist', n: 10000, xp: 1200, text: 'Drive 10 km in any game' }, { id: 'w_mwin5', type: 'miniWin', n: 5, xp: 1500, text: 'Win 5 minigames' },
   { id: 'w_kinds', type: 'miniKind', n: 5, xp: 1500, text: 'Play 5 different minigames' }, { id: 'w_sgame3', type: 'seasonGame', n: 3, xp: 1500, text: 'Play 3 Season games' },
-  { id: 'w_prac', type: 'practiceSec', n: 600, xp: 1200, text: 'Spend 10 minutes in the Practice Arena' }, { id: 'w_online3', type: 'online', n: 3, xp: 1500, text: 'Play 3 online matches' }
+  { id: 'w_rez', type: 'rez', n: 2, xp: 2000, text: 'Bring team-mates back at a rez garage twice' }, { id: 'w_drift3', type: 'driftBoost3', n: 15, xp: 1500, text: 'Get 15 full (purple) drift boosts' }, { id: 'w_prac', type: 'practiceSec', n: 600, xp: 1200, text: 'Spend 10 minutes in the Practice Arena' }, { id: 'w_online3', type: 'online', n: 3, xp: 1500, text: 'Play 3 online matches' }
 ];
 
 const Progress = {
@@ -100,14 +118,16 @@ const Progress = {
     const mine = this.mine(sc).filter(p => p && p.chair); if (!mine.length) return; const S = sc.prog || (sc.prog = { dist: 0, prac: 0, chairs: new Map(), score: m.score ? m.score.slice() : [0, 0] }), br = m.kind === 'br';
     if (m.state === 'play' || (!m.mini && m.state !== 'over')) {
       for (const p of mine) {
+        const c0 = p.chair; if (c0.dr) { const kb = S.chairs.get(c0); if (kb && c0.dr.boost > 0 && !kb.boost) { this.ev('driftBoost'); if (c0.dr.lvl >= 3) this.ev('driftBoost3'); } if (kb) kb.boost = c0.dr.boost > 0; }
         const c = p.chair, k = S.chairs.get(c) || { x: c.x, y: c.y, bin: c.binLeft || 0, kills: 0, dmg: 0, air: 0 }; S.chairs.set(c, k);
         const d = Math.hypot(c.x - k.x, c.y - k.y); if (d < 3) S.dist += d; k.x = c.x; k.y = c.y;
         if ((c.binLeft || 0) > 0 && !(k.bin > 0)) this.ev('penalty'); k.bin = c.binLeft || 0;
-        if (br && c.gs) { if (c.gs.kills > k.kills) this.ev('brKill', c.gs.kills - k.kills); k.kills = c.gs.kills; if (c.gs.dmg > k.dmg + 1) { this.ev('brDmg', Math.floor(c.gs.dmg - k.dmg)); k.dmg = Math.floor(c.gs.dmg); } if (c.gs.air && !k.air) this.ev('jump'); k.air = c.gs.air; }
+        if (br && c.gs) { if (c.gs.kills > k.kills) { this.ev('brKill', c.gs.kills - k.kills); S.kills = (S.kills || 0) + c.gs.kills - k.kills; } k.kills = c.gs.kills; if (c.gs.dmg > k.dmg + 1) { this.ev('brDmg', Math.floor(c.gs.dmg - k.dmg)); k.dmg = Math.floor(c.gs.dmg); } if (c.gs.air && !k.air) this.ev('jump'); k.air = c.gs.air; }
       }
+      S.played = (S.played || 0) + dt;
       if (S.dist >= 25) { const n = Math.floor(S.dist); S.dist -= n; this.ev('dist', n); }
       if (sc.setup.practice && !m.mini) { S.prac += dt; if (S.prac >= 1) { const n = Math.floor(S.prac); S.prac -= n; this.ev('practiceSec', n); } }
-      if (!m.mini && m.score) { const sides = new Set(mine.map(p => p.side)); for (const s of sides) if (m.score[s] > S.score[s]) this.ev('goal', m.score[s] - S.score[s]); S.score = m.score.slice(); }
+      if (!m.mini && m.score) { const sides = new Set(mine.map(p => p.side)); for (const s of sides) if (m.score[s] > S.score[s]) { this.ev('goal', m.score[s] - S.score[s]); S.goals = (S.goals || 0) + m.score[s] - S.score[s]; } S.score = m.score.slice(); }
     }
     if (m.state === 'over' && !S.over) { S.over = true; this.matchOver(sc, m, mine); }
   },
@@ -117,7 +137,7 @@ const Progress = {
       const kind = m.mini.kind, rows = (m.result && m.result.rows) || [], ks = new Set(mine.map(p => p.chair && p.chair.k)), sides = new Set(mine.map(p => p.side));
       if (kind === 'br') {
         const teams = []; for (const r of rows) { const c = m.chairs.find(x => x.k === r.k); const t = c && c.gs ? c.gs.team : -1; if (!teams.includes(t)) teams.push(t); }
-        const myT = mine[0].chair && mine[0].chair.gs ? mine[0].chair.gs.team : -2, place = teams.indexOf(myT) + 1; this.ev('br'); if (place === 1) { won = true; this.ev('brWin'); } if (place >= 1 && place <= 3) this.ev('brTop3');
+        const myT = mine[0].chair && mine[0].chair.gs ? mine[0].chair.gs.team : -2, place = teams.indexOf(myT) + 1; this.ev('br'); if (place === 1) { won = true; this.ev('brWin'); } if (place >= 1 && place <= 3) { this.ev('brTop3'); S.top3 = true; }
       } else {
         this.ev('mini'); this.ev('mini:' + kind); this.ev('miniKind:' + kind);
         won = m.result && (m.result.winSide >= 0 ? sides.has(m.result.winSide) : rows[0] && ks.has(rows[0].k)); if (won) this.ev('miniWin');
@@ -126,6 +146,9 @@ const Progress = {
       this.ev('hockey'); const s = mine[0].side; won = m.score[s] > m.score[1 - s]; if (won) this.ev('hockeyWin'); if (season) this.ev('seasonGame');
     }
     if (online) this.ev('online');
-    if (!sc.setup.practice || m.mini) this.addXp(won ? 150 : 80, won ? 'Match won' : 'Match played');
+    if (!sc.setup.practice || m.mini) {                                   // XP for playing: time, eliminations, goals, a win (quests give more)
+      const S = sc.prog || {}, mins = Math.min(30, (S.played || 0) / 60), parts = [[60, 'played'], [Math.round(mins * 25), Math.round(mins) + ' min'], [(S.kills || 0) * 30, (S.kills || 0) + ' eliminations'], [(S.goals || 0) * 15, (S.goals || 0) + ' goals'], [won ? 100 : 0, 'win'], [S.top3 && !won ? 50 : 0, 'top 3']].filter(([x]) => x > 0);
+      this.addXp(parts.reduce((a, [x]) => a + x, 0), (won ? 'Match won: ' : 'Match played: ') + parts.slice(1).map(([, t]) => t).join(', '));
+    }
   }
 };

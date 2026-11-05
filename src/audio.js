@@ -11,7 +11,17 @@ const SFX = {
   goal:     s => { s.tone({ wave: 'sawtooth', from: 220, dur: 0.9, vol: 0.3 }); s.tone({ wave: 'sawtooth', from: 330, dur: 0.9, vol: 0.2 }); },
   bump:     s => s.noise({ dur: 0.08, vol: 0.25, from: 400, to: 200 }),
   foul:     s => s.tone({ wave: 'sawtooth', from: 180, to: 90, dur: 0.35, vol: 0.3 }),
-  screech:  s => s.noise({ dur: 0.18, vol: 0.07, from: 3400, to: 2200, q: 6 })   // light, brief tyre squeal for the spin move
+  screech:  s => s.noise({ dur: 0.18, vol: 0.07, from: 3400, to: 2200, q: 6 }),   // light, brief tyre squeal for the spin move
+  /* gunshots (Battle Royale): a crack, a body, a low thump and an outdoor echo, different for every gun */
+  gun_pistol:  s => s.shot({ vol: 0.42, crack: 0.025, body: 0.12, bodyF: 1300, low: 0.12, lowF: 170, tail: 0.35 }),
+  gun_smg:     s => s.shot({ vol: 0.3, crack: 0.018, body: 0.07, bodyF: 1600, low: 0.07, lowF: 190, tail: 0.2 }),
+  gun_shotgun: s => s.shot({ vol: 0.62, crack: 0.03, body: 0.32, bodyF: 650, low: 0.3, lowF: 90, tail: 0.7 }),
+  gun_rifle:   s => s.shot({ vol: 0.44, crack: 0.02, body: 0.15, bodyF: 1050, low: 0.15, lowF: 130, tail: 0.5 }),
+  gun_sniper:  s => s.shot({ vol: 0.72, crack: 0.035, body: 0.36, bodyF: 850, low: 0.42, lowF: 75, tail: 1.2 }),
+  gun_rocket:  s => { s.shot({ vol: 0.35, crack: 0.01, body: 0.2, bodyF: 500, low: 0.2, lowF: 110, tail: 0.3 }); s.noise({ dur: 0.7, vol: 0.18, from: 1400, to: 300, q: 0.8 }); },
+  gun_paint:   s => s.shot({ vol: 0.22, crack: 0.012, crackF: 2400, body: 0.05, bodyF: 1800, low: 0.05, lowF: 240, tail: 0.08 }),   // a paintball marker: a soft pop
+  boom:        s => { s.shot({ vol: 0.8, crack: 0.04, body: 0.6, bodyF: 420, low: 0.7, lowF: 60, tail: 1.4 }); },
+  reload:      s => { s.noise({ dur: 0.04, vol: 0.18, from: 3000, q: 3 }); s.noise({ dur: 0.05, vol: 0.2, from: 1800, q: 4, at: s.ctx.currentTime + 0.22 }); }
 };
 
 /* MUSIC. A track is { bpm, stepsPerBeat, voices }. Each voice has a `loop`: space-separated steps.
@@ -89,6 +99,12 @@ const Sound = {
     o.type = wave; o.frequency.setValueAtTime(from, t); o.frequency.linearRampToValueAtTime(to, t + dur);
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + Math.min(0.01, dur / 4)); g.gain.linearRampToValueAtTime(0, t + dur);
     o.connect(g); g.connect(bus || this.sfxBus); o.start(t); o.stop(t + dur);
+  },
+  shot({ vol = 0.5, crack = 0.025, crackF = 3200, body = 0.15, bodyF = 1000, low = 0.15, lowF = 130, tail = 0.4 }) {   // one gunshot, built from layers
+    const c = this.ctx, t = c.currentTime, out = this.sfxBus, env = (g, v, d, t0 = t) => { g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(v, t0 + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d); };
+    const layer = (type, f, v, d, t0 = t, q = 0.7) => { const s = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain(); s.buffer = this.noiseBuffer; fl.type = type; fl.frequency.value = f; fl.Q.value = q; env(g, v, d, t0); s.connect(fl); fl.connect(g); g.connect(out); s.start(t0); s.stop(t0 + d + 0.05); };
+    layer('highpass', crackF, vol, crack); layer('lowpass', bodyF, vol * 0.85, body); layer('bandpass', 420, vol * 0.16, tail, t + 0.03, 0.6);
+    const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(lowF * 1.7, t); o.frequency.exponentialRampToValueAtTime(lowF * 0.45, t + low); env(g, vol * 0.9, low); o.connect(g); g.connect(out); o.start(t); o.stop(t + low + 0.05);
   },
   noise({ dur = 0.1, vol = 0.2, from = 1000, to = from, q = 1, at = null, bus = null }) {
     const t = at ?? this.ctx.currentTime, src = this.ctx.createBufferSource(), f = this.ctx.createBiquadFilter(), g = this.ctx.createGain();

@@ -19,7 +19,7 @@ const SCENES = [BootScene, TitleScene, LobbyHomeScene, MinigamesScene, MiniListS
 /* Phaser stops its whole loop if a scene throws, which looks like a freeze. Catch it, keep running, and tell the player with a small toast that can be dismissed
    (the full error is always in the browser console, F12). "Details" shows it on screen so it can be copied and sent to whoever looks after the game. */
 const crashLog = { last: '', at: 0, count: 0 };
-function toast(where, error) {
+function crashToast(where, error) {
   const text = `${where}\n${error && error.stack || error}`, now = Date.now();
   if (text === crashLog.last && now - crashLog.at < 6000) { crashLog.count++; crashLog.at = now; const c = document.getElementById('toastCount'); if (c) c.textContent = crashLog.count > 1 ? ' (x' + crashLog.count + ')' : ''; return; }   // the same error every frame: one toast, not hundreds
   crashLog.last = text; crashLog.at = now; crashLog.count = 1;
@@ -34,9 +34,9 @@ function toast(where, error) {
   box.append(row, pre); document.body.append(box);
   clearTimeout(crashLog.timer); crashLog.timer = setTimeout(() => { if (pre.style.display === 'none') box.remove(); }, 12000);        // goes away by itself unless you are reading the details
 }
-function reportCrash(where, error) { console.error('Crash in ' + where, error); toast('Something broke in ' + where, error); }
-addEventListener('error', e => { console.error(e.error || e.message); toast('Script error', e.error || e.message); });
-addEventListener('unhandledrejection', e => { console.error(e.reason); toast('Unhandled promise', e.reason); });
+function reportCrash(where, error) { console.error('Crash in ' + where, error); crashToast('Something broke in ' + where, error); }
+addEventListener('error', e => { console.error(e.error || e.message); crashToast('Script error', e.error || e.message); });
+addEventListener('unhandledrejection', e => { console.error(e.reason); crashToast('Unhandled promise', e.reason); });
 for (const Scene of SCENES) for (const fn of ['create', 'update']) {
   const original = Object.prototype.hasOwnProperty.call(Scene.prototype, fn) && Scene.prototype[fn];
   if (original) Scene.prototype[fn] = function (...args) { try { return original.apply(this, args); } catch (e) { reportCrash(`${Scene.name}.${fn}`, e); } };

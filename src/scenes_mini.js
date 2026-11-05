@@ -134,6 +134,7 @@ class MiniSetupScene extends ListMenuScene {
     if (memberWaits()) return;
     if (!PeerTransport.available()) { Toasts.show(esc(netErrorText({ type: 'unsupported' })), [], 4000); return; }
     const mini = miniCfg(this.kind), sizes = miniSizes(cartsFor(this.kind));
+    if (this.kind === 'br' && Party.active && Party.members.length > (mini.squad || 1)) { Sound.play('back'); Toasts.show(`Your party has ${Party.members.length} people: set Teams to ${Party.members.length === 2 ? 'Duos or Trios' : 'Trios'} so you can all be in one squad.`, [], 5000); return; }   // a party is one squad
     Sound.play('select'); this.scene.start('Room', { role: 'host', preset: { mini, sizes, teamA: Settings.teamA, teamB: Settings.teamB, difficulty: Settings.difficulty, practice: true } });
   }
   start() {

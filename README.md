@@ -3,6 +3,31 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v13: Battle Royale squads, revives and the storm, drifting, hair, bigger maps
+
+**Battle Royale**
+- Squads: you stay with your party. Online, a party bigger than the squad size cannot join or host. Locally, ◀ ▶ on the player-select screen sets each player's squad. There are no team colours: everyone wears their own look.
+- Controller: A jump, X reload, RT shoot, LT aim, or heal a teammate when you hold a heal item next to them. LB/RB switch items, Y holsters (drive faster) and Y again takes out the last item. D-pad up opens the bag.
+- Last stand: at 0 HP you are downed (slow, bleeding) while a teammate still stands. Hold X near a downed teammate to revive. When the whole player is out, they drop a rez card: a teammate carries it into a rez garage (two openings, glows green) and waits inside. The garage then goes red while it cools down.
+- Heals take time and the character animates while using them: bandage, medkit, plate, cart armour and a full body kit. Ammo comes in types (light, shells, medium, heavy, rockets) and is carried without the gun.
+- Pickups are 3D models of the item that float and glow by rarity.
+- The storm closes in stages, each hurting more, with announcements and 30 s and 10 s warnings. It shows on the minimap and the bag's map, with a purple tint and vignette when you're inside.
+- Spectating: LB/RB switch player, ▼ toggles 1st/3rd person (3rd sits back to see ahead), and Y takes over a CPU teammate.
+- Bottom-left panel: you and your teammates with faces, names, health and shield.
+- Maps are much bigger (5 enlarged plus Island, Metro, Wilds and Sprawl); "random" picks one each match.
+
+**Everyone**
+- Drifting in every game: hold A while turning at speed (in Battle Royale, hold A after a jump). A drift keeps its speed. The drift bar charges three levels, and letting go gives a speed kick and a boost. Minigame items moved to X.
+- Capture the Flag (Fortress, Canyon) and King of the Hill (Ruins, Colosseum) have big maps with walls and moving parts; "Classic" keeps the old court. CPUs path round walls and back off when stuck.
+- Hair styles (11) and hair colour are separate locker slots, plus titles, new hats, outfits, faces and decals.
+- Actions (thumbs up, cheer, wave and more) are in the pass and the emoji wheel; the arms move when you use them. Your own emoji shows in front of your face; in Battle Royale others only see it nearby.
+- Arms and legs are visible in first person, holding the item or weapon.
+- Season 1 now has 100 tiers. You earn XP from playing, kills, goals, wins and top-3 finishes (less than quests). There are new quests for revives, heals, rez and drifting.
+- Layered gun sounds for each gun, reloads and explosions.
+- Menus are boxed tiles (Settings stays a list). The title screen buttons, like fullscreen, work with a controller.
+- Friends show when they were last online.
+- Fixed the bald patch at the front of the hair.
+
 ## v12: the lobby, your character, Season 1 "The Beginning", quests and the emoji wheel
 
 - **New main screen (lobby):** your character sits on a lit stage, with tabs along the top. Switch tabs with LB / RB (keyboard Q / E) or click them. The right stick turns your character.

@@ -250,7 +250,7 @@ export function createApi(store, opts = {}) {
     for (const [k, rel] of Object.entries(u.friends || {})) {
       if (rel === 'in') { incoming.push(await displayName(k)); continue; } if (rel === 'out') { outgoing.push(await displayName(k)); continue; }
       const f = await store.get('u/' + k); if (!f) continue;
-      const on = online(f); friends.push({ name: f.name, online: on, status: on ? f.status : null, adult: !!f.adult });
+      const on = online(f); friends.push({ name: f.name, online: on, status: on ? f.status : null, adult: !!f.adult, ago: f.lastSeen ? Math.max(0, now() - f.lastSeen) : null });   // ago: how long since they were last online (ms)
     }
     friends.sort((a, b) => (b.online - a.online) || a.name.localeCompare(b.name));
     return { me: me(u), friends, incoming, outgoing, invites: u.invites, unread: u.unread || {}, blocked: u.blocked || [] };

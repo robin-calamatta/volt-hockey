@@ -13,7 +13,7 @@ const STATE_CODE = { countdown: 0, play: 1, goal: 2, over: 3 }, STATE_NAME = ['c
 const r3 = v => Math.round(v * 1000) / 1000;
 const randomCode = () => Array.from({ length: CONFIG.online.codeLength }, () => CONFIG.online.codeAlphabet[Math.floor(Math.random() * CONFIG.online.codeAlphabet.length)]).join('');
 // Who you are, for other players' chat and voice rules (guests: no account, so quick chat only and no voice).
-const accountTag = () => ({ look: typeof Progress !== 'undefined' ? Progress.look() : null, acct: typeof Account !== 'undefined' ? Account.name : '', adult: typeof Account !== 'undefined' && Account.adult, vid: typeof Voice !== 'undefined' ? Voice.myId() : '' });
+const accountTag = () => ({ party: typeof Party !== 'undefined' && Party.active ? Party.id : '', psize: typeof Party !== 'undefined' && Party.active ? Party.members.length : 1, look: typeof Progress !== 'undefined' ? Progress.look() : null, acct: typeof Account !== 'undefined' ? Account.name : '', adult: typeof Account !== 'undefined' && Account.adult, vid: typeof Voice !== 'undefined' ? Voice.myId() : '' });
 const cleanCode = text => String(text || '').toUpperCase().split('').filter(ch => CONFIG.online.codeAlphabet.includes(ch)).join('').slice(0, CONFIG.online.codeLength);
 
 /* ---- transport: a "connection" is { send(obj), close(), onMessage, onClose } ---- */
@@ -145,7 +145,7 @@ function netErrorText(e) {
     ice: 'Found the room, but the two computers could not connect to each other directly (a router or firewall is blocking it). The game needs a relay server for this network (DEPLOY.md, "TURN relay").',
     network: 'Could not reach the matchmaking server. Check your internet connection.', 'server-error': 'The matchmaking server had a problem. Try again in a moment.',
     'socket-error': 'Lost the matchmaking server. Try again.', 'socket-closed': 'Lost the matchmaking server. Try again.', 'unavailable-id': 'Could not create a room. Try again.',
-    'browser-incompatible': 'This browser does not support online play.', full: 'That room is full.', started: 'That match has already started. Ask the host to return to the lobby.',
+    'browser-incompatible': 'This browser does not support online play.', full: 'That room is full.', 'party-too-big': 'Your party is bigger than this Battle Royale room\'s squads. Ask the host for bigger squads (duos or trios), or make your party smaller.', started: 'That match has already started. Ask the host to return to the lobby.',
     version: 'Different game versions. Everyone should reload the page.', unsupported: 'Online play is unavailable (the PeerJS library did not load).',
     host_left: 'The host left the room.', party_done: 'Your party leader finished that game. They will bring you into the next one.', lost: 'Lost connection to the host.', kicked: 'You were removed from the room.'
   })[t] || 'Connection problem (' + t + ').';
@@ -228,8 +228,9 @@ class HostSession {
       if (this.state !== 'lobby') return this.reject(entry, 'started');
       const side = this.openSide();
       if (this.roster.length >= CONFIG.online.maxPlayers || side === undefined) return this.reject(entry, 'full');
+      if (this.cfg.mini && this.cfg.mini.kind === 'br' && (+msg.psize || 1) > (this.cfg.mini.squad || 1)) return this.reject(entry, 'party-too-big');   // Battle Royale: your party plays as one squad
       entry.id = this.nextId++; clearTimeout(entry.hello);
-      this.roster.push({ id: entry.id, name: this.uniqueName(Settings.cleanName(msg.name) || 'Player ' + (this.roster.length + 1)), side, look: Avatar.cleanLook(msg.look), acct: cleanText(msg.acct, 20), adult: !!msg.adult, vid: cleanText(msg.vid, 80) });
+      this.roster.push({ id: entry.id, name: this.uniqueName(Settings.cleanName(msg.name) || 'Player ' + (this.roster.length + 1)), side, look: Avatar.cleanLook(msg.look), party: cleanText(msg.party, 80), acct: cleanText(msg.acct, 20), adult: !!msg.adult, vid: cleanText(msg.vid, 80) });
       entry.conn.send({ t: 'welcome', id: entry.id, code: this.code, roster: this.roster, cfg: this.cfg });
       return this.sendRoster();
     }
@@ -284,7 +285,7 @@ class HostSession {
 
   /* ---- in a match ---- */
   start(localSource) {                                           // returns the Match; call from the host's room screen
-    const players = this.roster.map((r, i) => ({ id: r.id, name: r.name, side: r.side, locked: !!r.lock, tag: 'P' + (i + 1), speedLevel: Settings.speedLevel, chair: null, spinQueued: 0, look: r.host ? null : r.look || null,
+    const players = this.roster.map((r, i) => ({ id: r.id, name: r.name, side: r.side, locked: !!r.lock, tag: 'P' + (i + 1), speedLevel: Settings.speedLevel, chair: null, spinQueued: 0, look: r.host ? null : r.look || null, squadKey: r.host ? (typeof Party !== 'undefined' && Party.active ? 'party:' + Party.id : null) : r.party ? 'party:' + r.party : null,
       remote: !(r.host || r.own === 1), src: r.host ? localSource : r.own === 1 ? this.guestSrc.get(r.id) : { ax: 0, ay: 0, pressed: {} } }));
     for (const e of this.entries.values()) e.players = new Map(players.filter(p => p.id === e.id || (this.roster.find(r => r.id === p.id) || {}).own === e.id).map(p => [p.id, p]));
     if (this.cfg.mini) { this.cfg.sizesRoom = this.cfg.sizesRoom || this.cfg.sizes; this.cfg.sizes = fitSizes(this.cfg.mini, players, this.cfg.sizesRoom); }   // no CPU carts: just the people in the room
@@ -314,6 +315,10 @@ class HostSession {
       else if (typeof ev === 'string' && ev.startsWith('emo:') && p.chair) Emotes.recv(this.match, p.chair, ev.slice(4));   // a guest's emoji
       else if ((ev === 'cyc:1' || ev === 'cyc:-1') && p.chair && !p.chair.out && modeOf(this.match) && modeOf(this.match).cycle) modeOf(this.match).cycle(p.chair, this.match, ev === 'cyc:-1' ? -1 : 1);
       else if ((ev === 'ads:1' || ev === 'ads:0') && p.chair && p.chair.gs) { p.brAds = ev === 'ads:1' ? 1 : 0; p.chair.gs.ads = p.brAds; }
+      else if ((ev === 'dr:1' || ev === 'dr:0') && p.chair) p.chair.driftHeld = ev === 'dr:1';   // drifting
+      else if (ev === 'rl' && p.chair && modeOf(this.match) && modeOf(this.match).reload) modeOf(this.match).reload(p.chair, this.match);
+      else if ((ev === 'int:1' || ev === 'int:0') && p.chair) { if (ev === 'int:1' && !p.chair.wantInt) p.chair.intPress = true; p.chair.wantInt = ev === 'int:1'; }
+      else if (typeof ev === 'string' && ev.startsWith('take:') && p.chair && this.match.kind === 'br') { const sc = window.voltGame && voltGame.scene.getScene('Game'); if (sc && sc.brTakeOver) sc.brTakeOver(p, +ev.slice(5)); }
       else if (ev === 'jmp' && p.chair && modeOf(this.match) && modeOf(this.match).jump) modeOf(this.match).jump(p.chair, this.match);
       else if (typeof ev === 'string' && ev.startsWith('ap:') && p.chair && p.chair.gs) { const v = +ev.slice(3); if (isFinite(v)) { p.brAp = Math.max(BR_AIM.min, Math.min(BR_AIM.max, v)); p.chair.gs.ap = MG.r2(p.brAp); } }   // a guest tilting their gun
       else if (typeof ev === 'string' && ev.startsWith('inv:') && p.chair && modeOf(this.match) && modeOf(this.match).invAct) { const [, op, x, y] = ev.split(':'); modeOf(this.match).invAct(p.chair, { op, a: +x, b: +y }, this.match); }   // a guest rearranging their inventory
@@ -435,18 +440,20 @@ class ClientSim {
     const C = CONFIG.online; dt = Math.min(dt, 0.05); this.clock += dt;
     for (const L of this.locals) {
       const found = inputs.find(x => x.id === L.id), input = found ? found.input : { ax: 0, ay: 0, pressed: {} }, p = input.pressed || {}; let spin = 0;
-      const SP = this.m.mini && modeOf(this.m) && modeOf(this.m).shooterPad;    // Battle Royale: RT fires, LB / RB step through your items, no spins
+      const MD = this.m.mini && modeOf(this.m), BRP = MD && MD.jumpOnA, SP = BRP;   // Battle Royale: its own buttons (modes_br2.js)
+      const dh = input.held && input.held.a && !(L.me && L.me.invOpen) ? 1 : 0; if (dh !== (L.drSent || 0)) { L.pending.push('dr:' + dh); L.drSent = dh; } if (L.me && L.me.chair) L.me.chair.driftHeld = !!dh;   // A (hold): drift
       if (SP && L.me) { const ads = !L.me.invOpen && input.held && input.held.spinCCW ? 1 : 0; if (ads !== (L.me.brAds || 0)) L.pending.push('ads:' + ads); L.me.brAds = ads; }   // LT: aim (zoom, slower)
       if (SP) { if (!(L.me && L.me.invOpen) && (p.halfCW || p.halfCCW)) L.pending.push(p.halfCCW ? 'cyc:-1' : 'cyc:1'); }
       else { if (p.halfCW) { L.pending.push('hcw'); spin = 0.5; } if (p.halfCCW) { L.pending.push('hccw'); spin = -0.5; }
       if (p.spinCW) { L.pending.push('cw'); spin = 1; } if (p.spinCCW) { L.pending.push('ccw'); spin = -1; } }
       const MJ = this.m.mini && modeOf(this.m) && modeOf(this.m).jump;         // Battle Royale: X jumps; your gun's tilt goes to the host when it changes
-      if (MJ && L.me && !L.me.invOpen) { brAimInput(L.me, input, dt); const ap = MG.r2(L.me.brAp || 0); if (Math.abs(ap - (L.sentAp || 0)) > 0.015 || (ap !== L.sentAp && this.clock - (L.apAt || 0) > 0.3)) { L.pending.push('ap:' + ap); L.sentAp = ap; L.apAt = this.clock; } if (p.x) L.pending.push('jmp'); }
-      if (this.m.mini && !(L.me && L.me.invOpen)) { const M = modeOf(this.m), hold = M && M.holdFire && input.held && (input.held.a || (SP && input.held.spinCW) || (input.held.x && !MJ)) && this.clock - (L.holdAt || 0) > 0.08; if (p.a || (SP && p.spinCW) || (p.x && !MJ) || hold) { L.pending.push('use'); L.holdAt = this.clock; } } else if (p.x && !MJ) L.pending.push('x');
+      if (MJ && L.me && !L.me.invOpen) { brAimInput(L.me, input, dt); const ap = MG.r2(L.me.brAp || 0); if (Math.abs(ap - (L.sentAp || 0)) > 0.015 || (ap !== L.sentAp && this.clock - (L.apAt || 0) > 0.3)) { L.pending.push('ap:' + ap); L.sentAp = ap; L.apAt = this.clock; } }
+      if (BRP) brPadEvents(L, input, dt, this.clock);
+      else if (this.m.mini && !(L.me && L.me.invOpen)) { const M = modeOf(this.m), hold = M && M.holdFire && input.held && input.held.x && this.clock - (L.holdAt || 0) > 0.08; if (p.x || hold) { L.pending.push('use'); L.holdAt = this.clock; } } else if (p.x) L.pending.push('x');
       if (spin) { Sound.play('screech'); L.spins.push({ t: this.clock, dir: Math.sign(spin), amt: Math.abs(spin) }); if (L.spins.length > 8) L.spins.shift(); }
       if (p.speedUp && L.me.speedLevel < Settings.speedCap) { L.me.speedLevel++; L.pending.push('up'); }
       if (p.speedDown && L.me.speedLevel > 1) { L.me.speedLevel--; L.pending.push('down'); }
-      if (p.y && !(L.me && L.me.invOpen)) L.pending.push('sw');
+      if (p.y && !BRP && !(L.me && L.me.invOpen)) L.pending.push('sw');
       const v = screenToCourt(input.ax, input.ay, L.me && L.me.chair && L.me.chair.x, L.me && L.me.chair && L.me.chair.y, L.me);                            // the stick is read on screen; the host (and our prediction) work in court directions
       L.in = { ax: v.x, ay: v.y };
       L.frames.push({ seq: this.seq, t: this.clock, dt, ax: v.x, ay: v.y, spin, speed: Math.min(CONFIG.speedLevels[L.me.speedLevel - 1], Settings.maxSpeed()) });
