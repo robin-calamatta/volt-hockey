@@ -375,7 +375,7 @@ MODES.br = {
       const walls = M.walls.filter(w => w.lv === G.lv); return MG.clearPath(c.x, c.y, o.x, o.y, walls, 0.05) && (G.lv > 0 || MG.clearPath(c.x, c.y, o.x, o.y, M.trees.map(t => ({ x0: t.x - t.r, y0: t.y - t.r, x1: t.x + t.r, y1: t.y + t.r })), 0)); };
     if (G.hp < 55 && G.inv.some(it => it.k === 'med') && G.cd <= 0) { G.sel = G.inv.findIndex(it => it.k === 'med'); c.wantUse = true; }
     else if (G.sh < 50 && G.inv.some(it => it.k === 'pot') && G.cd <= 0 && !(G.seenAt > m.simTime - 2)) { G.sel = G.inv.findIndex(it => it.k === 'pot'); c.wantUse = true; }
-    const foe = MG.live(m).filter(o => o.gs.team !== G.team && sees(o)).sort((a, b) => MH.dist(c, a) - MH.dist(c, b))[0];
+    const foe = MG.live(m).filter(o => o.gs.team !== G.team && sees(o)).sort((a, b) => MH.dist(c, a) + (a.gs.down ? 40 : 0) - MH.dist(c, b) - (b.gs.down ? 40 : 0))[0];   // (a standing enemy first: a downed one only when nobody else is about)
     if (foe) {                                                             // fight: pick the right gun, aim (leading the target) and fire
       G.seenAt = m.simTime; const d = MH.dist(c, foe), slot = this.bestSlot(c, d), it = G.inv[slot];
       if (slot !== G.sel && G.inv[slot] && BR_GUNS[G.inv[slot].k]) G.sel = slot;

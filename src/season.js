@@ -10,7 +10,7 @@ const Season = {
 
   /* ---- creating a season ---- */
   create({ team, difficulty, periodSeconds, double, year, ratings, history }) {
-    const n = TEAMS.length, rt = ratings ? ratings.slice() : TEAMS.map(t => t.rating);
+    const n = SEASON_N, rt = ratings ? ratings.slice() : TEAMS.slice(0, SEASON_N).map(t => t.rating);
     const rounds = this.schedule(n, !!double);
     return { v: 1, year: year || 1, team, difficulty: difficulty || 'Normal', periodSeconds: periodSeconds || 300, double: !!double,
              ratings: rt, rounds, day: 0, stage: 'regular', playoffs: null, champion: null, userPlayoffResult: '', log: [], settings: { cup: this.C().cupName } };
@@ -33,7 +33,7 @@ const Season = {
 
   /* ---- results and the table ---- */
   standings(s) {
-    const row = {}; TEAMS.forEach((_, t) => { row[t] = { t, gp: 0, w: 0, l: 0, otl: 0, pts: 0, gf: 0, ga: 0, form: [] }; });
+    const row = {}; TEAMS.slice(0, SEASON_N).forEach((_, t) => { row[t] = { t, gp: 0, w: 0, l: 0, otl: 0, pts: 0, gf: 0, ga: 0, form: [] }; });
     const C = this.C();
     for (const fx of s.rounds.flat()) {
       if (!fx.done) continue;
@@ -107,7 +107,7 @@ const Season = {
   },
 
   /* ---- the playoffs ---- */
-  qualifiers() { let q = 1; while (q * 2 <= Math.min(this.C().qualifiers, TEAMS.length)) q *= 2; return q; },
+  qualifiers() { let q = 1; while (q * 2 <= Math.min(this.C().qualifiers, SEASON_N)) q *= 2; return q; },
   seriesLength(round, rounds) { const L = this.C().series; return L[Math.max(0, L.length - (rounds - round))] || 3; },   // the last round is always the last length in the list
   roundName(round, rounds) { const left = rounds - round; return left === 1 ? CONFIG.season.cupName + ' Final' : left === 2 ? 'Semifinal' : left === 3 ? 'Quarterfinal' : 'Round of ' + Math.pow(2, left); },
   startPlayoffs(s) {
@@ -142,7 +142,7 @@ const Season = {
     return this.create({ team: s.team, difficulty: s.difficulty, periodSeconds: s.periodSeconds, double: s.double, year: s.year + 1, ratings });
   },
   save(s) { try { localStorage.setItem(this.key, JSON.stringify(s)); } catch (e) { /* storage blocked */ } if (typeof Account !== 'undefined') Account.changed(); },   // logged in: also saved online
-  load() { try { const s = JSON.parse(localStorage.getItem(this.key) || 'null'); return s && s.v === 1 && Array.isArray(s.rounds) && s.ratings && s.ratings.length === TEAMS.length ? s : null; } catch (e) { return null; } },
+  load() { try { const s = JSON.parse(localStorage.getItem(this.key) || 'null'); return s && s.v === 1 && Array.isArray(s.rounds) && s.ratings && s.ratings.length === SEASON_N ? s : null; } catch (e) { return null; } },
   clear() { try { localStorage.removeItem(this.key); } catch (e) { /* storage blocked */ } if (typeof Account !== 'undefined') Account.changed(); },
   history() { try { const h = JSON.parse(localStorage.getItem(this.historyKey) || '[]'); return Array.isArray(h) ? h : []; } catch (e) { return []; } },
   addHistory(s) {

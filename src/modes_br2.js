@@ -21,7 +21,7 @@ Object.assign(BR_ITEMS, {
   wall: { name: 'SHIELD WALL', icon: '🧱', stack: 2, pick: 1, col: 0x7d8790, about: 'a wall in front of you that stops bullets' }
 });
 BR_LOOT.length = 0; BR_LOOT.push(['pistol', 5], ['smg', 4], ['shotgun', 4], ['rifle', 3], ['sniper', 1.5], ['rocket', 1], ['band', 4], ['medkit', 2], ['plate', 3], ['armour', 1.5], ['fullkit', 0.5], ['boost', 2], ['wall', 1.5], ['am_light', 3], ['am_shells', 2], ['am_medium', 3], ['am_heavy', 1.5], ['am_rockets', 0.6]);
-Object.assign(BR, { downHp: 100, bleed: 30, reviveTime: 5, reviveHp: 30, rezTime: 6, rezCool: 90, cardLife: 90, holsterSpeed: 1.12, useSpeed: 0.5, downSpeed: 0.35, mateRange: 3.2 });
+Object.assign(BR, { downHp: 100, bleed: 30, reviveTime: 4, reviveHp: 30, rezTime: 6, rezCool: 90, cardLife: 90, holsterSpeed: 1.12, useSpeed: 0.5, downSpeed: 0.35, mateRange: 3.2 });
 
 /* ---------- bigger maps, more maps, Random ---------- */
 function brCopy(M, ox, oy, into) {                                        // copy a map's pieces, moved by (ox, oy)
@@ -192,7 +192,7 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
             if ((U.left -= h) <= 0) { T.hp = Math.round(T.hp); T.sh = Math.round(T.sh); this.spend(c, U.s); G.use = null; m.sfx('select'); if (t !== c && c.player && !c.player.remote) Progress.ev('healMate'); } } }
         else if (G.ads && !c.wantAdsUsed) { const it = G.inv[G.sel]; if (it && BR_ITEMS[it.k] && BR_ITEMS[it.k].heal) { c.wantAdsUsed = true; this.healMate(c, m); } }
         if (!G.ads) c.wantAdsUsed = false;
-        if (G.down) { G.dhp -= BR.downHp / BR.bleed * h; if (G.dhp <= 0) this.finish(m, c, m.chairs[G.kb] || null); continue; }
+        if (G.down) { if (!m.chairs.some(o => o.gs && o.gs.rvk === c.k && o.gs.rv > 0)) G.dhp -= BR.downHp / BR.bleed * h;   /* (no bleeding while a team-mate is reviving you) */ if (G.dhp <= 0) this.finish(m, c, m.chairs[G.kb] || null); continue; }
         const rt = c.wantInt ? this.reviveTarget(m, c) : null;           // reviving: hold B next to a downed team-mate
         if (rt) { if (G.rvk !== rt.k) { G.rvk = rt.k; G.rv = 0; } G.rv += h / BR.reviveTime; if (G.rv >= 1) { Object.assign(rt.gs, { down: 0, dhp: 0, hp: BR.reviveHp }); G.rv = 0; G.rvk = -1; m.sfx('select'); MG.notice(m, `${MG.up(m.name(c))} REVIVED ${MG.up(m.name(rt))}`, 1.8); if (c.player && !c.player.remote) Progress.ev('revive'); } }
         else { G.rv = 0; G.rvk = -1; }
@@ -217,7 +217,7 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
       const G = c.gs; if (c.out || (!storm && m.gs.t < BR.grace)) return;
       if (storm) { G.sacc = (G.sacc || 0) + dmg; if (G.sacc < 1) return; dmg = G.sacc; G.sacc = 0; }   /* the storm hurts health only (never armour), a point at a time */
       if (G.down) { G.dhp -= dmg; if (by && by !== c) { by.gs.dmg += dmg; by.gs.hm = MG.r2(m.gs.t); G.kb = by.k; } G.hitT = 0.25; if (G.dhp <= 0) this.finish(m, c, by && by !== c ? by : m.chairs[G.kb] || null); return; }
-      if (!storm) { const s = Math.min(G.sh, dmg); G.sh -= s; dmg -= s; } G.hp -= dmg; G.hitT = 0.25; if (by && by !== c) { by.gs.dmg += dmg; by.gs.hm = MG.r2(m.gs.t); }
+      if (!storm) { const s = Math.min(G.sh, dmg); G.sh -= s; dmg -= s; } G.hp -= dmg; G.hitT = 0.25; if (by && by !== c) { by.gs.dmg += dmg; by.gs.hm = MG.r2(m.gs.t); G.hurtAt = m.gs.t; }
       if (G.hp > 0) return; G.hp = 0;
       const standing = mates(m, c).filter(o => !o.gs.down);
       if ((m.mini.squad || 1) > 1 && standing.length) {                   // DOWN: crawl, can't fire or use things; a team-mate can revive you (hold B); bleed out in 30 s
@@ -251,17 +251,22 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
     ai(c, m) {
       const G = c.gs, g = m.gs; if (c.out) return { x: 0, y: 0, speed: 0 };
       c.wantInt = false;
-      if (G.down) { const t = mates(m, c).filter(o => !o.gs.down).sort((a, b) => MH.dist(c, a) - MH.dist(c, b))[0]; return t ? MH.to(c, t.x, t.y, 0.9) : { x: 0, y: 0, speed: 0 }; }
+      if (G.down) { const t = mates(m, c).filter(o => !o.gs.down).sort((a, b) => MH.dist(c, a) - MH.dist(c, b))[0]; return t && MH.dist(c, t) > 1.8 ? MH.to(c, t.x, t.y, 0.9) : { x: 0, y: 0, speed: 0 }; }   // (crawl to a team-mate, then keep still while they revive you)
       if (G.use) return { x: Math.cos(c.heading), y: Math.sin(c.heading), speed: 0.2 };
       const foeNear = MG.live(m).some(o => o.gs.team !== G.team && MH.dist(c, o) < 12 && Math.abs(o.gs.z - G.z) < 1);
       if (G.hol && G.inv.length) { G.hol = 0; G.sel = Math.min(G.last, G.inv.length - 1); }
       const held = G.inv[G.sel]; if (held && BR_GUNS[held.k] && held.a <= 0 && G.rl <= 0) this.reload(c, m);
+      const attacked = (G.hurtAt !== undefined && g.t - G.hurtAt < 2.5) || MG.live(m).some(o => o.gs.team !== G.team && !o.gs.down && MH.dist(c, o) < 10 && Math.abs(o.gs.z - G.z) < 1);
+      const dn = mates(m, c).filter(o => o.gs.down).sort((a, b) => MH.dist(c, a) - MH.dist(c, b))[0];   // a team-mate down and nobody shooting at you: go and revive them
+      if (dn && !attacked && MH.dist(c, dn) < 80 && G.hp >= 25) {
+        if (MH.dist(c, dn) < 2 && Math.abs(dn.gs.z - G.z) < 1) { c.wantInt = true; return { x: dn.x - c.x, y: dn.y - c.y, speed: 0 }; }
+        const save = c.goTo; c.goTo = { x: dn.x, y: dn.y, lv: dn.gs.lv }; const out = M0.ai.call(this, c, m); c.goTo = save; if (out && MH.dist(c, dn) < 6 && !(out.speed > 0.3)) { const a = Math.atan2(dn.y - c.y, dn.x - c.x); return { x: Math.cos(a), y: Math.sin(a), speed: 0.6 }; } return out;
+      }
       if (!foeNear) {                                                      // heal up when it is calm
         const find = ks => G.inv.findIndex(it => ks.includes(it.k));
         const want = G.hp < 40 ? find(['medkit', 'fullkit', 'band']) : G.hp < 75 ? find(['band', 'medkit']) : G.sh < 50 ? find(['armour', 'plate', 'fullkit']) : -1;
         if (want >= 0 && G.cd <= 0 && this.helps(c, BR_ITEMS[G.inv[want].k])) { G.sel = want; c.wantUse = true; return { x: Math.cos(c.heading), y: Math.sin(c.heading), speed: 0.15 }; }
-        const dn = mates(m, c).filter(o => o.gs.down).sort((a, b) => MH.dist(c, a) - MH.dist(c, b))[0];   // a team-mate down: go and revive them
-        if (dn && MH.dist(c, dn) < 40) { if (MH.dist(c, dn) < 2 && Math.abs(dn.gs.z - G.z) < 1) { c.wantInt = true; return { x: dn.x - c.x, y: dn.y - c.y, speed: 0 }; } const save = c.goTo; c.goTo = { x: dn.x, y: dn.y, lv: dn.gs.lv }; const out = M0.ai.call(this, c, m); c.goTo = save; return out; }
+        /* (reviving is handled above, when nobody is attacking) */
         const card = g.L.find(L => L[1] === 'card' && m.chairs[L[5]] && m.chairs[L[5]].gs.team === G.team && Math.hypot(L[2] - c.x, L[3] - c.y) < 60);
         const M = this.map(m), gi = (M.rez || []).map((q, i) => ({ q, i })).filter(o => g.gar[o.i] <= g.t).sort((a, b) => Math.hypot(a.q.cx - c.x, a.q.cy - c.y) - Math.hypot(b.q.cx - c.x, b.q.cy - c.y))[0];
         const save = c.goTo; if (card) c.goTo = { x: card[2], y: card[3], lv: card[4] }; else if (G.cards.length && gi) c.goTo = { x: gi.q.cx, y: gi.q.cy, lv: 0 };

@@ -106,7 +106,7 @@ Object.assign(GameScene.prototype, {
   },
 
   /* ----- the overlay: split lines, names, ball arrows, speed meter, mini-map ----- */
-  pooled(list, i, style) { return (list[i] || (list[i] = this.add.text(0, 0, '', style).setOrigin(0.5).setDepth(19).setStroke('#0d151b', 4))).setAlpha(1); },
+  pooled(list, i, style) { return (list[i] || (list[i] = this.add.text(0, 0, '', style).setOrigin(0.5).setDepth(19).setStroke('#0d151b', 4))).setAlpha(1).setScale(1); },
   hud3d() {
     const g = this.hud3, m = this.match, V3 = CONFIG.view3d, T = V3.tags, split = this.vps.length > 1; g.clear(); let nt = 0, nv = 0;
     const tagStyle = { ...STYLE.tag, fontSize: '20px' }, vpStyle = { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: '#ffffff' };
@@ -136,9 +136,21 @@ Object.assign(GameScene.prototype, {
       // speed meter for your own cart (the ring on the floor is out of sight in first person)
       if (vp.p && vp.chair && vp.mode !== 'broadcast') {
         const n = CONFIG.speedLevels.length, lv = vp.p.speedLevel || 0, x0 = R.x + 18, y0 = R.y + R.h - 22 - (this.match && this.match.kind === 'br' && !this.flat ? 44 : 0);   // (Battle Royale: health and shield sit under it)
-        g.fillStyle(0x0d151b, 0.6).fillRoundedRect(x0 - 8, y0 - 28, n * 16 + 84, 40, 8);
-        for (let i = 0; i < n; i++) g.fillStyle(i < lv ? 0xffffff : 0x55626c, i < lv ? 1 : 0.6).fillRect(x0 + 66 + i * 16, y0 - i * 3.5, 11, 6 + i * 3.5);
-        this.pooled(this.vpText, nv++, { ...vpStyle, fontSize: '17px' }).setText('SPEED').setOrigin(0, 0.5).setPosition(x0, y0 - 8).setColor('#9fb2bf').setVisible(true);
+        const D = vp.chair.dr, F = CONFIG.drift, drifting = D && !vp.chair.out && (D.on || D.boost > 0), now = this.time.now;
+        if (!drifting) {
+          g.fillStyle(0x0d151b, 0.6).fillRoundedRect(x0 - 8, y0 - 28, n * 16 + 84, 40, 8);
+          for (let i = 0; i < n; i++) g.fillStyle(i < lv ? 0xffffff : 0x55626c, i < lv ? 1 : 0.6).fillRect(x0 + 66 + i * 16, y0 - i * 3.5, 11, 6 + i * 3.5);
+          this.pooled(this.vpText, nv++, { ...vpStyle, fontSize: '17px' }).setText('SPEED').setOrigin(0, 0.5).setPosition(x0, y0 - 8).setColor('#9fb2bf').setVisible(true);
+        } else {                                                          // v13.1: while you drift, the speed meter is the drift meter
+          const top3 = F.levels[2], k = D.on ? Math.min(1, D.ch / top3) : 1, lvl = D.on ? D.lvl : D.lvl || 1, col = F.colors[Math.max(1, lvl)] || 0xffffff, pulse = 0.5 + 0.5 * Math.sin(now / (D.on ? 70 : 45)), N = 8, bw = 13, W = N * (bw + 4) + 96;
+          g.fillStyle(0x0d151b, 0.78).fillRoundedRect(x0 - 8, y0 - 34, W, 48, 10).lineStyle(3, col, 0.5 + 0.5 * pulse).strokeRoundedRect(x0 - 8, y0 - 34, W, 48, 10);
+          g.fillStyle(col, 0.12 + 0.12 * pulse).fillRoundedRect(x0 - 14, y0 - 40, W + 12, 60, 14);           // a glow round it
+          for (let i = 0; i < N; i++) { const f = (i + 1) / N, on = f <= k + 1e-6 || !D.on, need = f * top3, c = need <= F.levels[0] ? F.colors[1] : need <= F.levels[1] ? F.colors[2] : F.colors[3], x = x0 + 74 + i * (bw + 4), h = 8 + i * 3.2, jit = on && D.on ? (Math.random() - 0.5) * 2 : 0;
+            g.fillStyle(on ? c : 0x2a3640, on ? 0.85 + 0.15 * pulse : 0.7).fillRect(x + jit, y0 + 6 - h, bw, h); if (on) g.fillStyle(0xffffff, 0.35 * pulse).fillRect(x + jit, y0 + 6 - h, bw, 3); }
+          for (let i = 0; i < 4 && D.on; i++) { const sx = x0 + 74 + k * N * (bw + 4) + Math.random() * 10, sy = y0 - 4 - Math.random() * 26; g.fillStyle(0xffffff, 0.9).fillRect(sx, sy, 2, 2).fillStyle(col, 0.9).fillRect(sx + 3, sy + 3, 2, 2); }   // sparks off the end of the charge
+          const label = D.on ? ['DRIFT', 'DRIFT', 'DRIFT!!', 'MAX!!!'][lvl] : ['BOOST', 'BOOST!', 'BIG BOOST!', 'MAX BOOST!'][lvl] || 'BOOST!';
+          this.pooled(this.vpText, nv++, { ...vpStyle, fontSize: '19px' }).setText(label).setOrigin(0, 0.5).setPosition(x0 + (D.on ? Math.sin(now / 40) * 1.5 : 0), y0 - 10).setScale(label.length > 7 ? 0.62 : 1).setColor('#' + col.toString(16).padStart(6, '0')).setVisible(true);
+        }
       }
       if (split && vp.p) this.pooled(this.vpText, nv++, vpStyle).setOrigin(0, 0.5).setText(vp.p.name || vp.p.tag || '').setColor(teamColorHex(m.teams[vp.p.side])).setPosition(R.x + 14, R.y + top + 18).setVisible(true);
       if (m.mini && vp.p && vp.chair && !split) { /* one view: the item line is drawn by the game screen */ } else if (m.mini && vp.p && vp.chair && m.state === 'play') { const l = this.itemLine(vp.p); if (l) this.pooled(this.vpText, nv++, { ...vpStyle, fontSize: '22px' }).setOrigin(0.5).setText(l).setColor('#ffe27a').setPosition(cx, R.y + R.h - 30).setVisible(true); }

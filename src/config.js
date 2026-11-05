@@ -139,7 +139,7 @@ const CONFIG = {
              turnSpeed:   { min: 0.5, max: 2, step: 0.1 }, timeSpeed: { min: 0.5, max: 10, step: 0.5 },
              speedLevel:  { min: 1, max: 5, step: 1 }, speedCap: { min: 1, max: 5, step: 1 }, ballBounce: { min: 0, max: 1, step: 0.05 },
              ballGrip:    { min: 0, max: 30, step: 2 }, ballFriction: { min: 0, max: 4, step: 0.1 },
-             zoomPct: { min: 70, max: 150, step: 5 }, fov3d: { min: 60, max: 100, step: 5 }, chaseDist: { min: 1.5, max: 6, step: 0.5 }, tiltDeg: { min: 0, max: 60, step: 5 }, commentVolume: { min: 0, max: 1, step: 0.1 }, crowdVolume: { min: 0, max: 1, step: 0.1 }, sizeA: { min: 1, max: 5, step: 1 }, sizeB: { min: 1, max: 5, step: 1 }, stickLength: { min: 0.1, max: 0.5, step: 0.02 } },
+             zoomPct: { min: 70, max: 150, step: 5 }, fov3d: { min: 60, max: 100, step: 5 }, chaseDist: { min: 1.5, max: 6, step: 0.5 }, tiltDeg: { min: 0, max: 60, step: 5 }, commentVolume: { min: 0, max: 1, step: 0.1 }, crowdVolume: { min: 0, max: 1, step: 0.1 }, sizeA: { min: 0, max: 5, step: 1 }, sizeB: { min: 0, max: 5, step: 1 }, stickLength: { min: 0.1, max: 0.5, step: 0.02 } },
 
   // CPU skill levels, easiest to hardest. Every level plays as a team (roles, passing, shooting); the harder ones do it faster and better.
   //  speed: share of full stick used      turnBoost: turning speed multiplier      reaction: seconds between decisions

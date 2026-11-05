@@ -10,15 +10,16 @@ function hairShell(k, line = HAIR_LINE, bumps = 0, seed = 1) {         // a shel
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i), h = Math.hypot(x, z) || 1e-6, f = x / h, el = Math.asin(Math.max(-1, Math.min(1, y)));
     const hl = f >= 0 ? line.side + (line.front - line.side) * f : line.side + (line.back - line.side) * -f;
-    let s = el >= hl ? k : 0.82; if (bumps && el >= hl) s += bumps * (0.5 + 0.5 * Math.sin(x * 23 + seed) * Math.sin(y * 19 + seed * 2) * Math.sin(z * 21 + seed * 3));
+    let s = el >= hl && !(line.top !== undefined && el > line.top) ? k : 0.82;   // (line.top: under a hat the hair stops at the hat's band) if (bumps && el >= hl) s += bumps * (0.5 + 0.5 * Math.sin(x * 23 + seed) * Math.sin(y * 19 + seed * 2) * Math.sin(z * 21 + seed * 3));
     p.setXYZ(i, x * 0.095 * s, y * 0.11 * s, z * 0.09 * s);
   }
   g.computeVertexNormals(); return g;
 }
 function hairGeometry(style, hat) {                                     // the hair for a style, round the head's centre (a hat squashes it)
-  const parts = [], mk = (g, x = 0, y = 0, z = 0) => parts.push(g.translate(x, y, z)), under = hat && hat !== 'none' && hat !== 'headband' && hat !== 'halo' && hat !== 'bandana' && hat !== 'visor';
+  const parts = [], mk = (g, x = 0, y = 0, z = 0) => parts.push(g.translate(x, y, z)), under = hat && !['none', 'headband', 'halo', 'bandana', 'visor', 'party', 'crown'].includes(hat);
   if (style === 'bald') return null;
-  if (under || style === 'buzz') mk(hairShell(1.035));
+  if (under) mk(hairShell(style === 'afro' || style === 'curly' ? 1.1 : 1.05, { ...HAIR_LINE, top: ['tophat', 'cowboy', 'chef'].includes(hat) ? 0.58 : 0.2 }, style === 'curly' || style === 'afro' ? 0.05 : 0, 3));   // a hat on: only the hair below its band shows
+  else if (style === 'buzz') mk(hairShell(1.035));
   else if (style === 'curly') mk(hairShell(1.16, { front: 0.38, side: 0.02, back: -0.45 }, 0.09, 3));
   else if (style === 'afro') mk(hairShell(1.42, { front: 0.42, side: 0.08, back: -0.35 }, 0.07, 5));
   else if (style === 'mohawk') { mk(hairShell(1.02)); for (let i = 0; i < 8; i++) { const a = 0.5 + i / 7 * (Math.PI - 1.1); mk(new THREE.ConeGeometry(0.022, 0.08 + 0.02 * Math.sin(i), 4).rotateZ(a - Math.PI / 2), Math.cos(a) * 0.1, Math.sin(a) * 0.115 + 0.01, 0); } }
@@ -189,7 +190,7 @@ const Rig = {
     else if (H === 'party') { put(at(new THREE.ConeGeometry(0.07, 0.2, 18), 0, 0.17), hm); put(at(new THREE.SphereGeometry(0.022, 8, 6), 0, 0.28), this.mat('#ffd23f', 0.5)); }
     else if (H === 'viking') { put(at(new THREE.SphereGeometry(0.11, 18, 9, 0, Math.PI * 2, 0, Math.PI / 2), -0.005, 0.01), this.mat('#8a8f96', 0.35, 0.7)); for (const sd of [-1, 1]) put(at(new THREE.ConeGeometry(0.025, 0.12, 10).rotateX(sd * -0.9), 0, 0.09, sd * 0.12), this.mat('#f4f1ea', 0.6)); }
     else if (H === 'halo') { const me = put(at(new THREE.TorusGeometry(0.085, 0.012, 8, 28).rotateX(Math.PI / 2), -0.01, 0.2), new THREE.MeshStandardMaterial({ color: 0xffe27a, emissive: 0xffd23f, emissiveIntensity: 1.2 })); me.castShadow = false; }
-    else if (H === 'propeller') { put(at(new THREE.SphereGeometry(0.106, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.8, 1), -0.005, 0.02), hm); put(at(new THREE.CylinderGeometry(0.006, 0.006, 0.05, 6), -0.005, 0.12), this.mat('#22262b', 0.5)); const prop = put(at(new THREE.BoxGeometry(0.2, 0.006, 0.03), -0.005, 0.145), this.mat('#ffd23f', 0.4)); prop.name = 'propeller'; }
+    else if (H === 'propeller') { put(at(new THREE.SphereGeometry(0.106, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1.02, 0.97, 1.02), -0.005, 0.02), hm); put(at(new THREE.CylinderGeometry(0.006, 0.006, 0.05, 6), -0.005, 0.12), this.mat('#22262b', 0.5)); const prop = put(at(new THREE.BoxGeometry(0.2, 0.006, 0.03), -0.005, 0.145), this.mat('#ffd23f', 0.4)); prop.name = 'propeller'; }
     else if (H === 'chef') { put(at(new THREE.CylinderGeometry(0.1, 0.1, 0.06, 20), -0.005, 0.07), this.mat('#f4f4f2', 0.8)); put(at(new THREE.SphereGeometry(0.11, 16, 10).scale(1, 0.75, 1), -0.005, 0.15), this.mat('#f4f4f2', 0.8)); }
     else if (H === 'bandana') { put(at(new THREE.SphereGeometry(0.104, 18, 8, 0, Math.PI * 2, 0, Math.PI * 0.42), -0.005, 0.02), hm); put(at(new THREE.ConeGeometry(0.03, 0.08, 6).rotateZ(Math.PI / 2 + 0.6), -0.11, 0.0), hm); }
     const O = look.outfit, dark = this.mat('#22262b', 0.6), white = this.mat('#f4f4f2', 0.6), L = G3.limb;

@@ -36,7 +36,7 @@ class SeasonMenuScene extends ListMenuScene {
 class SeasonSetupScene extends ListMenuScene {
   constructor() { super('SeasonSetup'); }
   create() {
-    const C = CONFIG.season, n = TEAMS.length, levels = Season.levels(), games = d => (d ? 2 : 1) * (n - 1);
+    const C = CONFIG.season, n = SEASON_N, levels = Season.levels(), games = d => (d ? 2 : 1) * (n - 1);
     const cycle = (key, list, d) => { const i = list.indexOf(Settings[key]); Settings[key] = list[(i + d + list.length) % list.length]; Settings.save(); };
     this.buildMenu('NEW SEASON', [
       { label: () => `Your team   ◀ ${TEAMS[Settings.seasonTeam].name} ▶`, change: d => { Settings.seasonTeam = (Settings.seasonTeam + d + n) % n; Settings.save(); } },
@@ -113,7 +113,7 @@ class SeasonHubScene extends ListMenuScene {
     panel(this, x0 - 20, 135, 570, 545);
     badge(this, x0 + 55, 205, s.team, 100);
     this.add.text(x0 + 130, 165, TEAMS[s.team].name.toUpperCase(), { ...STYLE.hud, fontSize: '46px', color: teamColorHex(s.team) });
-    this.add.text(x0 + 130, 217, `${lineText(null, row)}   ${row.pts} pts   ${ordinal(row.rank)} of ${TEAMS.length}`, { ...STYLE.hint, fontSize: '26px', color: '#e8eef2' });
+    this.add.text(x0 + 130, 217, `${lineText(null, row)}   ${row.pts} pts   ${ordinal(row.rank)} of ${SEASON_N}`, { ...STYLE.hint, fontSize: '26px', color: '#e8eef2' });
     this.add.text(x0, 277, stageText(s), { ...STYLE.hud, fontSize: '30px', color: '#f2c200' });
     let y = 322;
     if (done) {

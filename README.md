@@ -3,6 +3,19 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v13.2: team leagues, team and controller select screens, drift meter, CPU revives
+
+- **Leagues**: teams are grouped into the **Premier League** (the original 15), **National Teams** (Sweden, Denmark, USA, Canada, France, England, Malta, Australia, Finland, Norway, Germany, Italy, Switzerland, Czechia, Japan, Ireland, Netherlands) and **Cities** (Barrie, Toronto, London, Kitchener, Niagara, Ottawa, Hamilton, Montreal, Vancouver, Waterloo, Guelph, Orillia, Sudbury, Windsor, Oshawa, Kingston). Every new team has its own logo (flags for the nations, crests for the cities, made by `tools/gen_logos.mjs`). Season mode is played in the Premier League.
+- **Team select** (Practice, Play now, New season), laid out like a big console hockey game:
+  - A HOME card and an AWAY card show the logo, name, league, overall rating and OFF/DEF/SPD/GOA bars.
+  - ◀ ▶ changes team, LB/RB (keyboard Q/E) changes league, Y picks at random, and A confirms HOME and then AWAY.
+  - X opens **Game settings**: difficulty, max cart speed, switching carts, game clock and how to play.
+- **Practice**: each team's CARTS row (▲ ▼ then ◀ ▶) goes down to **NONE**, so one team can be empty (not both).
+- **Controller select**: every controller joins as a card in the middle (NOT PLAYING). Push it ◀ ▶ under a team's logo. X locks it to one cart (🔒), ▲ ▼ picks a name and Y types one. Start plays; anyone left in the middle sits out.
+- **Drift in first and third person** now actually starts (it checks how fast the cart is turning, not just the stick). The **SPEED meter turns into the drift meter** while you drift: coloured bars that fill blue, orange then purple, with a glow, sparks and DRIFT / MAX!!! / BOOST! labels.
+- **CPU revives**: a CPU goes to a downed teammate and revives them whenever nobody is shooting at it and no enemy is within 10 m. Enemies now shoot standing players before downed ones, you don't bleed out while someone is reviving you, and a revive takes 4 s. In test matches CPUs now revive 1–3 times a game.
+- **Hats**: hair no longer shows through hats (under a hat only the hair below the band shows), and the cap is a touch taller so the head doesn't poke through.
+
 ## v13.1: storm, heals, recoil, reloads, drift feel, minigame menus
 
 - **Storm** now hurts health (never cart armour), a point at a time, more every stage. At 0 health you go down like any other hit (with a teammate still up), and a downed player in the storm bleeds out faster. Before, the damage was rounded away each step.

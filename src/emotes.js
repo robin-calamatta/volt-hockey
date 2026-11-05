@@ -23,7 +23,8 @@ const Emotes = {
     const V = CONFIG.view, F = CONFIG.drift; if (!sc.drG || !sc.drG.scene) { sc.drG = sc.add.graphics().setDepth(44); sc.drT = sc.add.text(0, 0, '', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5).setDepth(45).setStroke('#0d151b', 4); }
     const g = sc.drG; g.clear(); sc.drT.setVisible(false);
     for (const p of Progress.mine(sc)) { const c = p.chair, D = c && c.dr; if (!D || c.out || (!D.on && D.boost <= 0)) continue;
-      const vp = sc.vps && sc.vps.find(v => v.p === p), R = vp ? vp.rect : { x: 0, y: 0, w: V.width, h: V.height }, w = 180, x = R.x + R.w / 2 - w / 2, y = R.y + R.h - 168;
+      const vp = sc.vps && sc.vps.find(v => v.p === p); if (vp && vp.mode !== 'broadcast' && !sc.flat) continue;   /* (first / third person: the speed meter turns into the drift meter) */
+      const R = vp ? vp.rect : { x: 0, y: 0, w: V.width, h: V.height }, w = 180, x = R.x + R.w / 2 - w / 2, y = R.y + R.h - 168;
       g.fillStyle(0x0d151b, 0.75).fillRoundedRect(x - 6, y - 6, w + 12, 20, 8);
       for (let i = 0; i < 3; i++) { const a = i ? F.levels[i - 1] : 0, b = F.levels[i], k = D.on ? Math.max(0, Math.min(1, (D.ch - a) / (b - a))) : (D.lvl > i ? 1 : 0), sx = x + i * (w / 3); g.fillStyle(0x223040, 1).fillRect(sx + 1, y, w / 3 - 2, 8).fillStyle(F.colors[i + 1], 1).fillRect(sx + 1, y, (w / 3 - 2) * k, 8); }
       if (!D.on && D.boost > 0) sc.drT.setText(['', 'BOOST!', 'BIG BOOST!', 'MAX BOOST!'][D.lvl] || 'BOOST!').setColor('#' + F.colors[Math.max(1, D.lvl)].toString(16).padStart(6, '0')).setPosition(R.x + R.w / 2, y - 18).setVisible(D.lvl > 0); }
