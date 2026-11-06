@@ -13,9 +13,9 @@
 const MODES = {};
 const CTRL = {                                                         // control lines used by the How to play pages
   drive: 'Drive: left stick  /  WASD  /  arrows  /  touch stick',
-  spin: 'Spin (a quick turn that whacks things): triggers  /  E Q  /  . ,  /  SPIN buttons',
-  item: 'Use a power-up: X  /  X  /  \\  /  touch X',
-  drift: 'Drift: hold A while turning (Space  /  Right Shift  /  touch A): let go when the bar is purple for the biggest boost',
+  spin: 'Spin (a half turn that whacks things): LB / RB  /  R Z  /  ] [  /  SPIN buttons',
+  item: 'Use a power-up / fire: RT (or X)  /  E (or X)  /  . (or \\)  /  touch FIRE or X',
+  drift: 'Drift: hold B while turning (Backspace  /  Right Ctrl  /  touch B): let go when the bar is purple for the biggest boost',
   speed: 'Cart speed: D-pad ◀ ▶  /  C V  /  ; \'',
   pause: 'Pause: Start  /  Esc  /  II'
 };
@@ -72,7 +72,7 @@ function fitSizes(mini, players, sizes) {
     this.bannerLeft -= h; this.noticeLeft -= h;
     if (this.state === 'countdown') {
       this.timer -= h; const n = Math.ceil(this.timer); if (n !== this.lastCount && n > 0) { this.lastCount = n; this.sfx('count'); }
-      if (this.timer <= 0) { this.state = 'play'; this.sfx('whistle'); this.line(M.startLine ? M.startLine(this) : 'Go!'); }
+      if (this.timer <= 0) { this.state = 'play'; this.sfx(this.kind === 'br' ? 'br_go' : 'whistle'); this.line(M.startLine ? M.startLine(this) : 'Go!'); }
     } else if (this.state === 'play') {
       this.simulate(h);
       if (this.state === 'play' && M.timeUp && !M.noClock) { const was = this.clock; this.clock -= h; if (was > 30 && this.clock <= 30) { this.notice = '30 SECONDS LEFT'; this.noticeLeft = 2; } if (this.clock <= 0) M.timeUp(this); }

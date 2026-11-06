@@ -103,7 +103,8 @@ class Match {
 
   /* ----- flow ----- */
   kickoff() {
-    const F = CONFIG.formation, W = this.width, cy = this.centerY;
+    const F = CONFIG.formation, W = this.width, cy = this.centerY, carry = Settings.penalties && Settings.penaltyCarry && this.state !== undefined, freed = this.scoredOn; this.scoredOn = undefined;
+    const keep = new Map(); if (carry) for (const c of this.chairs) if (c.binLeft > 0 && c.side !== freed) keep.set(c, c.binLeft);   /* penalties that carry over: still in the sin bin after the face-off (unless that team was just scored on) */
     for (const c of this.chairs) {
       const dir = c.side ? -1 : 1, base = c.side ? W : 0, size = this.sizes[c.side], guard = c.index === 0 && size > 1;
       const x = guard ? this.nets[c.side].mouthX + dir * F.guardStandoff : base + dir * F.fieldX;
@@ -111,6 +112,7 @@ class Match {
       const y = guard || field < 2 ? cy : cy + (slot - (field - 1) / 2) * gap * (field === 2 ? 2 : 1);
       Object.assign(c, { x, y, vx: 0, vy: 0, heading: c.side ? Math.PI : 0, omega: 0, binLeft: 0, spinLeft: 0, spinCooldown: 0, carrying: false, playing: true, advanced: false, stuckFor: 0, stallFor: 0, wallFor: 0, escapeLeft: 0, thinkIn: 0 });
     }
+    for (const [c, left] of keep) { c.binLeft = left; c.x = c.y = -50; }
     Object.assign(this.ball, { x: W / 2, y: cy, vx: 0, vy: 0 }); this.lastTouch = -1; this.ballIn = [false, false];
     this.brains = []; for (const c of this.chairs) { c.role = null; c.plan = null; c.aiCmd = null; c.aiNext = 0; }   // CPUs start the next play fresh
     this.state = 'countdown'; this.timer = CONFIG.match.countdownSeconds; this.lastCount = 0;
@@ -126,7 +128,7 @@ class Match {
   }
   scoreGoal(side) {
     if (this.state !== 'play') return;
-    this.score[side]++; this.state = 'goal'; this.timer = CONFIG.match.goalPauseSeconds;
+    this.score[side]++; this.state = 'goal'; this.timer = CONFIG.match.goalPauseSeconds; this.scoredOn = 1 - side;   // (penalties carrying over: the team scored on is back to full strength)
     this.say('GOAL  ' + TEAMS[this.teams[side]].name.toUpperCase()); this.sfx('goal');
     const own = !(this.lastChair && this.lastChair.side === side), a = this.score[side], o = this.score[1 - side], who = own ? '' : this.name(this.lastChair), total = a + o;
     const key0 = this.scorers || (this.scorers = {}); if (!own) key0[who] = (key0[who] || 0) + 1; const cnt = own ? 0 : key0[who];
@@ -136,7 +138,7 @@ class Match {
   }
   foul(c, why = 'FOUL') {
     (this.pens || (this.pens = [0, 0]))[c.side]++;
-    c.binLeft = CONFIG.foul.binSeconds; c.ownIn = false; c.x = c.y = -50; c.vx = c.vy = 0;
+    c.binLeft = Settings.penaltySeconds || CONFIG.foul.binSeconds; c.ownIn = false; c.x = c.y = -50; c.vx = c.vy = 0;
     this.notice = `${why}: ${TEAMS[this.teams[c.side]].name.toUpperCase()} CART ${c.index + 1} TO THE SIN BIN`; this.noticeLeft = CONFIG.foul.noticeSeconds; this.sfx('foul');
     this.call('penalty', this.V({ ...this.W(c, 'who'), why: ({ FOUL: 'a foul', CREASE: 'being in the crease' })[why] || why.toLowerCase(), team: TEAMS[this.teams[c.side]].name }), 2); this.call('powerplay', this.V({ team: TEAMS[this.teams[c.side]].name }), 1);
   }

@@ -3,6 +3,60 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v13.5.3: cart driving sound
+- **Settings > Sound** has **Cart driving sound** (On / Off) and **Cart driving volume** (10% to 200%).
+- The motor whine is quieter: at 100% it is about 40% as loud as before.
+
+## v13.5.2: penalty options
+- **Settings > Game rules** (and the online room's rules page) has two new rows:
+  - **Penalty time**: how long a cart sits in the sin bin, 5 to 120 s in steps of 5. The default is 10 s (it was a fixed 8 s).
+  - **Penalties carry over after a goal** (Off by default). When it's On, a penalty keeps running through the face-off after a goal and into the next period. If the short-handed team gets scored on, all its penalties end and it's back to full strength. A team that scores while short-handed (or takes a penalty after scoring) still serves the full time.
+
+## v13.5.1: music folders, a sizzling opening
+- `assets/music/menu/` plays in the menus and the lobby, `assets/music/game/` in the games, and `assets/music/intro/` behind the opening splash (one song picked at random, which keeps playing on the title screen). Each folder is shuffled on its own, carries on with its next song when you come back to it, and plays every song before any repeats.
+- Battle Royale has a **Music** option (Off by default).
+- Run `node tools/make-playlist.js` before uploading to Netlify. It now writes all three lists.
+- The opening sparkler sizzles, crackles and pops as it burns the logo in, whooshes when the logo flares, then fizzles out. (Browsers only allow sound after a click or key press, so on a first visit with no click yet the opening can be silent.)
+
+## v13.5: local players in the lobby, ready up, play again, jerseys, any-league seasons
+
+- **Local players**: a second controller presses START in the lobby (or ＋ PLAYER, then A on their controller) and they stand on the stage with you. They come along into everything: hockey (on your team), seasons, minigames, Battle Royale (your squad), and online rooms and party games (as your local guests). To leave, they hold B. The controller screen after picking a game is gone, which also fixes the empty nameplate there.
+- **Ready up**: every game waits until every player has pressed A, online too. The host's START skips the wait.
+- **Play again**: at the end, A plays again straight away (minigames and Battle Royale get a new random map) and B goes back to the lobby. Online, the host's A takes the whole room into the next game.
+- **Time played** in Volt Hockey, minigames and Battle Royale is on the CAREER tab.
+- **Seasons in any league**: LB / RB on the new-season screen picks the league (Premier League, National Teams or Cities). The season is that league's teams only. Old saves carry on as Premier League seasons. The season hub menu is a list again, so it no longer overlaps the info card.
+- **Jerseys**: in hockey every shirt has its team's crest on the chest, and national teams wear their flag.
+- **Battle Royale**:
+  - The gun in your hands lifts up and glows in the hotbar, marked IN HAND.
+  - The bag opens on the item you're holding.
+  - Using up an item no longer swaps what's in your hands.
+  - Being revived shows you the progress and who is reviving you. Two people reviving is twice as quick, and both sides see "⚡ x2".
+  - Getting yourself up at a rez garage shows its progress.
+  - Rez markers are see-through.
+  - Armour plates only go up to 50.
+  - Nothing swings into your face on ramps in first person.
+- **Drift boost** is faster (×1.55 for longer), with flames from the back wheels, a short fire trail and a wider view.
+
+## v13.4: gun tiers, self-rez, giant maps, party in the lobby
+
+- **Gun tiers**: Uncommon (green), Rare (blue), Epic (purple) and Legendary (gold). Each tier hits harder (×1, ×1.12, ×1.25, ×1.4). The loot glow, hotbar and bag all show the tier colour and name.
+- **Sniper scope** is dead centre on screen.
+- **Headshots** have a burst of sparks and a ring, a "HEADSHOT!" pop with a gold flash, and a bigger sound.
+- **Equipping**: switching guns or items takes a moment, with the hands lowering and coming back up. You can't fire until it's ready.
+- **Pistol** is semi-auto and fires as fast as you pull the trigger.
+- **Heals**: you can open the bag and move a med or shield you're using, and it keeps applying.
+- **Downed** lasts about 38 s. You can't heal while downed. Drive into a ready rez garage and you get yourself back up, with heartbeat and defibrillator sounds (reviving and rezzing teammates have them too).
+- **Maps**: four new places (Volt Arena, Castle Hill, The Airfield, The Factory), and two giant maps: Mega Island (nine places in one) and The Frontier (a long strip). Squads go up to 5 and matches up to 20 carts.
+- **No team colours in Battle Royale**: everyone wears their locker look. PLAY on Battle Royale drops you straight in with your party, with no team picking. X opens its options.
+- **Party in the lobby** (up to 5): your friends stand in a V behind you (you, then 2, then 2), each in their own look with their name over them. Y or the 😀 button opens emotes, and your party sees them.
+- **Aiming down sights** is smoother and slower to turn.
+- **Hockey and every mode**: the triggers no longer spin the cart 90°. B is drift everywhere. In the minigames the item is used with RT (or X), same as Battle Royale.
+- **The "dying smoke alarm" chirp is gone**: it was the match-start whistle. It's softer now, Battle Royale has its own start sound, and far-off shots and storm sounds are quieter by distance.
+
+## v13.3.1: fix for Battle Royale freezing the browser
+
+- v13.3 gave every chest its own small light for the opening glow. A big map has 150+ chests, and the 3D engine lights every pixel with every light, so the graphics card choked and the browser froze while the match loaded. The glow is now a sprite, so the scene is back to its 3 normal lights.
+
 ## v13.3: Battle Royale interaction, melee, doors, new items, headshots, squad stats, realistic sound
 
 - **Fixed the crash at the end of a Battle Royale** (`S is not defined` in progress.js).
@@ -311,13 +365,13 @@ Keyboard 1: WASD, E / Q spin, V / C speed up / down, F switch, Space select, Ent
 Settings menu (also in the pause menu): volumes, cart turning speed, game clock speed, starting cart speed, ball bounce, ball grip, stick length, collisions on/off, penalties on/off, difficulty.
 
 ## Your own music
-Drop mp3/ogg/wav/m4a/flac files into one folder, `assets/music/`. The menus and the matches both shuffle songs from it. (Files in the older `menu/` and `match/` subfolders are added to the same pool.)
+Drop mp3/ogg/wav/m4a/flac files into `assets/music/menu/` (the menus and the lobby), `assets/music/game/` (every game) and `assets/music/intro/` (the opening splash). Each folder shuffles on its own and carries on where it left off, so every song plays before any repeats. Battle Royale only plays game music if its **Music** option is On; it's Off by default. (The older `match/` folder still counts as game music. Songs loose in `assets/music/` play in both.)
 - **Local dev server** (`npx serve`, `python3 -m http.server`): the game reads the folders itself. Nothing to do.
 - **Public hosting** (Netlify, GitHub Pages, Wix...): hosts hide folder listings, so run `node tools/make-playlist.js` before uploading.
   It writes `assets/music/playlist.json`, which the game reads. Re-run it whenever you add or remove songs.
 - Or list file names by hand in `MUSIC_FILES` in `src/music.js`.
 The title screen says how many songs were found. No songs found (or none loadable) = the built-in 8-bit tunes play.
-Songs shuffle; "Next song" is in the pause menu.
+"Next song" is in the pause menu.
 
 ## Practice mode
 Main menu > Practice: pick any team sizes (1 to 3 carts per side, e.g. 1v1, 2v2, 1v3), no clock, and the pause menu has every setting

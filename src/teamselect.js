@@ -90,7 +90,7 @@ const TeamSelect = {
   build(sc, cfg) {
     const V = CONFIG.view; menuBackdrop(sc); sc.ts = { cfg, focus: 0, row: 0, done: [] }; sc.tsSet = new TSSettings(sc, cfg.settings);
     sc.add.text(128, 44, cfg.title, { ...STYLE.title, fontSize: '50px' }).setOrigin(0, 0.5); sc.add.rectangle(128, 76, 120, 4, THEME.gold, 0.95).setOrigin(0, 0.5);
-    if (cfg.sub) sc.add.text(128, 96, cfg.sub, { fontFamily: FONT, fontSize: '19px', color: '#9fb2bf' }).setOrigin(0, 0.5);
+    if (cfg.sub) { sc.tsSub = sc.add.text(128, 96, typeof cfg.sub === 'function' ? cfg.sub() : cfg.sub, { fontFamily: FONT, fontSize: '19px', color: '#9fb2bf' }).setOrigin(0, 0.5); sc.tsSubF = typeof cfg.sub === 'function' ? cfg.sub : null; }
     const pill = sc.add.text(V.width - 40, 44, '⚙  GAME SETTINGS  (X)', { fontFamily: FONT, fontSize: '20px', fontStyle: 'bold', color: '#e8eef2', backgroundColor: '#1d3a55', padding: { x: 14, y: 8 } }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true });
     pill.on('pointerdown', () => { if (!sc.tsSet.open) { Sound.play('select'); sc.tsSet.show(); } });
     const n = cfg.cards.length, w = n === 1 ? 560 : 540, h = 500, gap = n === 1 ? 0 : V.width - 2 * w - 80;
@@ -147,15 +147,15 @@ const TeamSelect = {
   };
   P.update = function () { TeamSelect.update(this); };
 }
-/* New season: your team (the Premier League) */
+/* New season: your team, in any league (the season is that league's teams only) */
 { const P = SeasonSetupScene.prototype;
   P.create = function () {
-    const C = CONFIG.season, n = SEASON_N, levels = Season.levels(), games = d => (d ? 2 : 1) * (n - 1);
+    const C = CONFIG.season, nOf = () => leagueTeams(TEAMS[Settings.seasonTeam].league).length, levels = Season.levels(), games = d => (d ? 2 : 1) * (nOf() - 1), lgName = () => LEAGUES.find(L => L.id === TEAMS[Settings.seasonTeam].league).name;
     const cycle = (key, list, d) => { const i = list.indexOf(Settings[key]); Settings[key] = list[(i + d + list.length) % list.length]; Settings.save(); };
-    if (Settings.seasonTeam >= n) Settings.seasonTeam = 0;
+    if (!TEAMS[Settings.seasonTeam]) Settings.seasonTeam = 0;
     TeamSelect.build(this, {
-      title: 'NEW SEASON', sub: `The Premier League: ${n} teams, ${games(Settings.seasonDouble)} games, then the playoffs`,
-      cards: [{ side: 'YOUR TEAM', get: () => Settings.seasonTeam, set: t => { Settings.seasonTeam = t; Settings.save(); }, leagueLock: 'premier' }],
+      title: 'NEW SEASON', sub: () => `${lgName()}: ${nOf()} teams, ${games(Settings.seasonDouble)} games, then the playoffs   (LB / RB: league)`,
+      cards: [{ side: 'YOUR TEAM', get: () => Settings.seasonTeam, set: t => { Settings.seasonTeam = t; Settings.save(); } }],
       settings: [
         { label: () => `CPU skill   ◀ ${Settings.seasonDifficulty} ▶`, change: d => cycle('seasonDifficulty', levels, d) },
         { label: () => `Game length   ◀ ${Settings.seasonPeriod / 60} min periods ▶`, change: d => cycle('seasonPeriod', C.periodChoices, d) },
@@ -165,7 +165,7 @@ const TeamSelect = {
       onNext: () => this.start(), onBack: () => this.scene.start('SeasonMenu')
     });
   };
-  P.update = function () { TeamSelect.update(this); };
+  P.update = function () { TeamSelect.update(this); if (this.tsSubF) this.tsSub.setText(this.tsSubF()); };
 }
 
 /* Controller select: a card for every controller; push it under a team (or leave it in the middle to sit out) */

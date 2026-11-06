@@ -32,7 +32,7 @@ const CONFIG = {
   // The "c" shaped cup on the front of the cart. Its middle is recessed, its arms reach forward.
   cup:     { frontX: 0.5, halfWidth: 0.3, recess: 0.08, points: 7, colliderRadius: 0.05,
              stickColliderRadius: 0.03, stickColliders: 5 },   // the stem of the "t"; its length is the Stick length setting
-  drift: { grip: 0.28, turn: 1.0, drag: 0.12, yaw: 0.9, minSpeed: 0.35, levels: [0.8, 1.6, 2.6], boost: [0, 0.5, 0.9, 1.4], boostMul: 1.32, colors: [0xffffff, 0x3dd6ff, 0xff9f1c, 0xc44dff] },   // drifting (chair.js): slide, charge levels (s), boost (s) per level
+  drift: { grip: 0.28, turn: 1.0, drag: 0.12, yaw: 0.9, minSpeed: 0.35, levels: [0.8, 1.6, 2.6], boost: [0, 0.8, 1.3, 1.9], boostMul: 1.55, colors: [0xffffff, 0x3dd6ff, 0xff9f1c, 0xc44dff] },   // drifting (chair.js): slide, charge levels (s), boost (s) per level
   spin:    { degrees: 90, seconds: 0.14, cooldown: 0.55 }, // slap-shot spin (RT clockwise, LT counter-clockwise)
 
   foul:    { noticeSeconds: 3, minClosingSpeed: 2.8, binSeconds: 8, facingDot: 0.6, hitDot: 0.8, bumpSoundSpeed: 1.5 },
@@ -132,11 +132,11 @@ const CONFIG = {
     shake:   { seconds: 0.35, metres: 0.08 }, maxFov: 92
   },
   // Starting values of the settings that can also be changed in the menus.
-  defaults: { masterVolume: 1, voiceVolume: 1, micVolume: 1, micMonitor: false, voiceMode: 'open', lockCart: false, invertLook: false, lookH: 0.7, lookV: 1, camMode: 'first', allowThird: false, allowBroadcast: false, fov3d: 74, chaseDist: 2, speedLevel: 5, speedCap: 5, ballBounce: 0.1, ballGrip: 30, stickLength: 0.26, ballFriction: 1.6, adapt: true, sizeA: 3, sizeB: 3, collisions: true, penalties: true },
+  defaults: { cartSound: true, cartVolume: 1, penaltySeconds: 10, penaltyCarry: false, masterVolume: 1, voiceVolume: 1, micVolume: 1, micMonitor: false, voiceMode: 'open', lockCart: false, invertLook: false, lookH: 0.7, lookV: 1, camMode: 'first', allowThird: false, allowBroadcast: false, fov3d: 74, chaseDist: 2, speedLevel: 5, speedCap: 5, ballBounce: 0.1, ballGrip: 30, stickLength: 0.26, ballFriction: 1.6, adapt: true, sizeA: 3, sizeB: 3, collisions: true, penalties: true },
 
   // Slider limits used by the settings menus.
   ranges:  { masterVolume: { min: 0, max: 1, step: 0.05 }, voiceVolume: { min: 0, max: 1, step: 0.05 }, micVolume: { min: 0, max: 2, step: 0.1 }, musicVolume: { min: 0, max: 1, step: 0.05 }, sfxVolume: { min: 0, max: 1, step: 0.05 },
-             turnSpeed:   { min: 0.5, max: 2, step: 0.1 }, lookH: { min: 0.2, max: 2, step: 0.1 }, lookV: { min: 0.2, max: 2, step: 0.1 }, timeSpeed: { min: 0.5, max: 10, step: 0.5 },
+             turnSpeed:   { min: 0.5, max: 2, step: 0.1 }, lookH: { min: 0.2, max: 2, step: 0.1 }, lookV: { min: 0.2, max: 2, step: 0.1 }, timeSpeed: { min: 0.5, max: 10, step: 0.5 }, penaltySeconds: { min: 5, max: 120, step: 5 }, cartVolume: { min: 0.1, max: 2, step: 0.1 },
              speedLevel:  { min: 1, max: 5, step: 1 }, speedCap: { min: 1, max: 5, step: 1 }, ballBounce: { min: 0, max: 1, step: 0.05 },
              ballGrip:    { min: 0, max: 30, step: 2 }, ballFriction: { min: 0, max: 4, step: 0.1 },
              zoomPct: { min: 70, max: 150, step: 5 }, fov3d: { min: 60, max: 100, step: 5 }, chaseDist: { min: 1.5, max: 6, step: 0.5 }, tiltDeg: { min: 0, max: 60, step: 5 }, commentVolume: { min: 0, max: 1, step: 0.1 }, crowdVolume: { min: 0, max: 1, step: 0.1 }, sizeA: { min: 0, max: 5, step: 1 }, sizeB: { min: 0, max: 5, step: 1 }, stickLength: { min: 0.1, max: 0.5, step: 0.02 } },

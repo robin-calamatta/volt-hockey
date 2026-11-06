@@ -79,7 +79,7 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
       const r = P2.take.call(this, m, c, L); brSlots(c.gs); return r;
     },
     openBox(m, c, L) {                                                    // a chest or a crate opens where it stands; the loot spills out
-      const chest = L[1] === 'chest'; L[1] = chest ? 'chestO' : 'ammoO'; L[9] = MG.r2(m.gs.t); m.sfx(chest ? 'chest_open' : 'crate_open');
+      const chest = L[1] === 'chest'; L[1] = chest ? 'chestO' : 'ammoO'; L[9] = MG.r2(m.gs.t); this.sfxNear(m, chest ? 'chest_open' : 'crate_open', L[2], L[3]);
       if (c.player && !c.player.remote && chest) Progress.ev('chest');
       this.spill(m, L[2], L[3], 1.1, 1.0, () => {
         if (chest) { const hi = L[4] > 0, gun = (hi && Math.random() < 0.6 ? ['rifle', 'sniper', 'rocket', 'shotgun'] : ['pistol', 'pistol', 'smg', 'smg', 'shotgun', 'rifle', 'rifle', 'sniper', 'rocket'])[Math.floor(Math.random() * (hi ? 4 : 9))];
@@ -99,6 +99,8 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
       else if (op === 'sel' && A) { G.sel = G.inv.indexOf(A); G.hol = 0; }
       else if (op === 'drop' && A) { const i = G.inv.indexOf(A), q = c.toWorld(-1.3, 0); G.inv.splice(i, 1); const L = this.drop(m, q.x, q.y, G.lv, A.k, A.a); L[6] = MG.r2(m.gs.t + 2.5); L[7] = c.k; G.sel = Math.max(0, Math.min(G.sel > i ? G.sel - 1 : G.sel, G.inv.length - 1)); m.sfx('back'); }
     },
+    /* world sounds (chests, doors, fights) only play when a person is near enough to hear them: a CPU opening a chest across the map makes no noise for you */
+    sfxNear(m, name, x, y, r = 26) { if (m.chairs.some(o => o.player && (!o.out || true) && Math.hypot(o.x - x, o.y - y) < r)) m.sfx(name); },
     /* what X would act on right now (shown as a prompt): a door, then the nearest thing to pick up or open */
     interactFocus(m, c) {
       const G = c.gs, M = this.map(m), g = m.gs; if (c.out || G.down || G.air) return null; let best = null, bd = R_CART() + 1.1;
@@ -122,28 +124,29 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
     },
     toggleDoor(m, c, d) {
       const g = m.gs, i = d.door; if (g.dr[i] === 2) return;
-      if (g.dr[i] === 1) { if (m.chairs.some(o => !o.out && o.gs.lv === 0 && o.x > d.x0 - R_CART() && o.x < d.x1 + R_CART() && o.y > d.y0 - R_CART() && o.y < d.y1 + R_CART())) { if (c.player) this.say(m, c, 'SOMETHING IS IN THE DOORWAY'); return; } g.dr[i] = 0; m.sfx('door_close'); }
-      else { g.dr[i] = 1; m.sfx('door_open'); }
+      if (g.dr[i] === 1) { if (m.chairs.some(o => !o.out && o.gs.lv === 0 && o.x > d.x0 - R_CART() && o.x < d.x1 + R_CART() && o.y > d.y0 - R_CART() && o.y < d.y1 + R_CART())) { if (c.player) this.say(m, c, 'SOMETHING IS IN THE DOORWAY'); return; } g.dr[i] = 0; this.sfxNear(m, 'door_close', d.cx, d.cy); }
+      else { g.dr[i] = 1; this.sfxNear(m, 'door_open', d.cx, d.cy); }
       brDoorSync(m);
     },
     hitDoor(m, i, dmg) {
-      const g = m.gs; if (g.dr[i] !== 0) return; g.dh[i] -= dmg; m.sfx('wood_hit');
-      if (g.dh[i] <= 0) { g.dr[i] = 2; g.db[i] = MG.r2(g.t + BR_DOOR.rebuild); m.sfx('wood_break'); const d = this.map(m).doors[i]; MG.add(m, { t: 'splint', x: d.cx, y: d.cy, life: 1.2, horiz: d.horiz ? 1 : 0 }); brDoorSync(m); }
+      const g = m.gs, dd = this.map(m).doors[i]; if (g.dr[i] !== 0) return; g.dh[i] -= dmg; this.sfxNear(m, 'wood_hit', dd.cx, dd.cy);
+      if (g.dh[i] <= 0) { g.dr[i] = 2; g.db[i] = MG.r2(g.t + BR_DOOR.rebuild); this.sfxNear(m, 'wood_break', dd.cx, dd.cy); const d = dd; MG.add(m, { t: 'splint', x: d.cx, y: d.cy, life: 1.2, horiz: d.horiz ? 1 : 0 }); brDoorSync(m); }
     },
     /* B: melee. Something in front of you within reach takes a hit (a door too) */
     melee(c, m, bash) {
       const G = c.gs; if (c.out || G.down || G.mcd > 0 || G.use) return; G.mcd = BR_MELEE.cd; G.melT = MG.r2(m.gs.t); const M = this.map(m);
       let hit = null, bd = BR_MELEE.range + R_CART();
       for (const o of MG.live(m)) { if (o === c || o.gs.team === G.team || o.gs.lv !== G.lv || Math.abs(o.gs.z - G.z) > 1) continue; const d = MH.dist(c, o), a = Math.abs(ANG(Math.atan2(o.y - c.y, o.x - c.x) - c.heading)); if (d < bd && a < BR_MELEE.arc) { bd = d; hit = o; } }
-      if (hit) { this.hurt(m, hit, bash ? BR_MELEE.bash : BR_MELEE.dmg, c, false, { melee: 1 }); const a = Math.atan2(hit.y - c.y, hit.x - c.x); hit.vx += Math.cos(a) * BR_MELEE.push; hit.vy += Math.sin(a) * BR_MELEE.push; m.sfx(bash ? 'shield_bash' : 'melee_hit'); return; }
+      if (hit) { this.hurt(m, hit, bash ? BR_MELEE.bash : BR_MELEE.dmg, c, false, { melee: 1 }); const a = Math.atan2(hit.y - c.y, hit.x - c.x); hit.vx += Math.cos(a) * BR_MELEE.push; hit.vy += Math.sin(a) * BR_MELEE.push; this.sfxNear(m, bash ? 'shield_bash' : 'melee_hit', c.x, c.y); return; }
       if (G.lv === 0) for (const d of M.doors || []) { if (m.gs.dr[d.door] !== 0) continue; const dd = Math.hypot(d.cx - c.x, d.cy - c.y), a = Math.abs(ANG(Math.atan2(d.cy - c.y, d.cx - c.x) - c.heading)); if (dd < BR_MELEE.range + 0.8 && a < 1.2) { this.hitDoor(m, d.door, BR_MELEE.door); return; } }
-      m.sfx('melee_whiff');
+      this.sfxNear(m, 'melee_whiff', c.x, c.y);
     },
     use(c, m) {
       const G = c.gs; if (c.out || G.down || G.use) return; const it = !G.hol && G.inv[G.sel];
       if (it && it.k === 'riot') return this.melee(c, m, true);           // the riot shield: RT bashes with it
-      if (it && it.k === 'bubble' && G.cd <= 0) { MG.add(m, { t: 'bub', x: MG.r2(c.x), y: MG.r2(c.y), z: G.z, lv: G.lv, r: BR_BUBBLE.r, until: MG.r2(m.gs.t + BR_BUBBLE.life), t0: MG.r2(m.gs.t) }); m.sfx('bubble'); G.cd = 0.8; this.spend(c, G.sel); return; }
-      return P2.use.call(this, c, m);
+      if (it && it.k === 'bubble' && G.cd <= 0) { MG.add(m, { t: 'bub', x: MG.r2(c.x), y: MG.r2(c.y), z: G.z, lv: G.lv, r: BR_BUBBLE.r, until: MG.r2(m.gs.t + BR_BUBBLE.life), t0: MG.r2(m.gs.t) }); this.sfxNear(m, 'bubble', c.x, c.y); G.cd = 0.8; this.spend(c, G.sel); return; }
+      const sf = m.sfx; m.sfx = (n, ...r) => { if (String(n).startsWith('gun_')) { if (m.chairs.some(o => o.player && Math.hypot(o.x - c.x, o.y - c.y) < 60)) sf.call(m, n, ...r); } else sf.call(m, n, ...r); };   // (gunfire is heard within 60 m)
+      try { return P2.use.call(this, c, m); } finally { m.sfx = sf; }
     },
     cmd(c, cmd, m) { const r = P2.cmd.call(this, c, cmd, m); const it = !c.gs.hol && c.gs.inv[c.gs.sel]; if (it && it.k === 'riot') c.speedMul *= 0.88; return r; },
     /* getting hit: the riot shield takes hits from the front; headshots; the damage shows over the target for whoever hit them */
@@ -151,8 +154,8 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
       const G = c.gs; if (c.out || (!storm && m.gs.t < BR.grace)) return;
       const riot = !storm && !G.hol && G.inv[G.sel] && G.inv[G.sel].k === 'riot' ? G.inv[G.sel] : null;
       if (riot && by && by !== c && !o.splash) { const a = Math.abs(ANG(Math.atan2(by.y - c.y, by.x - c.x) - c.heading)); if (a < 1.25) {
-        riot.h = (riot.h === undefined ? BR_ITEMS.riot.hp : riot.h) - dmg; this.num(m, c, by, 0, 0, 0, dmg); m.sfx('shield_hit');
-        if (riot.h <= 0) { G.inv.splice(G.sel, 1); G.sel = Math.max(0, Math.min(G.sel, G.inv.length - 1)); m.sfx('shield_break'); if (c.player) this.say(m, c, 'YOUR RIOT SHIELD BROKE'); }
+        riot.h = (riot.h === undefined ? BR_ITEMS.riot.hp : riot.h) - dmg; this.num(m, c, by, 0, 0, 0, dmg); this.sfxNear(m, 'shield_hit', c.x, c.y);
+        if (riot.h <= 0) { G.inv.splice(G.sel, 1); G.sel = Math.max(0, Math.min(G.sel, G.inv.length - 1)); this.sfxNear(m, 'shield_break', c.x, c.y); if (c.player) this.say(m, c, 'YOUR RIOT SHIELD BROKE'); }
         return; } }
       const sh0 = G.sh, hp0 = G.hp, d0 = G.dhp, dn0 = G.down;
       P2.hurt.call(this, m, c, dmg, by, storm);
@@ -176,9 +179,9 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
         if (hit) break;
         const sh = m.chairs[o.k];
         for (const c of m.chairs) { if (c === sh || c.out || (sh && c.gs.team === sh.gs.team) || hz < c.gs.z - 0.1 || hz > c.gs.z + 1.3) continue;
-          if (Math.hypot(c.x - o.x, c.y - o.y) < R_CART() + 0.12) { if (o.w !== 'rocket') { const head = hz >= c.gs.z + 0.98; this.hurt(m, c, BR_GUNS[o.w].dmg * (head ? BR_HEAD[o.w] || 1.5 : 1), sh, false, { head }); if (head && sh && sh.player) m.sfx('headshot'); } hit = true; break; } }
+          if (Math.hypot(c.x - o.x, c.y - o.y) < R_CART() + 0.12) { if (o.w !== 'rocket') { const head = hz >= c.gs.z + 0.98; this.hurt(m, c, BR_GUNS[o.w].dmg * (head ? BR_HEAD[o.w] || 1.5 : 1), sh, false, { head }); if (head) { MG.add(m, { t: 'hs', x: MG.r2(c.x), y: MG.r2(c.y), z: MG.r2(c.gs.z || 0), by: sh ? sh.k : -1, life: 0.7 }); if (sh && sh.player) m.sfx('headshot'); } } hit = true; break; } }
       }
-      if (hit && o.w === 'rocket') { const G = BR_GUNS.rocket; MG.add(m, { t: 'boom', x: MG.r2(o.x), y: MG.r2(o.y), z: o.z, life: 0.7 }); m.sfx('boom');
+      if (hit && o.w === 'rocket') { const G = BR_GUNS.rocket; MG.add(m, { t: 'boom', x: MG.r2(o.x), y: MG.r2(o.y), z: o.z, life: 0.7 }); this.sfxNear(m, 'boom', o.x, o.y, 80);
         for (const c of m.chairs) { if (c.out || Math.abs(c.gs.z - o.z) > 1.5) continue; const d = Math.hypot(c.x - o.x, c.y - o.y); if (d < G.splash) { const sh = m.chairs[o.k]; if (!(sh && c.gs.team === sh.gs.team && c !== sh)) this.hurt(m, c, G.dmg * (1 - d / G.splash * 0.6), sh, false, { splash: 1 }); } }
         for (const d of M.doors || []) if (Math.hypot(d.cx - o.x, d.cy - o.y) < G.splash) this.hitDoor(m, d.door, 90); }
       if (hit || g.t > o.until) MG.remove(m, o); else { o.x = MG.r2(o.x); o.y = MG.r2(o.y); o.z = Math.round(o.z * 1000) / 1000; }
@@ -191,16 +194,16 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
           else G.op = 0;
           c.intPress = false;                                              // (X is handled by xPress; holding it revives or opens)
         } else {                                                           // the CPU: opens doors in its way
-          if (G.lv === 0) for (const d of M.doors || []) if (g.dr[d.door] === 0 && Math.hypot(d.cx - c.x, d.cy - c.y) < 1.7) { g.dr[d.door] = 1; m.sfx('door_open'); brDoorSync(m); }
+          if (G.lv === 0) for (const d of M.doors || []) if (g.dr[d.door] === 0 && Math.hypot(d.cx - c.x, d.cy - c.y) < 1.7) { g.dr[d.door] = 1; this.sfxNear(m, 'door_open', d.cx, d.cy); brDoorSync(m); }
         }
       }
       P2.step.call(this, m, h);
       for (const c of m.chairs) { const G = c.gs; if (c.out) continue; brSlots(G);
         if (G.use) { const U = G.use, I = BR_ITEMS[U.k], t = U.tk >= 0 ? m.chairs[U.tk] : c; if (I && t && !this.helps(t, I)) { this.spend(c, U.s); G.use = null; m.sfx('select'); } }   // full: stop, that one is used up
       }
-      for (const i in g.dr || []) if (g.dr[i] === 2 && g.t >= g.db[i]) { const d = M.doors[i]; if (!m.chairs.some(o => !o.out && o.gs.lv === 0 && o.x > d.x0 - R_CART() && o.x < d.x1 + R_CART() && o.y > d.y0 - R_CART() && o.y < d.y1 + R_CART())) { g.dr[i] = 0; g.dh[i] = BR_DOOR.hp; m.sfx('door_close'); brDoorSync(m); } }
+      for (const i in g.dr || []) if (g.dr[i] === 2 && g.t >= g.db[i]) { const d = M.doors[i]; if (!m.chairs.some(o => !o.out && o.gs.lv === 0 && o.x > d.x0 - R_CART() && o.x < d.x1 + R_CART() && o.y > d.y0 - R_CART() && o.y < d.y1 + R_CART())) { g.dr[i] = 0; g.dh[i] = BR_DOOR.hp; this.sfxNear(m, 'door_close', d.cx, d.cy); brDoorSync(m); } }
       for (const o of MG.all(m, 'bub')) if (g.t > o.until) MG.remove(m, o);
-      for (const o of MG.all(m, 'dn').concat(MG.all(m, 'splint'))) { o.life -= h; if (o.life <= 0) MG.remove(m, o); }
+      for (const o of MG.all(m, 'dn').concat(MG.all(m, 'splint'), MG.all(m, 'hs'))) { o.life -= h; if (o.life <= 0) MG.remove(m, o); }
       if (g.L.some(L => L[1] === 'chestO' || L[1] === 'ammoO')) g.L = g.L.filter(L => !((L[1] === 'chestO' || L[1] === 'ammoO') && g.t - L[9] > 60));   // opened boxes go after a minute
     },
     /* the storm: a big warning on screen (g.sw: [text, time, kind]) and the storm siren */
@@ -223,7 +226,24 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
 }
 
 /* the CPU's map of where it can drive: doors count as open (it opens them as it gets there) */
-{ const nav = MODES.br.nav; MODES.br.nav = function (m) { if (m.brNav) return m.brNav; const M = this.map(m); brDoors(M); for (const d of M.doors) d.lv = -99; try { return nav.call(this, m); } finally { brDoorSync(m); } }; }
+/* (v13.4: built much faster: each wall marks the cells it covers, instead of every cell checking every wall. On the biggest maps the old way froze the game for seconds at the start) */
+MODES.br.nav = function (m) {
+  if (m.brNav) return m.brNav; const M = this.map(m); brDoors(M); const cs = 1.2, W = Math.ceil(m.width / cs), H = Math.ceil(m.height / cs), top = Math.max(0, ...M.floors.map(f => f.lv)), Lc = top + 1, g = new Uint8Array(W * H * Lc), pad = R_CART() + 0.15;
+  const mark = (q, L, p, v = 1) => { if (L < 0 || L >= Lc) return; const i0 = Math.max(0, Math.ceil((q.x0 - p) / cs - 0.5)), i1 = Math.min(W - 1, Math.floor((q.x1 + p) / cs - 0.5)), j0 = Math.max(0, Math.ceil((q.y0 - p) / cs - 0.5)), j1 = Math.min(H - 1, Math.floor((q.y1 + p) / cs - 0.5));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const x = (i + 0.5) * cs, y = (j + 0.5) * cs; if (x > q.x0 - p && x < q.x1 + p && y > q.y0 - p && y < q.y1 + p) g[(L * H + j) * W + i] = v; } };
+  for (let L = 1; L < Lc; L++) g.fill(2, L * W * H, (L + 1) * W * H);     // upper levels: nothing until a floor is there (2 = check it)
+  for (const f of M.floors) mark(f, f.lv, 0.6, 3); for (const q of M.ramps) mark(q, q.lv + 1, 1.2, 3);
+  for (let L = 1; L < Lc; L++) for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const k = (L * H + j) * W + i; if (g[k] === 2) g[k] = 1; else if (g[k] === 3) g[k] = this.onFloor(M, L, (i + 0.5) * cs, (j + 0.5) * cs, pad) ? 0 : 1; }
+  for (const w of M.walls) if (w.kind !== 'door') mark(w, w.lv, pad);
+  for (const q of M.ramps) { mark(q, q.lv, pad); mark(q, q.lv + 1, pad); }
+  for (const t of M.trees) mark({ x0: t.x - t.r, y0: t.y - t.r, x1: t.x + t.r, y1: t.y + t.r }, 0, pad);
+  for (let L = 0; L < Lc; L++) for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const x = (i + 0.5) * cs, y = (j + 0.5) * cs; if (x < pad || y < pad || x > m.width - pad || y > m.height - pad) g[(L * H + j) * W + i] = 1; }
+  const links = new Map(), cell = (x, y, L) => (L * H + Math.max(0, Math.min(H - 1, Math.floor(y / cs)))) * W + Math.max(0, Math.min(W - 1, Math.floor(x / cs)));
+  for (const q of M.ramps) { const ux = [1, 0, -1, 0][q.dir], uy = [0, 1, 0, -1][q.dir], cx = (q.x0 + q.x1) / 2, cy = (q.y0 + q.y1) / 2, half = q.dir % 2 === 0 ? (q.x1 - q.x0) / 2 : (q.y1 - q.y0) / 2;
+    const a = cell(cx - ux * (half + 1.5), cy - uy * (half + 1.5), q.lv), b = cell(cx + ux * (half + 1.5), cy + uy * (half + 1.5), q.lv + 1), cost = half * 2 / cs + 1;
+    if (!g[a] && !g[b]) { (links.get(a) || links.set(a, []).get(a)).push([b, cost, q]); (links.get(b) || links.set(b, []).get(b)).push([a, cost, q]); } }
+  brDoorSync(m); return (m.brNav = { cs, W, H, Lc, g, links, cell });
+};
 
 /* the buttons: X interacts (or reloads), hold X to open / revive, B melee */
 function brPadInput(sc, m, p, src, dt) {
@@ -281,6 +301,98 @@ if (typeof window !== 'undefined') window.addEventListener('mousedown', e => { i
       P3.end.call(this, m, team); if (!m.result) return;
       m.result.br = { teams: teams.length, place: Object.fromEntries(teams.map((t, i) => [t, i + 1])), at: MG.r2(g.t),
         stats: m.chairs.map(c => ({ k: c.k, team: c.gs.team, name: MG.pname(c) || m.name(c), kills: c.gs.kills || 0, knocks: c.gs.knocks || 0, ast: c.gs.ast || 0, dmg: Math.round(c.gs.dd || 0), rvs: c.gs.rvs || 0, rzs: c.gs.rzs || 0, alive: Math.round(c.out ? (c.gs.outAt || g.t) : g.t), out: !!c.out })) };
+    }
+  });
+}
+
+/* ---- v13.4: gun tiers, taking a gun out takes a moment, a quicker pistol, a longer last stand, rezzing yourself ---- */
+const BR_TIER = [{ n: 'UNCOMMON', col: 0x5ad45a, mul: 1 }, { n: 'RARE', col: 0x3d8bff, mul: 1.12 }, { n: 'EPIC', col: 0xb05cff, mul: 1.25 }, { n: 'LEGENDARY', col: 0xffb627, mul: 1.4 }];
+const brName = (k, t) => BR_GUNS[k] ? `${BR_TIER[t || 0].n} ${BR_GUNS[k].name}` : (BR_ITEMS[k] || { name: k }).name;
+const BR_EQUIP = { pistol: 0.35, smg: 0.5, shotgun: 0.75, rifle: 0.65, sniper: 0.95, rocket: 1.05, item: 0.35 };
+Object.assign(BR_GUNS.pistol, { cd: 0.11 });                           // semi-automatic: as fast as you can pull the trigger
+Object.assign(BR, { bleed: 38 });                                     // the last stand lasts longer
+{ const BRm = MODES.br, P4 = { ...BRm };
+  const rollTier = hi => { const r = Math.random() * 100; return hi ? (r < 25 ? 0 : r < 55 ? 1 : r < 85 ? 2 : 3) : (r < 48 ? 0 : r < 78 ? 1 : r < 93 ? 2 : 3); };
+  Object.assign(BRm, {
+    drop(m, x, y, lv, k, a) {
+      const L = P4.drop.call(this, m, x, y, lv, k, a); if (!BR_GUNS[L[1]]) return L;
+      let t = this.tierNext; this.tierNext = undefined;
+      if (t === undefined && this.tierQ) { const i = this.tierQ.findIndex(q => q[0] === L[1]); if (i >= 0) t = this.tierQ.splice(i, 1)[0][1]; }
+      L[12] = t === undefined ? rollTier(lv > 0) : t || 0; return L;
+    },
+    take(m, c, L) {
+      const before = new Set(c.gs.inv), r = P4.take.call(this, m, c, L);
+      if (BR_GUNS[L[1]]) for (const it of c.gs.inv) if (!before.has(it) && it.k === L[1]) it.t = L[12] || 0;
+      return r;
+    },
+    finish(m, c, by) { if (c.out) return; this.tierQ = c.gs.inv.map(it => [it.k, it.t || 0]); try { return P4.finish.call(this, m, c, by); } finally { this.tierQ = null; } },
+    swap(m, c) { const it = c.gs.inv[c.gs.sel], L = m.gs.L.find(x => x[0] === c.gs.swapL), t = L && L[12]; this.tierNext = it && it.t; const r = P4.swap.call(this, m, c); this.tierNext = undefined; if (r && c.gs.inv[c.gs.sel] && BR_GUNS[c.gs.inv[c.gs.sel].k]) c.gs.inv[c.gs.sel].t = t || 0; return r; },
+    swapFar(m, c, L) { const it = c.gs.inv[c.gs.sel], t = L[12]; this.tierNext = it && it.t; P4.swapFar.call(this, m, c, L); this.tierNext = undefined; const n = c.gs.inv[c.gs.sel]; if (n && BR_GUNS[n.k]) n.t = t || 0; },
+    invAct(c, act, m) {
+      const G = c.gs; if (!act || c.out) return; brSlots(G);
+      const using = G.use && G.inv[G.use.s], A = brSlotItem(G, act.a);
+      if (act.op === 'drop' && A) this.tierNext = A.t;
+      if (using && (act.op === 'swap' || act.op === 'sel')) {             // rearranging your bag while healing: the heal carries on
+        const U = G.use; if (act.op === 'swap') { const B = brSlotItem(G, act.b); if (A && act.b >= 0 && act.b < BR.slots) { A.s = act.b; if (B) B.s = act.a; brSlots(G); } }
+        U.s = G.inv.indexOf(using); G.sel = U.s; return; }
+      if (using && act.op === 'drop' && A !== using) { const U = G.use; const keep = using; P4.invAct.call(this, c, { ...act }, m); G.use = U; brSlots(G); U.s = G.inv.indexOf(keep); G.sel = U.s; this.tierNext = undefined; return; }
+      const r = P4.invAct.call(this, c, act, m); this.tierNext = undefined; return r;
+    },
+    use(c, m) {
+      const G = c.gs; if (c.out || G.down) return; if (G.eq > 0) return;   // still taking it out
+      const n0 = (m.gs.objs || []).length, it = !G.hol && G.inv[G.sel], r = P4.use.call(this, c, m);
+      if (it && BR_GUNS[it.k]) for (const o of (m.gs.objs || []).slice(n0)) if (o.t === 'bul' && o.k === c.k && o.tr === undefined) o.tr = it.t || 0;
+      return r;
+    },
+    reload(c, m) { if (c.gs.eq > 0 || c.gs.down) return; return P4.reload.call(this, c, m); },
+    healMate(c, m) { if (c.gs.down || c.gs.eq > 0) return false; return P4.healMate.call(this, c, m); },
+    bullet(m, o, h) {                                                     // a better tier hits harder
+      const G = BR_GUNS[o.w], d0 = G.dmg; G.dmg = Math.round(d0 * BR_TIER[o.tr || 0].mul * 10) / 10; try { return P4.bullet.call(this, m, o, h); } finally { G.dmg = d0; }
+    },
+    step(m, h) {
+      const g = m.gs;
+      for (const c of m.chairs) { const G = c.gs; if (c.out) continue; G.eq = Math.max(0, (G.eq || 0) - h);
+        if (G.down) { G.use = null; }                                     // no healing while you're down
+        const it = !G.hol && G.inv[G.sel], key = it ? it.k : '-';
+        if (key !== G.eqK) { if (G.eqK !== undefined && it) { G.eq = BR_EQUIP[it.k] || BR_EQUIP.item; G.eqT = G.eq; G.rl = 0; if (c.player) this.sfxNear(m, BR_GUNS[it.k] ? 'equip_gun' : 'equip_item', c.x, c.y); } G.eqK = key; }
+      }
+      P4.step.call(this, m, h); this.selfRez(m, h);
+    },
+    /* downed and you reach a ready rez garage on your own: stay inside and you get yourself back up */
+    selfRez(m, h) {
+      const g = m.gs, M = this.map(m);
+      for (const c of m.chairs) { const G = c.gs; if (c.out || !G.down) { G.srz = 0; continue; }
+        const i = (M.rez || []).findIndex(q => c.x > q.x0 && c.x < q.x1 && c.y > q.y0 && c.y < q.y1 && (G.lv || 0) === 0);
+        if (i < 0 || g.gar[i] > g.t) { G.srz = 0; continue; }
+        const before = G.srz || 0; G.srz = before + h; if (Math.floor(before / 0.85) !== Math.floor(G.srz / 0.85)) this.sfxNear(m, 'heartbeat', c.x, c.y);
+        if (G.srz >= BR.rezTime) { Object.assign(G, { down: 0, dhp: 0, hp: BR.reviveHp, srz: 0 }); g.gar[i] = MG.r2(g.t + BR.rezCool); this.sfxNear(m, 'defib', c.x, c.y); MG.notice(m, `${MG.up(m.name(c))} GOT BACK UP AT A REZ GARAGE`, 2); if (c.player) this.say(m, c, 'BACK ON YOUR WHEELS!'); }
+      }
+      for (const c of m.chairs) { const G = c.gs; if (c.out || !(G.rv > 0)) { G.rvBeat = 0; continue; } const b = G.rvBeat || 0; G.rvBeat = b + h; if (Math.floor(b / 0.85) !== Math.floor(G.rvBeat / 0.85)) this.sfxNear(m, 'heartbeat', c.x, c.y); }   // (reviving: a heartbeat too)
+      for (const c of m.chairs) { const G = c.gs; if (c.out || !(G.rz > 0)) { G.rzBeat = 0; continue; } const b = G.rzBeat || 0; G.rzBeat = b + h; if (Math.floor(b / 0.85) !== Math.floor(G.rzBeat / 0.85)) this.sfxNear(m, 'heartbeat', c.x, c.y); }   // (rezzing a team-mate: their heartbeat)
+    },
+    rez(m, c, i) { const r = P4.rez.call(this, m, c, i); this.sfxNear(m, 'defib', c.x, c.y); return r; },
+    tierOf(L) { return L[12] || 0; }
+  });
+}
+
+/* ---- v13.5: reviving together is quicker, the one being revived sees it, and the gun in your hands never changes under you ---- */
+{ const BRm = MODES.br, P5 = { ...BRm };
+  Object.assign(BRm, {
+    spend(c, slot) {                                                      // using one up: whatever you are holding stays in your hands
+      const G = c.gs, held = G.inv[G.sel], last = G.inv[G.last]; P5.spend.call(this, c, slot);
+      if (held && G.inv.includes(held)) G.sel = G.inv.indexOf(held); if (last && G.inv.includes(last)) G.last = G.inv.indexOf(last);
+    },
+    step(m, h) {
+      P5.step.call(this, m, h);
+      for (const t of m.chairs) { if (!t.gs) continue; const T = t.gs; T.rvN = 0; T.rvP = 0; T.rvBy = null;
+        if (t.out || !T.down) continue;
+        const R = m.chairs.filter(o => !o.out && o.gs && o.gs.rvk === t.k && o.gs.rv > 0); if (!R.length) continue;
+        let p = Math.max(...R.map(o => o.gs.rv)); if (R.length > 1) p += (R.length - 1) * h / BR.reviveTime;   // two of you: twice as quick
+        T.rvN = R.length; T.rvP = Math.round(Math.min(1, p) * 1000) / 1000; T.rvBy = R.map(o => o.k);
+        if (p >= 1) { Object.assign(T, { down: 0, dhp: 0, hp: BR.reviveHp, rvN: 0, rvP: 0, rvBy: null }); for (const o of R) { o.gs.rv = 0; o.gs.rvk = -1; if (o.player && !o.player.remote) Progress.ev('revive'); }
+          m.sfx('select'); this.sfxNear(m, 'defib', t.x, t.y); MG.notice(m, `${R.map(o => MG.up(m.name(o))).join(' + ')} REVIVED ${MG.up(m.name(t))}`, 1.8); }
+        else for (const o of R) o.gs.rv = p;
+      }
     }
   });
 }

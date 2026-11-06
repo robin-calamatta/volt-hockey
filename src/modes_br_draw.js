@@ -91,7 +91,8 @@ Object.assign(View3D.prototype, {
     for (const cart of this.carts) {
       const ch = cart.ch, G = ch.gs || {}; cart.group.visible = !ch.out; if (ch.out) continue;
       cart.group.position.y = G.z || 0;
-      if (G.ramp >= 0) { const r = MODES.br.map(m).ramps[G.ramp]; if (r) { const tilt = Math.atan2(BR.H, r.dir % 2 === 0 ? r.x1 - r.x0 : r.y1 - r.y0), ra = [0, Math.PI / 2, Math.PI, -Math.PI / 2][r.dir], rel = normalizeAngle(ch.heading - ra); cart.group.rotation.z = tilt * Math.cos(rel); cart.group.rotation.x = -tilt * Math.sin(rel); } } else { cart.group.rotation.z = 0; cart.group.rotation.x = 0; }   // tilted on a ramp
+      const ownFirst = (this.sc.vps || []).length === 1 && this.sc.vps[0].mode === 'first' && this.sc.vps[0].chair === ch && !this.sc.vps[0].spect;   /* (in your own first-person view the cart stays level on a ramp: tilting it swung your arms and knees up into your face) */
+      if (G.ramp >= 0 && !ownFirst) { const r = MODES.br.map(m).ramps[G.ramp]; if (r) { const tilt = Math.atan2(BR.H, r.dir % 2 === 0 ? r.x1 - r.x0 : r.y1 - r.y0), ra = [0, Math.PI / 2, Math.PI, -Math.PI / 2][r.dir], rel = normalizeAngle(ch.heading - ra); cart.group.rotation.z = tilt * Math.cos(rel); cart.group.rotation.x = -tilt * Math.sin(rel); } } else { cart.group.rotation.z = 0; cart.group.rotation.x = 0; }   // tilted on a ramp
       let ring = this.brRings.get(cart.group); if (!ring) { ring = new THREE.Mesh(new THREE.RingGeometry(0.66, 0.8, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: BR_TEAMCOL[G.team % BR_TEAMCOL.length], transparent: true, opacity: 0.9, depthWrite: false })); ring.position.y = 0.04; cart.group.add(ring); this.brRings.set(cart.group, ring); }
       ring.material.color.setHex(G.hitT > 0 ? 0xffffff : BR_TEAMCOL[G.team % BR_TEAMCOL.length]); ring.visible = !(ch.player && !ch.player.remote && (this.sc.setup.players || []).length === 1);   // (not under your own cart: it would fill your view)
     }
@@ -185,7 +186,7 @@ Object.assign(GameScene.prototype, {
       this.brH = { g, slots, hp: this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '15px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0, 0.5).setDepth(32), name: this.add.text(V.width / 2, V.height - 118, '', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#ffe27a' }).setOrigin(0.5).setDepth(32).setShadow(0, 2, '#000', 4, true, true) };
     }
     const H = this.brH, all = [H.g, H.hp, H.name, ...H.slots.flatMap(s => [s.img, s.txt, s.key])];
-    if (!show) { all.forEach(o => o.setVisible(false)); return false; }
+    if (!show) { all.forEach(o => o.setVisible(false)); H.slots.forEach(s => s.inHand && s.inHand.setVisible(false)); return false; }
     all.forEach(o => o.setVisible(true));
     const V = CONFIG.view, G = c.gs, sw = 96, sh = 62, gap = 8, bwid = BR.slots * sw + (BR.slots - 1) * gap, x0 = V.width - 16 - bwid, y0 = V.height - 74, g = H.g; g.clear();   // the inventory: bottom right
     const bw = 260, bx = 16, by = V.height - 24;                              // health (green to red) and shield (blue) bars: bottom left, under the speed meter
@@ -193,15 +194,18 @@ Object.assign(GameScene.prototype, {
     g.fillStyle(0x223040, 1).fillRect(bx, by - 14, bw, 9).fillStyle(0x3d8bff, 1).fillRect(bx, by - 14, bw * Math.max(0, G.sh) / BR.maxShield, 9);
     const hpk = Math.max(0, G.hp) / BR.hp; g.fillStyle(0x3a2025, 1).fillRect(bx, by - 2, bw, 11).fillStyle(hpk > 0.5 ? 0x5ad45a : hpk > 0.25 ? 0xffc23d : 0xff4d4d, 1).fillRect(bx, by - 2, bw * hpk, 11);
     H.hp.setText(`${Math.ceil(G.hp)}  |  ${Math.ceil(G.sh)}${G.boost > 0 ? '   🚀' : ''}`).setPosition(bx + bw + 14, by - 4);
+    brSlots(G);
     for (let i = 0; i < BR.slots; i++) {
-      const s = H.slots[i], it = brSlotItem(G, i), x = x0 + i * (sw + gap), sel = it && it === G.inv[G.sel] && !G.hol;   /* (slots keep their place: gaps stay gaps) */
-      g.fillStyle(sel ? 0x2a3a48 : 0x0d151b, sel ? 0.92 : 0.7).fillRoundedRect(x, y0, sw, sh, 8).lineStyle(sel ? 3 : 1.5, sel ? 0xffd23f : 0x3a4a58, 1).strokeRoundedRect(x, y0, sw, sh, 8);
-      s.key.setPosition(x + 6, y0 + 3);
+      const s = H.slots[i], it = brSlotItem(G, i), x = x0 + i * (sw + gap), sel = it && it === G.inv[G.sel] && !G.hol, y = sel ? y0 - 14 : y0;   /* (slots keep their place: gaps stay gaps; the one in your hands lifts up and glows) */
+      if (sel) { const pul = 0.5 + 0.5 * Math.sin(this.time.now / 260); g.fillStyle(0xffd23f, 0.14 + 0.1 * pul).fillRoundedRect(x - 6, y - 6, sw + 12, sh + 12, 12); g.fillStyle(0xffd23f, 1).fillTriangle(x + sw / 2 - 8, y0 + sh + 2, x + sw / 2 + 8, y0 + sh + 2, x + sw / 2, y0 + sh - 6); }
+      g.fillStyle(sel ? 0x2a3a48 : 0x0d151b, sel ? 0.97 : 0.55).fillRoundedRect(x, y, sw, sh, 8).lineStyle(sel ? 4 : 1.5, sel ? 0xffd23f : 0x3a4a58, 1).strokeRoundedRect(x, y, sw, sh, 8); if (it && BR_GUNS[it.k] && typeof BR_TIER !== 'undefined') { const T = BR_TIER[it.t || 0]; g.fillStyle(T.col, sel ? 0.3 : 0.16).fillRoundedRect(x + 2, y + 2, sw - 4, sh - 4, 7).fillStyle(T.col, 1).fillRect(x + 6, y + sh - 6, sw - 12, 4); }   /* (the gun's tier colour) */
+      if (sel) g.fillStyle(0xffd23f, 1).fillRoundedRect(x + sw / 2 - 26, y - 10, 52, 14, 5);
+      s.key.setPosition(x + 6, y + 3).setText(sel ? '' : String(i + 1)); s.inHand = s.inHand || this.add.text(0, 0, 'IN HAND', { fontFamily: FONT, fontSize: '11px', fontStyle: 'bold', color: '#1a1206' }).setOrigin(0.5).setDepth(33); s.inHand.setVisible(!!sel).setPosition(x + sw / 2, y - 3);
       if (!it) { s.img.setVisible(false); s.txt.setText(''); continue; }
-      s.img.setTexture(this.brIcon(it.k)).setDisplaySize(84, 47).setPosition(x + sw / 2, y0 + sh / 2 - 3).setAlpha(BR_GUNS[it.k] && it.a <= 0 ? 0.35 : 1);
-      s.txt.setText(BR_GUNS[it.k] ? String(it.a) : 'x' + it.a).setColor(BR_GUNS[it.k] && it.a <= 0 ? '#ff6b6b' : '#ffffff').setPosition(x + sw - 6, y0 + sh - 3);
+      s.img.setTexture(this.brIcon(it.k)).setDisplaySize(sel ? 92 : 78, sel ? 52 : 44).setPosition(x + sw / 2, y + sh / 2 - 3).setAlpha(BR_GUNS[it.k] && it.a <= 0 ? 0.35 : sel ? 1 : 0.6); s.sel = sel;
+      s.txt.setText(BR_GUNS[it.k] ? String(it.a) : 'x' + it.a).setColor(BR_GUNS[it.k] && it.a <= 0 ? '#ff6b6b' : '#ffffff').setPosition(x + sw - 6, y + sh - 3);
     }
-    const it = G.inv[G.sel]; H.name.setText(it ? `${(BR_GUNS[it.k] || BR_ITEMS[it.k]).name}    RT ${BR_GUNS[it.k] ? 'fire' : 'use'} · LT aim · LB/RB switch · X jump · B bag` : 'Empty-handed: drive into a CHEST for a gun').setPosition(x0 + bwid / 2, y0 - 16);
+    const it = G.inv[G.sel]; H.name.setText(it ? `${(BR_GUNS[it.k] || BR_ITEMS[it.k]).name}    RT ${BR_GUNS[it.k] ? 'fire' : 'use'} · LT aim · LB/RB switch · X jump · B bag` : 'Empty-handed: drive into a CHEST for a gun').setPosition(x0 + bwid / 2, y0 - 34);
     return true;
   }
 });
@@ -221,7 +225,9 @@ Object.assign(GameScene.prototype, {
     const G = c.gs, it = G.inv[G.sel], gun = it && BR_GUNS[it.k];
     if (gun) {                                                                // the crosshair: where your shots will go (heading + right stick), 12 m out
       const a = c.heading + (p0._look ? p0._look.x * CONFIG.view3d.look.yaw * Math.PI / 180 : 0), pt = brPitch(c), q = this.v3.project(vp, c.x + Math.cos(a) * 12 * Math.cos(pt), (G.z || 0) + 0.55 + Math.sin(pt) * 12, c.y + Math.sin(a) * 12 * Math.cos(pt));
+      if (brAds(c) && it.k === 'sniper' && vp.mode === 'first') { q.x = vp.rect.x + vp.rect.w / 2; q.y = vp.rect.y + vp.rect.h / 2; q.behind = false; }   /* (the scope: dead centre) */
       if (!q.behind) { const ads = brAds(c), sz = 7 + gun.spread * 60 * (ads ? 0.35 : 1), hit = G.hm !== undefined && g.t - G.hm < 0.25; G2.lineStyle(2, 0x000000, 0.5).strokeCircle(q.x, q.y, sz + 1).lineStyle(2, hit ? 0xff4d4d : 0xffffff, 0.9).strokeCircle(q.x, q.y, sz).fillStyle(0xffffff, 1).fillCircle(q.x, q.y, 1.6);
+        if (ads && it.k === 'sniper' && vp.mode === 'first') { q.x = vp.rect.x + vp.rect.w / 2; q.y = vp.rect.y + vp.rect.h / 2; }   /* (the scope sits dead centre: the camera looks straight down the aim when you aim) */
         if (ads && it.k === 'sniper' && vp.mode === 'first') G2.lineStyle(520, 0x05080a, 0.88).strokeCircle(q.x, q.y, 560).lineStyle(2, 0x000000, 0.8).lineBetween(q.x - 290, q.y, q.x - 12, q.y).lineBetween(q.x + 12, q.y, q.x + 290, q.y).lineBetween(q.x, q.y - 290, q.x, q.y - 12).lineBetween(q.x, q.y + 12, q.x, q.y + 290);   // the sniper's scope
         if (hit) G2.lineStyle(3, 0xff4d4d, 1).lineBetween(q.x - 14, q.y - 14, q.x - 6, q.y - 6).lineBetween(q.x + 14, q.y - 14, q.x + 6, q.y - 6).lineBetween(q.x - 14, q.y + 14, q.x - 6, q.y + 6).lineBetween(q.x + 14, q.y + 14, q.x + 6, q.y + 6); }
     }
@@ -268,7 +274,7 @@ Object.assign(GameScene.prototype, {
    (swapping), Y holds it, X drops it on the ground, B closes. Mouse / touch: click a slot, then the buttons. */
 class BRInvScene extends Phaser.Scene {
   constructor() { super('BRInv'); }
-  init(d) { this.d = d; this.cur = d.chair.gs.sel || 0; this.pick = -1; }
+  init(d) { this.d = d; const G = d.chair.gs, held = !G.hol && G.inv[G.sel]; this.cur = held && held.s !== undefined ? held.s : 0; this.pick = -1; }   /* (the bag opens on what is in your hands) */
   create() {
     const V = CONFIG.view, cx = V.width / 2, cy = V.height / 2 - 20, W = 820, Hh = 360; this.cx = cx; this.cy = cy;
     this.add.rectangle(cx, V.height / 2, V.width, V.height, 0x000000, 0.35); panel(this, cx - W / 2, cy - Hh / 2, W, Hh, { alpha: 0.95, radius: 18 });
@@ -299,6 +305,6 @@ class BRInvScene extends Phaser.Scene {
       if (held) g.fillStyle(0x7dff6a, 1).fillCircle(s.x + 56, y - 40, 5);
       s.img.setVisible(!!it).setY(y - 6); s.t.setY(y + 44); if (it) { s.img.setTexture(d.game.brIcon(it.k)).setDisplaySize(124, 70); s.t.setText(BR_GUNS[it.k] ? String(it.a) : 'x' + it.a); } else s.t.setText(''); });
     const it = brSlotItem(G, this.cur), gun = it && BR_GUNS[it.k];
-    this.info.setText(!it ? (this.pick >= 0 ? 'Empty slot: A puts it here' : 'Empty slot') : gun ? `${gun.name}   ammo ${it.a}     damage ${gun.dmg}${gun.pellets ? ' x' + gun.pellets : ''}   ${(1 / gun.cd).toFixed(1)} shots/s   range ${gun.range} m${gun.auto ? '   (hold to fire)' : ''}` : `${BR_ITEMS[it.k].name} x${it.a}     ${{ med: 'heals 50', pot: '+50 shield', boost: '3 s of speed', wall: 'a wall that stops bullets' }[it.k] || ''}`);
+    this.info.setText(!it ? (this.pick >= 0 ? 'Empty slot: A puts it here' : 'Empty slot') : gun ? `${brName(it.k, it.t)}   ammo ${it.a}     damage ${gun.dmg}${gun.pellets ? ' x' + gun.pellets : ''}   ${(1 / gun.cd).toFixed(1)} shots/s   range ${gun.range} m${gun.auto ? '   (hold to fire)' : ''}` : `${BR_ITEMS[it.k].name} x${it.a}     ${{ med: 'heals 50', pot: '+50 shield', boost: '3 s of speed', wall: 'a wall that stops bullets' }[it.k] || ''}`);
   }
 }

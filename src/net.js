@@ -442,15 +442,15 @@ class ClientSim {
     for (const L of this.locals) {
       const found = inputs.find(x => x.id === L.id), input = found ? found.input : { ax: 0, ay: 0, pressed: {} }, p = input.pressed || {}; let spin = 0;
       const MD = this.m.mini && modeOf(this.m), BRP = MD && MD.jumpOnA, SP = BRP;   // Battle Royale: its own buttons (modes_br2.js)
-      const dh = input.held && (BRP ? input.held.b : input.held.a) && !(L.me && L.me.invOpen) ? 1 : 0;   /* (Battle Royale drifts on B) */ if (dh !== (L.drSent || 0)) { L.pending.push('dr:' + dh); L.drSent = dh; } if (L.me && L.me.chair) L.me.chair.driftHeld = !!dh;   // A (hold): drift
+      const dh = input.held && input.held.b && !(L.me && L.me.invOpen) ? 1 : 0;   /* (Battle Royale drifts on B) */ if (dh !== (L.drSent || 0)) { L.pending.push('dr:' + dh); L.drSent = dh; } if (L.me && L.me.chair) L.me.chair.driftHeld = !!dh;   // A (hold): drift
       if (SP && L.me) { const ads = !L.me.invOpen && input.held && input.held.spinCCW ? 1 : 0; if (ads !== (L.me.brAds || 0)) L.pending.push('ads:' + ads); L.me.brAds = ads; }   // LT: aim (zoom, slower)
       if (SP) { if (!(L.me && L.me.invOpen) && (p.halfCW || p.halfCCW)) L.pending.push(p.halfCCW ? 'cyc:-1' : 'cyc:1'); }
       else { if (p.halfCW) { L.pending.push('hcw'); spin = 0.5; } if (p.halfCCW) { L.pending.push('hccw'); spin = -0.5; }
-      if (p.spinCW) { L.pending.push('cw'); spin = 1; } if (p.spinCCW) { L.pending.push('ccw'); spin = -1; } }
+      /* (v13.4: the triggers no longer spin the cart) */ }
       const MJ = this.m.mini && modeOf(this.m) && modeOf(this.m).jump;         // Battle Royale: X jumps; your gun's tilt goes to the host when it changes
       if (MJ && L.me && !L.me.invOpen) { brAimInput(L.me, input, dt); const ap = MG.r2(L.me.brAp || 0); if (Math.abs(ap - (L.sentAp || 0)) > 0.015 || (ap !== L.sentAp && this.clock - (L.apAt || 0) > 0.3)) { L.pending.push('ap:' + ap); L.sentAp = ap; L.apAt = this.clock; } }
       if (BRP) brPadEvents(L, input, dt, this.clock);
-      else if (this.m.mini && !(L.me && L.me.invOpen)) { const M = modeOf(this.m), hold = M && M.holdFire && input.held && input.held.x && this.clock - (L.holdAt || 0) > 0.08; if (p.x || hold) { L.pending.push('use'); L.holdAt = this.clock; } } else if (p.x) L.pending.push('x');
+      else if (this.m.mini && !(L.me && L.me.invOpen)) { const M = modeOf(this.m), hold = M && M.holdFire && input.held && (input.held.x || input.held.spinCW) && this.clock - (L.holdAt || 0) > 0.08; if (p.x || p.spinCW || hold) { L.pending.push('use'); L.holdAt = this.clock; } } else if (p.x) L.pending.push('x');
       if (spin) { Sound.play('screech'); L.spins.push({ t: this.clock, dir: Math.sign(spin), amt: Math.abs(spin) }); if (L.spins.length > 8) L.spins.shift(); }
       if (p.speedUp && L.me.speedLevel < Settings.speedCap) { L.me.speedLevel++; L.pending.push('up'); }
       if (p.speedDown && L.me.speedLevel > 1) { L.me.speedLevel--; L.pending.push('down'); }

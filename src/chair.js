@@ -73,7 +73,7 @@ class Chair {
     const om = this.omega || 0, tk = Math.max(turnK, Math.min(1, Math.abs(om) / 2.2)), ts = Math.abs(turn) > 0.02 ? Math.sign(turn) : Math.sign(om);   // (first / third person: the cart turns as fast as you steer, so how fast it is turning counts too)
     if (!D.on && this.driftHeld && !spinning && speed > K.maxSpeed * F.minSpeed && tk > 0.22 && ts) { D.on = 1; D.dir = ts; D.ch = 0; D.hop = 0.18; if (this.onDrift) this.onDrift(0); }
     if (D.on) {
-      if (!this.driftHeld || speed < K.maxSpeed * F.minSpeed * 0.6 || spinning) { const lvl = D.ch >= F.levels[2] ? 3 : D.ch >= F.levels[1] ? 2 : D.ch >= F.levels[0] ? 1 : 0; D.on = 0; D.lvl = lvl; D.boost = F.boost[lvl]; D.ch = 0; if (lvl) { const kick = 1 + 0.1 * lvl; this.vx *= kick; this.vy *= kick; } if (lvl && this.onDrift) this.onDrift(lvl); }   /* letting go gives a kick of speed straight away, then the boost holds it */
+      if (!this.driftHeld || speed < K.maxSpeed * F.minSpeed * 0.6 || spinning) { const lvl = D.ch >= F.levels[2] ? 3 : D.ch >= F.levels[1] ? 2 : D.ch >= F.levels[0] ? 1 : 0; D.on = 0; D.lvl = lvl; D.boost = F.boost[lvl]; D.ch = 0; if (lvl) { const kick = 1 + 0.18 * lvl; this.vx *= kick; this.vy *= kick; } if (lvl && this.onDrift) this.onDrift(lvl); }   /* letting go gives a kick of speed straight away, then the boost holds it */
       else { const into = ts === D.dir ? 0.6 + 0.7 * tk : 0.35; D.ch = Math.min(F.levels[2] + 0.4, D.ch + dt * into); D.lvl = D.ch >= F.levels[2] ? 3 : D.ch >= F.levels[1] ? 2 : D.ch >= F.levels[0] ? 1 : 0; }
     }
     return D;

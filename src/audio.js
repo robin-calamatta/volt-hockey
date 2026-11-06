@@ -173,6 +173,8 @@ const Sound = {
     return steps;
   },
   playMusic(name) {                // your own shuffled files if found (see music.js), otherwise the built-in 8-bit tune
+    if (this.playlist && this.playlist.name === name && this.player && !this.player.paused) return;   // (already playing this folder: keep going)
+    if (this.music && this.music.name === name) return;
     const id = this.musicRequest = (this.musicRequest || 0) + 1;
     this.stopMusic();
     const wait = new Promise(resolve => setTimeout(resolve, MUSIC_START_WAIT_MS));
@@ -184,15 +186,17 @@ const Sound = {
   },
   playSynth(name) {
     const track = MUSIC[name];
-    this.music = { track, voices: track.voices.map(v => ({ ...v, steps: this.compile(v.loop) })), step: 0, next: this.ctx.currentTime + 0.1 };
+    this.music = { name, track, voices: track.voices.map(v => ({ ...v, steps: this.compile(v.loop) })), step: 0, next: this.ctx.currentTime + 0.1 };
     this.musicTimer = setInterval(() => this.pumpMusic(), 50);
   },
   shuffled(list) { const a = [...list]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; },
-  startPlaylist(name) { this.playlist = { name, order: this.shuffled(PLAYLISTS[name]), index: -1, failures: 0 }; this.nextTrack(); },
+  startPlaylist(name) {             // each folder keeps its own shuffled order: coming back to it carries on with the next song, every song plays before any repeats
+    const O = this.orders || (this.orders = {}); let o = O[name]; if (!o || o.src !== PLAYLISTS[name]) o = O[name] = { src: PLAYLISTS[name], order: this.shuffled(PLAYLISTS[name]), index: -1 };
+    this.playlist = { name, failures: 0, get order() { return o.order; }, set order(v) { o.order = v; }, get index() { return o.index; }, set index(v) { o.index = v; } }; this.nextTrack(); },
   nextTrack() {                    // plays the next shuffled song; reshuffles after the last one
     const p = this.playlist; if (!p) return;
     if (this.player) { this.player.onended = this.player.onerror = null; this.player.pause(); }
-    p.index++; if (p.index >= p.order.length) { p.order = this.shuffled(PLAYLISTS[p.name]); p.index = 0; }
+    p.index++; if (p.index >= p.order.length) { const last = p.order[p.order.length - 1]; let o = this.shuffled(PLAYLISTS[p.name]); if (o.length > 1 && o[0] === last) o.push(o.shift()); p.order = o; p.index = 0; }   // (a fresh shuffle, never the same song twice in a row)
     const audio = new Audio(p.order[p.index]);
     audio.volume = Settings.musicVolume * CONFIG.audio.realMusicGain;
     audio.onended = () => this.nextTrack();

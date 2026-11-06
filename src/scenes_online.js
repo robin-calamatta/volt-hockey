@@ -161,7 +161,7 @@ class JoinCodeScene extends Phaser.Scene {
 /* The room: shows the code and who is on which side. The host sets teams, sizes and difficulty and starts the match. */
 class RoomScene extends ListMenuScene {
   constructor() { super('Room'); }
-  init(data) { this.role = data.role; this.session = data.session || null; this.cursorAt = data.cursor || 0; this.capturing = false; this.rules = !!data.rules; this.preset = data.preset || (data.session && data.session.preset) || null; }   // preset: a party leader's match / practice / season game (partyGame)
+  init(data) { this.role = data.role; this.session = data.session || null; this.cursorAt = data.cursor || 0; this.capturing = false; this.rules = !!data.rules; this.preset = data.preset || (data.session && data.session.preset) || null; this.again = !!data.again; }   // preset: a party leader's match / practice / season game (partyGame)
   create() {
     const host = this.role === 'host'; this.opening = false;
     if (host && !this.session) {
@@ -205,7 +205,7 @@ class RoomScene extends ListMenuScene {
       { label: () => 'Close room', select: () => this.leave() }
     ] : host ? [
       speedCapItem('Max cart speed (locked for all)'),
-      toggle('Cart collisions', 'collisions'), toggle('Penalties', 'penalties'), lockCartItem(), slider('Game clock speed', 'timeSpeed', times),   // rules: only the host can change these, and they are fixed for everyone at kick-off
+      toggle('Cart collisions', 'collisions'), toggle('Penalties', 'penalties'), slider('Penalty time', 'penaltySeconds', v => `${v} s`), toggle('Penalties carry over after a goal', 'penaltyCarry'), lockCartItem(), slider('Game clock speed', 'timeSpeed', times),   // rules: only the host can change these, and they are fixed for everyone at kick-off
       { label: () => `Left team   ◀ ${teamName(cfg().teamA)} ▶`, change: d => cycle('teamA', d) },
       { label: () => `Right team   ◀ ${teamName(cfg().teamB)} ▶`, change: d => cycle('teamB', d) },
       { label: () => `Left side carts   ◀ ${cfg().sizes[0]} ▶`, change: d => size(0, d) },

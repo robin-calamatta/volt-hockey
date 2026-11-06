@@ -27,6 +27,7 @@ const kf = (keys, p) => { if (p <= keys[0][0]) return keys[0].slice(1); for (let
   Avatar.poseFor = function (ch, m, now) {
     const p = pf(ch, m, now); if (!m || m.kind !== 'br' || !ch.gs) return p; const G = ch.gs, it = G.inv && G.inv[G.sel];
     if (p.name === 'gun' && it && BR_GUNS[it.k]) {
+      if (G.eq > 0) return { ...p, eqk: 1 - G.eq / (G.eqT || 1) };   // taking it out: it comes up from your lap
       if (G.rl > 0 && G.rlS === G.sel) return { ...p, name: 'reload', rp: 1 - G.rl / (G.rlT || 1) };
       const pump = G.pumpT !== undefined && m.gs.t - G.pumpT < 0.35 && it.k === 'shotgun' ? (m.gs.t - G.pumpT) / 0.35 : -1;
       return { ...p, kick: brKick(ch, m), pump };
@@ -40,6 +41,7 @@ const kf = (keys, p) => { if (p <= keys[0][0]) return keys[0].slice(1); for (let
       return { R: [g.R[0] - 0.04, g.R[1] + 0.04, g.R[2] - 0.03], L: [tx + L[0], L[1], L[2]] }; }
     const P = pose(name, t, extra);
     if (extra.fp && name.startsWith('a_')) { const { tx } = this.K(), f = q => q && [Math.max(q[0] + 0.32, tx + 0.42), Math.max(0.86, Math.min(q[1], 1.12)), q[2] * 0.7]; P.R = f(P.R); P.L = f(P.L); }   // (first person: in front of your eyes)
+    if (extra.eqk !== undefined) { const e = 1 - Math.pow(1 - Math.min(1, extra.eqk), 2), dn = 1 - e; P.R = [P.R[0] - 0.12 * dn, P.R[1] - 0.3 * dn, P.R[2]]; if (P.L) P.L = [P.L[0] - 0.1 * dn, P.L[1] - 0.25 * dn, P.L[2]]; }
     if (name === 'gun') { const k = extra.kick || 0; if (k) { P.R = [P.R[0] - 0.07 * k, P.R[1] + 0.035 * k, P.R[2]]; P.L = [P.L[0] - 0.06 * k, P.L[1] + 0.03 * k, P.L[2]]; }
       if (extra.pump >= 0) { const b = Math.sin(extra.pump * Math.PI) * 0.09; P.L = [P.L[0] - b, P.L[1], P.L[2]]; } }   // the shotgun pump after the last shell
     return P;
@@ -49,6 +51,7 @@ const kf = (keys, p) => { if (p <= keys[0][0]) return keys[0].slice(1); for (let
     if (R.item && BR_GUNS[R.itemKey]) {
       if (name === 'reload') { const A = RELOADS[R.itemKey] || RELOADS.rifle, rp = extra.rp || 0; R.item.rotation.x = kf(A.roll, rp)[0]; R.item.rotation.z += kf(A.pitch, rp)[0]; }
       else if (extra.kick) { R.item.rotation.z += 0.32 * extra.kick; R.item.position.x -= 0.03 * extra.kick; }
+      if (extra.eqk !== undefined) { const e = Math.min(1, extra.eqk); R.item.rotation.z -= 1.1 * (1 - e) * (1 - e); R.item.rotation.x += 0.6 * (1 - e) * Math.sin(e * Math.PI); }
     }
     if (!R.mag) { R.mag = new THREE.Group(); const m1 = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.1, 0.05), new THREE.MeshStandardMaterial({ color: 0x23272b, roughness: 0.5, metalness: 0.5 })), m2 = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.06, 8), new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.5 })), m3 = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.22, 10).rotateZ(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x5d6b3a, roughness: 0.6 }));
       m2.rotation.z = Math.PI / 2; R.mag.add(m1, m2, m3); R.mag.userData.kinds = { mag: m1, shell: m2, rocket: m3 }; group.add(R.mag); }
@@ -61,7 +64,7 @@ const kf = (keys, p) => { if (p <= keys[0][0]) return keys[0].slice(1); for (let
   P.update = function (dt) {
     const r = upd.call(this, dt);
     if (this.m && this.m.kind === 'br') { const now = performance.now() / 1000;
-      for (const c of this.carts || []) { const p = Avatar.poseFor(c.ch, this.m, now); if (p.name === 'reload' || p.name === 'melee' || p.kick || p.pump >= 0) Rig.update(c.group, p.name, p.t, { layer: c.layer, item: p.item, pitch: p.pitch, sleeves: c.group.userData.sleeves, hide: c.ch.out, rp: p.rp, kick: p.kick, pump: p.pump }); } }
+      for (const c of this.carts || []) { const p = Avatar.poseFor(c.ch, this.m, now); if (p.name === 'reload' || p.name === 'melee' || p.kick || p.pump >= 0 || p.eqk !== undefined) Rig.update(c.group, p.name, p.t, { layer: c.layer, item: p.item, pitch: p.pitch, sleeves: c.group.userData.sleeves, hide: c.ch.out, rp: p.rp, kick: p.kick, pump: p.pump, eqk: p.eqk }); } }
     if (this.sc && this.sc.vps) { const now = performance.now() / 1000;                   // first person: an emote's arms come out in front of you, where you can see them
       for (const vp of this.sc.vps) { if (vp.mode !== 'first' || !vp.chair || vp.spect) continue; const c = (this.carts || []).find(k => k.ch === vp.chair); if (!c) continue; const p = Avatar.poseFor(c.ch, this.m, now);
         if (p.name && p.name.startsWith('a_')) Rig.update(c.group, p.name, p.t, { layer: c.layer, item: p.item, pitch: p.pitch, sleeves: c.group.userData.sleeves, hide: c.ch.out, fp: true }); } }
@@ -80,6 +83,16 @@ const kf = (keys, p) => { if (p <= keys[0][0]) return keys[0].slice(1); for (let
           const w = new THREE.Vector3(CONFIG.view3d.cart.seatX - 0.32, 0.08, sd * 0.3); c.group.localToWorld(w); sp.position.copy(w); sp.visible = true; sp.userData = { life: 0.7, t: 0, vy: 0.5 + Math.random() * 0.4, col: D.lvl }; sp.material.color.setHex(D.lvl >= 2 ? 0xeee6ff : 0xffffff); sp.scale.setScalar(0.25); }
       }
     }
+    /* v13.5: the boost out of a drift: flames out of the back wheels and a short trail of fire on the ground */
+    if (!this.flameTex) { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d'), gr = x.createRadialGradient(32, 32, 1, 32, 32, 30); gr.addColorStop(0, 'rgba(255,255,220,1)'); gr.addColorStop(0.3, 'rgba(255,200,60,0.9)'); gr.addColorStop(0.65, 'rgba(255,90,20,0.5)'); gr.addColorStop(1, 'rgba(255,40,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); this.flameTex = new THREE.CanvasTexture(cv); this.flames = []; }
+    const flame = () => this.flames.find(o => !o.visible) || (this.flames.length < 220 ? (() => { const o = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.flameTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); this.scene.add(o); this.flames.push(o); return o; })() : null);
+    for (const c of this.carts || []) { const D = c.ch.dr; if (!D || !(D.boost > 0) || c.ch.out) { c.flameAcc = 0; continue; }
+      const hot = D.lvl >= 3 ? 0xd89bff : D.lvl >= 2 ? 0xffb347 : 0x9fe8ff;   /* (the colour of the drift level) */
+      if ((c.flameAcc = (c.flameAcc || 0) + dt) > 0.025) { c.flameAcc = 0;
+        for (const sd of [1, -1]) { const w = new THREE.Vector3(CONFIG.view3d.cart.seatX - 0.42, 0.14, sd * 0.32); c.group.localToWorld(w);
+          const f1 = flame(); if (f1) { f1.position.copy(w); f1.visible = true; f1.userData = { t: 0, life: 0.22, s0: 0.38, vy: 0.9, trail: false }; f1.material.color.setHex(0xffffff); }
+          const f2 = flame(); if (f2) { f2.position.set(w.x, 0.06 + (c.group.position.y || 0), w.z); f2.visible = true; f2.userData = { t: 0, life: 1.0, s0: 0.28, vy: 0.05, trail: true }; f2.material.color.setHex(hot); } } } }
+    for (const f of this.flames) { if (!f.visible) continue; const u = f.userData; u.t += dt; if (u.t > u.life) { f.visible = false; continue; } const k = u.t / u.life; f.position.y += u.vy * dt; f.scale.setScalar(u.trail ? u.s0 * (1 - k * 0.6) * (0.85 + Math.random() * 0.3) : u.s0 * (1 + k)); f.material.opacity = u.trail ? 0.9 * (1 - k) : 1 - k; }
     for (const sp of this.smoke) { if (!sp.visible) continue; const u = sp.userData; u.t += dt; if (u.t > u.life) { sp.visible = false; continue; } const k = u.t / u.life; sp.position.y += u.vy * dt; sp.scale.setScalar(0.25 + k * 0.9); sp.material.opacity = 0.55 * (1 - k); }
   };
   /* the camera: recoil kicks your view up a little; in first person a drift leans the view and widens it */
@@ -87,9 +100,15 @@ const kf = (keys, p) => { if (p <= keys[0][0]) return keys[0].slice(1); for (let
   P.placeCamera = function (vp, dt) {
     const c = pc.call(this, vp, dt), ch = vp.chair; if (!ch || vp.mode === 'broadcast' || vp.mode === '2d') return c;
     const st = this.camFor(vp.key); let changed = false;
+    if (this.m.kind === 'br' && !vp.spect && ch.gs && vp.mode === 'first') {           // aiming in first person: the camera looks exactly where the shots go, so the scope and crosshair sit in the middle
+      st.adsK = (st.adsK || 0) + ((brAds(ch) ? 1 : 0) - (st.adsK || 0)) * (1 - Math.exp(-12 * dt));
+      if (st.adsK > 0.01) { const p0 = vp.p || {}, a = ch.heading + (p0._look ? p0._look.x * CONFIG.view3d.look.yaw * Math.PI / 180 : 0), pt = brPitch(ch), z = (ch.gs.z || 0) + 0.55, T = new THREE.Vector3(ch.x + Math.cos(a) * 30 * Math.cos(pt), z + Math.sin(pt) * 30, ch.y + Math.sin(a) * 30 * Math.cos(pt));
+        const q0 = c.quaternion.clone(); c.lookAt(T); c.quaternion.copy(q0.slerp(c.quaternion, st.adsK)); changed = true; } }
     if (this.m.kind === 'br' && !vp.spect && ch.gs) { const k = brKick(ch, this.m); if (k > 0.001) { c.rotateX(0.045 * k); changed = true; } }
     if (vp.mode === 'first') { const D = ch.dr, want = D && D.on ? D.dir : 0; st.lean = (st.lean || 0) + (want - (st.lean || 0)) * (1 - Math.exp(-8 * dt));
       if (Math.abs(st.lean) > 0.002) { c.rotateZ(-st.lean * 0.075); c.fov += Math.abs(st.lean) * 5; c.updateProjectionMatrix(); changed = true; } }
+    { const D = ch.dr, want = D && D.boost > 0 ? 1 : 0; st.bst = (st.bst || 0) + (want - (st.bst || 0)) * (1 - Math.exp(-(want ? 14 : 4) * dt));   /* the boost: the view punches wider */
+      if (st.bst > 0.01) { c.fov += st.bst * (vp.mode === 'first' ? 14 : 9); c.updateProjectionMatrix(); changed = true; } }
     if (changed) c.updateMatrixWorld(); return c;
   };
 }

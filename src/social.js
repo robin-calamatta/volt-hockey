@@ -104,11 +104,11 @@ function joinRoomFromAnywhere(code) {
    member -> leader  { t:'hello', name, acct, adult, vid }  { t:'vid', vid }  { t:'chat', text, q, to }  { t:'bye' }
    leader -> member  { t:'members', list, you }  { t:'chat', from, acct, text, q }  { t:'room', code }  { t:'end' }  { t:'kick' } */
 const Party = {
-  role: null, id: '', peer: null, link: null, conns: new Map(), members: [], myKey: '', listeners: new Set(), max: CONFIG.online.maxPlayers,
+  role: null, id: '', peer: null, link: null, conns: new Map(), members: [], myKey: '', listeners: new Set(), max: 5, emoFns: new Set(),   // (a party is up to 5 people)
   on(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); },
   emit() { for (const fn of this.listeners) { try { fn(); } catch (e) { console.error(e); } } if (typeof Voice !== 'undefined') Voice.refresh(); if (typeof Chat !== 'undefined') Chat.refresh(); },
   get active() { return !!this.role; },
-  meInfo() { return { name: Account.name || Settings.myName() || 'Player', acct: Account.name || '', adult: Account.adult, vid: typeof Voice !== 'undefined' ? Voice.myId() : '' }; },
+  meInfo() { return { name: Account.name || Settings.myName() || 'Player', acct: Account.name || '', adult: Account.adult, vid: typeof Voice !== 'undefined' ? Voice.myId() : '', look: typeof Progress !== 'undefined' ? Progress.look() : null }; },
   create() {
     if (this.role) return Promise.resolve(this.id);
     if (!Account.loggedIn) { Toasts.show('Log in to start a party.', [], 4000); return Promise.reject(new Error('login')); }
@@ -129,11 +129,13 @@ const Party = {
     if (!msg || typeof msg !== 'object') return;
     if (msg.t === 'hello') {
       if (this.members.length >= this.max) { conn.send({ t: 'end', reason: 'full' }); setTimeout(() => conn.close(), 300); return; }
-      this.conns.set(key, conn); this.members.push({ key, leader: false, name: cleanText(msg.name, 20) || 'Player', acct: cleanText(msg.acct, 20), adult: !!msg.adult, vid: cleanText(msg.vid, 80) });
+      this.conns.set(key, conn); this.members.push({ key, leader: false, name: cleanText(msg.name, 20) || 'Player', acct: cleanText(msg.acct, 20), adult: !!msg.adult, vid: cleanText(msg.vid, 80), look: typeof Avatar !== 'undefined' && msg.look ? Avatar.cleanLook(msg.look) : null });
       this.sendMembers(); Toasts.show(`<b>${esc(msg.name)}</b> joined your party.`, [], 3500);
       if (Online.current && Online.current.role === 'host' && Online.current.code) conn.send({ t: 'room', code: Online.current.code });   // you are already in a room: come along
     } else if (msg.t === 'vid') { const m = this.members.find(x => x.key === key); if (m) { m.vid = cleanText(msg.vid, 80); this.sendMembers(); } }
     else if (msg.t === 'chat') { const m = this.members.find(x => x.key === key); if (m) this.relayChat(m, msg); }
+    else if (msg.t === 'look') { const m = this.members.find(x => x.key === key); if (m && typeof Avatar !== 'undefined') { m.look = Avatar.cleanLook(msg.look || {}); this.sendMembers(); } }
+    else if (msg.t === 'emo') { const id = cleanText(msg.id, 16); this.gotEmote(key, id); for (const [k, c] of this.conns) if (k !== key) c.send({ t: 'emo', key, id }); }
     else if (msg.t === 'bye') conn.close();
   },
   relayChat(m, msg) {                                          // leader: pass a message on, only to the people it is for
@@ -174,6 +176,7 @@ const Party = {
     if (!msg || typeof msg !== 'object') return;
     if (msg.t === 'members') { this.members = Array.isArray(msg.list) ? msg.list : []; this.myKey = msg.you; this.emit(); }
     else if (msg.t === 'chat') Chat.receive({ channel: 'party', ...msg });
+    else if (msg.t === 'emo') this.gotEmote(cleanText(msg.key, 12), cleanText(msg.id, 16));
     else if (msg.t === 'room') { const code = cleanCode(msg.code); if (code) { Toasts.show('Your party leader opened room ' + esc(code) + '. Joining...', [], 3500); joinRoomFromAnywhere(code); } }
     else if (msg.t === 'end' || msg.t === 'kick') { Toasts.show(msg.reason === 'full' ? 'That party is full.' : msg.t === 'kick' ? 'You were removed from the party.' : 'The party has ended.', [], 4000); this.reset(); }
   },
@@ -193,6 +196,10 @@ const Party = {
     this.reset(); if (!quiet) Toasts.show('You left the party.', [], 3000);
   },
   reset() { this.role = null; this.id = ''; this.peer = null; this.link = null; this.conns = new Map(); this.members = []; this.myKey = ''; this.emit(); },
-  others() { return this.members.filter(m => m.key !== this.myKey); }
+  others() { return this.members.filter(m => m.key !== this.myKey); },
+  /* the lobby: your look and your emotes, for the others in your party */
+  updateLook() { const look = Progress.look(); if (this.role === 'leader') { const me = this.members.find(m => m.key === 'L'); if (me) { me.look = look; this.sendMembers(); } } else if (this.link) this.link.send({ t: 'look', look }); },
+  sendEmote(id) { if (this.role === 'leader') for (const c of this.conns.values()) c.send({ t: 'emo', key: 'L', id }); else if (this.link) this.link.send({ t: 'emo', id }); },
+  gotEmote(key, id) { for (const fn of this.emoFns) { try { fn(key, id); } catch (e) { console.error(e); } } }
 };
 addEventListener('beforeunload', () => { try { if (Party.role) Party.leave(true); } catch (e) { /* closing */ } });

@@ -14,7 +14,7 @@ for (const k of Object.keys(BR_ITEMS)) delete BR_ITEMS[k];
 Object.assign(BR_ITEMS, {
   band: { name: 'BANDAGES', icon: '🩹', stack: 15, pick: 5, hp: 15, cap: 75, time: 2.6, col: 0xf4f1ea, heal: 1, about: '+15 health (up to 75)' },
   medkit: { name: 'FIRST AID KIT', icon: '🧰', stack: 3, pick: 1, hp: 60, cap: 100, time: 5.5, col: 0xc0392b, heal: 1, about: '+60 health' },
-  plate: { name: 'ARMOUR PLATE', icon: '🛡', stack: 6, pick: 2, sh: 25, time: 2.2, col: 0x4a7fd8, heal: 1, about: '+25 cart armour' },
+  plate: { name: 'ARMOUR PLATE', icon: '🛡', stack: 6, pick: 2, sh: 25, shCap: 50, time: 2.2, col: 0x4a7fd8, heal: 1, about: '+25 cart armour (up to 50)' },
   armour: { name: 'HEAVY CART ARMOUR', icon: '🛡', stack: 2, pick: 1, sh: 75, time: 4.5, col: 0x1e3f8a, heal: 1, about: '+75 cart armour' },
   fullkit: { name: 'FULL BODY KIT', icon: '✚', stack: 1, pick: 1, hp: 100, cap: 100, sh: 100, time: 9, col: 0x2ecc71, heal: 1, about: 'full health and full cart armour' },
   boost: { name: 'BOOST', icon: '🚀', stack: 3, pick: 1, col: 0xffd23f, about: 'a few seconds of extra speed' },
@@ -67,7 +67,7 @@ function brJoin(name, look, theme, blurb, parts, W, H, seed) {             // di
   const T = { walls: [], floors: [], ramps: [], trees: [], loot: [], deco: [] }; for (const [M, ox, oy] of parts) brCopy(M, ox, oy, T);
   Object.assign(T, { name, size: { width: W, height: H }, theme, blurb, look }); brFill(T, W, H, look, seed); brRezGarages(T, W, H, Math.max(4, Math.round(W * H / 3500)), seed + 1); return T;
 }
-{ const O = { ...BR_MAPS }, P = 22;
+{ const O = { ...BR_MAPS }, P = 22; globalThis.BR_BASE = O;   /* (the original compact maps, for building bigger ones: modes_br_maps.js) */
   for (const [k, look] of [['downtown', 'downtown'], ['jungle', 'jungle'], ['port', 'port'], ['suburbs', 'suburbs'], ['canyon', 'canyon']]) BR_MAPS[k] = brBig(k, O[k], P, look, k.length * 97);
   BR_MAPS.island = brJoin('Volt Island', 'suburbs', O.suburbs.theme, 'The big one: Downtown, the Jungle, the Suburbs and the Canyon on one island, with farmland in between.', [[O.downtown, 14, 14], [O.jungle, 104, 10], [O.suburbs, 12, 102], [O.canyon, 100, 98]], 186, 184, 4242);
   BR_MAPS.metro = brJoin('Twin Cities', 'downtown', O.downtown.theme, 'Downtown and the Port, joined by an industrial strip.', [[O.downtown, 12, 14], [O.port, 100, 16]], 186, 96, 777);
@@ -155,11 +155,11 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
       if (gun) { if (G.rl > 0 && gun.shell && it.a > 0) G.rl = 0;   /* a shotgun can fire part-way through loading */
         if (G.rl > 0) return; if (it.a <= 0) { this.reload(c, m); G.cd = 0.25; return; } const a0 = it.a, r = M0.use.call(this, c, m); if (it.a < a0) { G.shotT = m.gs.t; G.shotN = (G.shotN || 0) + 1; } return r; }   // (shotT: the recoil)
       const I = BR_ITEMS[it.k]; if (!I) return;
-      if (I.heal) { if (!this.helps(c, I)) { if (c.player) this.say(m, c, I.hp && !I.sh ? (G.hp >= (I.cap || 100) ? (I.cap < 100 ? 'BANDAGES ONLY HEAL UP TO 75' : 'HEALTH IS FULL') : '') : 'CART ARMOUR IS FULL'); G.cd = 0.5; return; } G.use = { k: it.k, s: G.sel, left: I.time, tot: I.time, tk: -1 }; m.sfx('blip'); return; }
+      if (I.heal) { if (!this.helps(c, I)) { if (c.player) this.say(m, c, I.hp && !I.sh ? (G.hp >= (I.cap || 100) ? (I.cap < 100 ? 'BANDAGES ONLY HEAL UP TO 75' : 'HEALTH IS FULL') : '') : I.shCap && G.sh >= I.shCap && G.sh < BR.maxShield ? `PLATES ONLY GO UP TO ${I.shCap}` : 'CART ARMOUR IS FULL'); G.cd = 0.5; return; } G.use = { k: it.k, s: G.sel, left: I.time, tot: I.time, tk: -1 }; m.sfx('blip'); return; }
       if (it.k === 'boost') G.boost = 3; else if (it.k === 'wall') { const p = c.toWorld(1.6, 0); MG.add(m, { t: 'dwall', x: MG.r2(p.x), y: MG.r2(p.y), a: MG.r2(c.heading), lv: G.lv, z: G.z, hp: 150, until: m.gs.t + 25 }); }
       m.sfx('select'); G.cd = 0.8; this.spend(c, G.sel);
     },
-    helps(o, I) { const G = o.gs; return (I.hp && G.hp < (I.cap || 100)) || (I.sh && G.sh < BR.maxShield); },
+    helps(o, I) { const G = o.gs; return (I.hp && G.hp < (I.cap || 100)) || (I.sh && G.sh < (I.shCap || BR.maxShield)); },
     spend(c, slot) { const G = c.gs, it = G.inv[slot]; if (!it) return; it.a--; if (it.a <= 0) { G.inv.splice(slot, 1); G.sel = Math.max(0, Math.min(G.sel, G.inv.length - 1)); G.last = Math.min(G.last, Math.max(0, G.inv.length - 1)); } },
     healMate(c, m) {                                                       // LT with a heal: use it on the nearest team-mate who needs it
       const G = c.gs, it = G.inv[G.sel], I = it && BR_ITEMS[it.k]; if (!I || !I.heal || G.use || G.hol || G.down || c.out) return false;
@@ -188,7 +188,7 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
         if (G.use) { const U = G.use, it = G.inv[U.s], t = U.tk >= 0 ? m.chairs[U.tk] : c;   // a heal in progress (on you or a team-mate)
           if (!it || it.k !== U.k || G.sel !== U.s || G.hol || G.down || !t || t.out || t.gs.down || (t !== c && (MH.dist(c, t) > BR.mateRange + 0.5 || (c.player && U.tk >= 0 && !G.ads)))) { if (it && it.k === U.k && U.left < U.tot) this.spend(c, U.s); G.use = null; }   // stopped part-way: what went on stays on, and the item is used up
           else { const I = BR_ITEMS[U.k], T = t.gs, f = Math.min(h, U.left) / U.tot;   // health and armour go on bit by bit while you apply it
-            if (I.hp && T.hp < (I.cap || 100)) T.hp = Math.min(I.cap || 100, T.hp + I.hp * f); if (I.sh) T.sh = Math.min(BR.maxShield, T.sh + I.sh * f);
+            if (I.hp && T.hp < (I.cap || 100)) T.hp = Math.min(I.cap || 100, T.hp + I.hp * f); if (I.sh && T.sh < (I.shCap || BR.maxShield)) T.sh = Math.min(I.shCap || BR.maxShield, T.sh + I.sh * f);
             if ((U.left -= h) <= 0) { T.hp = Math.round(T.hp); T.sh = Math.round(T.sh); this.spend(c, U.s); G.use = null; m.sfx('select'); if (t !== c && c.player && !c.player.remote) Progress.ev('healMate'); } } }
         else if (G.ads && !c.wantAdsUsed) { const it = G.inv[G.sel]; if (it && BR_ITEMS[it.k] && BR_ITEMS[it.k].heal) { c.wantAdsUsed = true; this.healMate(c, m); } }
         if (!G.ads) c.wantAdsUsed = false;
@@ -242,8 +242,8 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
     /* ---- the storm: stages, each closing faster and hurting more; warnings and announcements ---- */
     storm(m, h) {
       const S = m.gs.st, g = m.gs, ph = S.ph, wait0 = S.wait; M0.storm.call(this, m, h);
-      if (S.wait > 0 && wait0 > 30 && S.wait <= 30) { MG.notice(m, `STORM STAGE ${S.ph + 1}: CLOSING IN 30 SECONDS`, 2.2); m.line(`Storm stage ${S.ph + 1} closes in thirty seconds. Head for the safe zone.`); m.sfx('whistle'); }
-      if (S.wait > 0 && wait0 > 10 && S.wait <= 10) { MG.notice(m, `STORM STAGE ${S.ph + 1}: 10 SECONDS!`, 2); m.sfx('whistle'); }
+      if (S.wait > 0 && wait0 > 30 && S.wait <= 30) { MG.notice(m, `STORM STAGE ${S.ph + 1}: CLOSING IN 30 SECONDS`, 2.2); m.line(`Storm stage ${S.ph + 1} closes in thirty seconds. Head for the safe zone.`); }
+      if (S.wait > 0 && wait0 > 10 && S.wait <= 10) { MG.notice(m, `STORM STAGE ${S.ph + 1}: 10 SECONDS!`, 2); }
       if (wait0 > 0 && S.wait <= 0 && S.shrink > 0) { g.stage = S.ph + 1; m.line(`Storm stage ${S.ph + 1}! The storm is closing in, and it hurts more now.`); }
       if (S.ph > ph) MG.notice(m, S.ph >= 6 ? 'FINAL STORM: NOWHERE IS SAFE' : `STAGE ${ph + 1} DONE. NEXT STAGE IN ${Math.ceil(S.wait)} SECONDS`, 2);
     },

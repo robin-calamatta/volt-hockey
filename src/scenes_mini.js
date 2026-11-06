@@ -247,9 +247,9 @@ Object.assign(GameScene.prototype, {
     T(cx, cy - h / 2 + 92, R.title, { fontSize: R.title.length > 22 ? '44px' : '58px', fontStyle: 'bold', color: R.winSide >= 0 ? teamColorHex(m.teams[R.winSide]) : '#ffffff' }).setStroke('#0d151b', 8);
     if (R.sub) T(cx, cy - h / 2 + 138, R.sub, { fontSize: '22px', color: '#9fb2bf' });
     R.rows.slice(0, 8).forEach((r, i) => { const y = cy - h / 2 + 178 + i * 30; T(cx - 250, y, ordinal(r.place), { fontSize: '22px', fontStyle: 'bold', color: i === 0 ? '#f2c200' : '#9fb2bf' }); T(cx - 90, y, r.name, { fontSize: '22px', fontStyle: 'bold', color: teamColorHex(m.teams[r.side]) }); T(cx + 170, y, r.text, { fontSize: '20px', color: '#e8eef2' }); });
-    const hint = o ? (o.role === 'host' ? 'A: back to the room' : 'Waiting for the host...') : 'A: play again   B: main menu';
+    const hint = o ? (o.role === 'host' ? 'A: play again   B: back to the room' : 'Waiting for the host...') : 'A: play again (new map)   B: back to the lobby';
     const hintT = T(cx, cy + h / 2 - 100, hint, { fontSize: '20px', fontStyle: 'bold', color: THEME.dim });
-    const btns = o ? (o.role === 'host' ? [['Back to the room', 'a']] : []) : [['Play again', 'a'], ['Main menu', 'b']];
+    const btns = o ? (o.role === 'host' ? [['Play again', 'a'], ['Back to the room', 'b']] : []) : [['Play again', 'a'], ['Back to the lobby', 'b']];
     btns.forEach(([label, b], i) => { const x = cx + (i - (btns.length - 1) / 2) * 280, tb = tapButton(this, x, cy + h / 2 - 44, 250, label, () => { this.resultTap = b; }); for (const o2 of [tb.bg, tb.t, tb.hit]) { o2.setDepth(42); add(o2); } });
     items.forEach(x => { x.setAlpha(0); if (x !== hintT) this.tweens.add({ targets: x, alpha: x.type === 'Rectangle' && x.fillAlpha !== undefined ? 0.55 : 1, duration: 350 }); });
     this.resultHint = hintT; this.result = items; this.events.once('shutdown', () => { this.result = null; this.resultHint = null; this.overAt = undefined; });

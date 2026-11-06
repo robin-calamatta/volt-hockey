@@ -134,7 +134,7 @@ const Rig = {
   update(group, name, t, extra = {}) {
     const R = this.attach(group, extra.layer), { tx } = this.K(), P = this.pose(name, t, extra), parts = group.userData.partMeshes || (group.userData.partMeshes = {});
     if (!parts.selfSkin) for (const ch of group.children) if (ch.userData && ch.userData.part) parts[ch.userData.part] = ch;
-    const skin = parts.selfSkin ? parts.selfSkin.material : null, shirt = parts.selfTeam ? parts.selfTeam.material : skin, long = extra.sleeves ? shirt : skin, vis = !extra.hide;
+    const skin = parts.selfSkin ? parts.selfSkin.material : null, shirt = parts.selfTeam ? (parts.selfTeam.material.userData.plain || parts.selfTeam.material) : skin, long = extra.sleeves ? shirt : skin, vis = !extra.hide;
     for (const S of R.sides) {
       const sd = S.sd, sh = new THREE.Vector3(tx, 0.96, sd * 0.18), T = new THREE.Vector3(...(sd > 0 ? P.R : P.L)), pole = new THREE.Vector3(...(sd > 0 ? P.pr || [tx - 0.15, 0.45, 0.62] : P.pl || [tx - 0.15, 0.45, -0.62]));
       const { elbow, hand } = this.solve(sh, T, 0.27, 0.3, pole); this.bone(S.up, sh, elbow); this.bone(S.fo, elbow, hand); S.ha.position.copy(hand); S.hand.copy(hand);

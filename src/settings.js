@@ -32,7 +32,7 @@ const Settings = {
     this.difficulty = names[(i + dir + names.length) % names.length]; this.save();
   },
   // Online: the host's physics settings apply to everyone. Held in memory only (never saved) and undone when leaving the room.
-  rulesKeys: ['lockCart', 'turnSpeed', 'stickLength', 'ballBounce', 'ballGrip', 'ballFriction', 'collisions', 'penalties', 'timeSpeed', 'speedCap'],
+  rulesKeys: ['lockCart', 'turnSpeed', 'stickLength', 'ballBounce', 'ballGrip', 'ballFriction', 'collisions', 'penalties', 'penaltySeconds', 'penaltyCarry', 'timeSpeed', 'speedCap'],
   rules() { return Object.fromEntries(this.rulesKeys.map(k => [k, this[k]])); },
   applyRules(r) { if (!this.savedRules) this.savedRules = this.rules(); for (const k of this.rulesKeys) if (k in r) this[k] = r[k]; },
   restoreRules() { if (this.savedRules) { for (const k of this.rulesKeys) this[k] = this.savedRules[k]; this.savedRules = null; } },

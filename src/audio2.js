@@ -32,21 +32,17 @@
     wood(at = 0, vol = 0.3, size = 1) { this.modal(at, [[180 / size, 1, 0.12], [410 / size, 0.6, 0.07], [760 / size, 0.35, 0.04], [1250 / size, 0.2, 0.025]], vol); this.nz({ at, f: 900 / size, q: 1.2, vol: vol * 0.8, d: 0.05 }); },
     metal(at = 0, vol = 0.25, size = 1, ring = 1) { this.modal(at, [[520 / size, 1, 0.5 * ring], [1340 / size, 0.6, 0.35 * ring], [2210 / size, 0.4, 0.25 * ring], [3170 / size, 0.25, 0.18 * ring], [4380 / size, 0.15, 0.12 * ring]], vol, 0.25); this.nz({ at, type: 'highpass', f: 3000, vol: vol * 0.6, d: 0.03 }); },
     thud(at = 0, vol = 0.4, f = 90) { this.osc({ at, f: f * 1.8, f2: f * 0.6, vol, a: 0.002, d: 0.16 }); this.nz({ at, type: 'lowpass', f: 500, vol: vol * 0.7, d: 0.08 }); },
-    creak(at = 0, dur = 0.5, vol = 0.08, f = 380) {                     // a hinge: a rough, wavering squeak
-      const c = this.ctx, t = c.currentTime + at, o = c.createOscillator(), fl = c.createBiquadFilter(), g = c.createGain(), l = c.createOscillator(), lg = c.createGain();
-      o.type = 'sawtooth'; o.frequency.setValueAtTime(f, t); o.frequency.linearRampToValueAtTime(f * 1.35, t + dur * 0.6); o.frequency.linearRampToValueAtTime(f * 0.9, t + dur);
-      l.type = 'square'; l.frequency.value = 23; lg.gain.value = f * 0.12; l.connect(lg); lg.connect(o.frequency); fl.type = 'bandpass'; fl.frequency.value = f * 3; fl.Q.value = 4;
-      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.04); g.gain.linearRampToValueAtTime(vol * 0.7, t + dur * 0.7); g.gain.linearRampToValueAtTime(0.0001, t + dur);
-      o.connect(fl); fl.connect(g); this.out(g, 0.15); o.start(t); l.start(t); o.stop(t + dur + 0.05); l.stop(t + dur + 0.05);
+    creak(at = 0, dur = 0.5, vol = 0.08, f = 380) {                     // a hinge: lots of tiny stick-slip grains (wood rubbing), no buzzing tone
+      const n = Math.round(dur * 55); for (let i = 0; i < n; i++) { const k = i / n, ff = f * (1.4 + 0.5 * Math.sin(k * 5)) * (0.9 + Math.random() * 0.2); this.nz({ at: at + k * dur + Math.random() * 0.006, f: ff, q: 6, vol: vol * 1.6 * (0.5 + 0.5 * Math.sin(k * Math.PI)), a: 0.001, d: 0.012 }); }
     },
     /* the motor under your own cart: a soft whine that rises with speed (one per player) */
     motor(id, speed, on = true) {
-      if (!this.ctx) return; const L = this.motors || (this.motors = {}); let d = L[id];
+      if (!this.ctx) return; if (on && Settings.cartSound === false) on = false;   /* (Settings > Sound: the cart motor can be turned off) */ const L = this.motors || (this.motors = {}); let d = L[id];
       if (!on) { if (d) { d.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.08); const o = d; setTimeout(() => { try { o.o1.stop(); o.o2.stop(); } catch (e) {} }, 500); clearInterval(d.iv); delete L[id]; } return; }
       if (!d) { const c = this.ctx, o1 = c.createOscillator(), o2 = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain(); o1.type = 'sawtooth'; o2.type = 'triangle'; f.type = 'lowpass'; f.frequency.value = 700; f.Q.value = 2; g.gain.value = 0;
         o1.connect(f); o2.connect(f); f.connect(g); g.connect(this.sfxBus); o1.start(); o2.start(); d = L[id] = { o1, o2, f, g }; d.iv = setInterval(() => { if (performance.now() - d.at > 300) this.motor(id, 0, false); }, 200); }
       const t = this.ctx.currentTime, k = Math.max(0, Math.min(1, speed)); d.at = performance.now();
-      d.o1.frequency.setTargetAtTime(70 + k * 160, t, 0.08); d.o2.frequency.setTargetAtTime(700 + k * 1500, t, 0.08); d.f.frequency.setTargetAtTime(400 + k * 1400, t, 0.1); d.g.gain.setTargetAtTime(k < 0.03 ? 0 : 0.012 + k * 0.022, t, 0.1);
+      d.o1.frequency.setTargetAtTime(70 + k * 160, t, 0.08); d.o2.frequency.setTargetAtTime(700 + k * 1500, t, 0.08); d.f.frequency.setTargetAtTime(400 + k * 1400, t, 0.1); d.g.gain.setTargetAtTime(k < 0.03 ? 0 : (0.005 + k * 0.009) * (Settings.cartVolume === undefined ? 1 : Settings.cartVolume), t, 0.1);   /* (v13.5.3: about 40% as loud as before, and its own volume slider) */
     }
   });
   const R = (a, b) => a + Math.random() * (b - a);
@@ -57,7 +53,9 @@
     back: s => { s.osc({ f: 700, f2: 420, vol: 0.09, d: 0.1 }); },
     count: s => { s.osc({ f: 880, vol: 0.14, d: 0.18 }); s.osc({ f: 1760, vol: 0.04, d: 0.1 }); },
     /* a referee's pea whistle: two close pitches warbling, with breath */
-    whistle: s => { const d = 0.5; s.osc({ f: 2950, vol: 0.12, a: 0.02, d, vib: 70, vibF: 28, wet: 0.2 }); s.osc({ f: 3010, vol: 0.09, a: 0.02, d, vib: 60, vibF: 31 }); s.nz({ f: 3000, q: 3, vol: 0.05, a: 0.02, d }); },
+    whistle: s => { const d = 0.42; s.osc({ f: 1750, vol: 0.06, a: 0.03, d, vib: 22, vibF: 11, wet: 0.25 }); s.osc({ f: 875, vol: 0.025, a: 0.03, d }); s.nz({ f: 1800, q: 2, vol: 0.025, a: 0.03, d }); },   // (softer and lower: the old one sounded like a smoke alarm chirping)
+    /* Battle Royale starts with a deep "go" horn and a whoosh, not a referee's whistle */
+    br_go: s => { s.osc({ wave: 'sawtooth', f: 98, vol: 0.05, a: 0.08, d: 0.9, wet: 0.5 }); s.osc({ wave: 'sawtooth', f: 147, vol: 0.04, a: 0.08, d: 0.9, wet: 0.5 }); s.nz({ type: 'lowpass', f: 400, f2: 2400, vol: 0.12, a: 0.25, d: 0.7, pink: true, wet: 0.4 }); },
     /* the goal horn: a big brassy chord with a slow swell and the arena's echo */
     goal: s => { for (const [f, v] of [[110, 0.14], [138.6, 0.1], [165, 0.1], [220, 0.06]]) { const c = s.ctx, t = c.currentTime, o = c.createOscillator(), fl = c.createBiquadFilter(), g = c.createGain(); o.type = 'sawtooth'; o.frequency.value = f; fl.type = 'lowpass'; fl.frequency.setValueAtTime(400, t); fl.frequency.linearRampToValueAtTime(1600, t + 0.25); fl.Q.value = 1.5; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.12); g.gain.setValueAtTime(v, t + 1.3); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.9); o.connect(fl); fl.connect(g); s.out(g, 0.45); o.start(t); o.stop(t + 2); } },
     foul: s => { for (const f of [196, 247]) s.osc({ wave: 'square', f, vol: 0.06, a: 0.01, d: 0.5 }); },   // a buzzer
@@ -68,11 +66,11 @@
     boom: s => { s.nz({ type: 'highpass', f: 1500, vol: 0.5, d: 0.04, wet: 0.4 }); s.osc({ f: 90, f2: 28, vol: 0.7, a: 0.003, d: 0.7 }); s.nz({ type: 'lowpass', f: 900, f2: 120, vol: 0.6, a: 0.003, d: 1.2, wet: 0.6, pink: true });
       for (let i = 0; i < 6; i++) s.nz({ at: 0.15 + Math.random() * 0.6, f: R(1500, 4000), q: 2, vol: 0.05, d: 0.03 }); },
     /* opening things */
-    chest_open: s => { s.metal(0, 0.06, 1.4, 0.4); s.creak(0.06, 0.45, 0.07, 300); s.wood(0.5, 0.2, 1.1); for (let i = 0; i < 6; i++) s.osc({ at: 0.45 + i * 0.06, f: [1568, 1976, 2349, 2637, 3136, 3951][i], vol: 0.04, d: 0.5, wet: 0.5 }); },   // (a latch, a creak, the lid, a little sparkle)
+    chest_open: s => { s.wood(0, 0.12, 1.6); s.creak(0.05, 0.4, 0.05, 260); s.wood(0.45, 0.25, 1.0); s.nz({ at: 0.42, f: 700, f2: 2200, q: 0.7, vol: 0.05, a: 0.08, d: 0.5, wet: 0.5 }); for (let i = 0; i < 3; i++) s.osc({ at: 0.45 + i * 0.08, f: [523, 659, 784][i], vol: 0.035, a: 0.03, d: 0.7, wet: 0.6 }); },   // (the latch, a creak, the lid, a soft warm chime)
     crate_open: s => { s.metal(0, 0.1, 1.7, 0.3); s.metal(0.12, 0.08, 1.6, 0.3); s.wood(0.3, 0.22, 0.8); },
-    pickup: s => { s.nz({ f: 1200, f2: 2400, q: 1.2, vol: 0.1, a: 0.005, d: 0.08 }); s.metal(0.06, 0.04, 2.2, 0.25); },          // a grab: cloth, then a clink
-    door_open: s => { s.metal(0, 0.05, 2, 0.3); s.creak(0.05, 0.65, 0.06, 340); },
-    door_close: s => { s.creak(0, 0.25, 0.04, 360); s.wood(0.22, 0.4, 1.3); s.thud(0.22, 0.25, 70); s.metal(0.26, 0.05, 2, 0.3); },
+    pickup: s => { s.nz({ f: 900, f2: 1800, q: 1.2, vol: 0.1, a: 0.005, d: 0.08 }); s.thud(0.06, 0.08, 140); },          // a grab: cloth, then a clink
+    door_open: s => { s.wood(0, 0.08, 1.8); s.creak(0.05, 0.6, 0.045, 300); },
+    door_close: s => { s.creak(0, 0.22, 0.035, 320); s.wood(0.22, 0.4, 1.3); s.thud(0.22, 0.25, 70); s.wood(0.27, 0.08, 2.4); },
     wood_hit: s => { s.wood(0, 0.32, R(0.9, 1.2)); s.thud(0, 0.15, 80); },
     wood_break: s => { s.thud(0, 0.4, 60); s.wood(0, 0.4, 0.9); for (let i = 0; i < 10; i++) { s.wood(0.03 + Math.random() * 0.35, 0.12, R(0.5, 1.6)); s.nz({ at: Math.random() * 0.3, f: R(1500, 5000), q: 3, vol: 0.06, d: 0.02 }); } s.nz({ type: 'lowpass', f: 600, vol: 0.2, d: 0.4, pink: true, wet: 0.3 }); },
     /* fights */
@@ -81,7 +79,7 @@
     shield_hit: s => { s.metal(0, 0.18, R(1.1, 1.3), 0.7); s.nz({ type: 'highpass', f: 2500, vol: 0.2, d: 0.03 }); },
     shield_bash: s => { s.metal(0, 0.2, 1.5, 0.5); s.thud(0, 0.4, 65); },
     shield_break: s => { s.metal(0, 0.25, 1.2, 1); for (let i = 0; i < 8; i++) s.osc({ at: Math.random() * 0.25, f: R(2500, 6000), vol: 0.05, d: R(0.1, 0.3), wet: 0.3 }); s.nz({ type: 'highpass', f: 3000, vol: 0.2, d: 0.35, wet: 0.3 }); },
-    headshot: s => { s.osc({ f: 2600, vol: 0.12, d: 0.25 }); s.osc({ f: 3900, vol: 0.06, d: 0.18 }); s.nz({ type: 'highpass', f: 5000, vol: 0.1, d: 0.02 }); },   // the "tink" you hear when you land one
+    headshot: s => { s.metal(0, 0.16, 0.9, 0.8); s.nz({ type: 'highpass', f: 2200, vol: 0.18, d: 0.04 }); s.thud(0.01, 0.3, 55); s.osc({ at: 0.05, f: 1320, vol: 0.05, d: 0.5, wet: 0.6 }); s.osc({ at: 0.09, f: 1980, vol: 0.035, d: 0.45, wet: 0.6 }); },   // a helmet ping, a crack, a punch and a shimmering ring
     bubble: s => { s.osc({ f: 180, f2: 620, vol: 0.18, a: 0.01, d: 0.35, wet: 0.4 }); for (let i = 0; i < 5; i++) s.osc({ at: 0.05 + i * 0.05, f: 900 + i * 260, vol: 0.04, d: 0.4, wet: 0.6 }); s.nz({ f: 3000, q: 0.8, vol: 0.06, a: 0.1, d: 0.4, wet: 0.4 }); },
     /* the storm: a rising siren-like swell over a low drone (stage warnings), and thunder when it starts moving */
     storm_warn: s => { const c = s.ctx, t = c.currentTime; for (const [f, v] of [[196, 0.08], [293.7, 0.06], [392, 0.05]]) { const o = c.createOscillator(), fl = c.createBiquadFilter(), g = c.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(f * 0.94, t); o.frequency.exponentialRampToValueAtTime(f * 1.06, t + 1.4); fl.type = 'lowpass'; fl.frequency.setValueAtTime(300, t); fl.frequency.exponentialRampToValueAtTime(2600, t + 1.4); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 1.2); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2); o.connect(fl); fl.connect(g); s.out(g, 0.5); o.start(t); o.stop(t + 2.3); }
@@ -89,6 +87,10 @@
     storm_close: s => { s.nz({ type: 'lowpass', f: 1800, f2: 90, vol: 0.5, a: 0.02, d: 2.6, pink: true, wet: 0.6 }); s.osc({ f: 55, f2: 30, vol: 0.4, a: 0.05, d: 2.2 }); for (let i = 0; i < 8; i++) s.nz({ at: Math.random() * 0.8, type: 'lowpass', f: R(300, 900), vol: 0.15, d: R(0.2, 0.5), pink: true });
       s.nz({ at: 0.3, f: 700, f2: 1400, q: 0.7, vol: 0.12, a: 0.8, d: 1.8, pink: true }); },   // (thunder, then the wind picks up)
     /* opening a door or a chest the CPU does far away is still heard: fine, it's a game */
+    equip_gun: s => { s.nz({ f: 700, f2: 1300, q: 1, vol: 0.07, a: 0.04, d: 0.12 }); s.metal(0.16, 0.05, 1.8, 0.25); s.nz({ at: 0.18, type: 'highpass', f: 3000, vol: 0.06, d: 0.02 }); },   // (cloth, then the gun clicks into your hands)
+    equip_item: s => s.nz({ f: 900, f2: 1500, q: 1, vol: 0.06, a: 0.03, d: 0.1 }),
+    heartbeat: s => { s.osc({ f: 62, f2: 42, vol: 0.32, a: 0.008, d: 0.11 }); s.osc({ at: 0.24, f: 56, f2: 40, vol: 0.22, a: 0.008, d: 0.1 }); },   // lub-dub
+    defib: s => { s.osc({ wave: 'sine', f: 600, f2: 3200, vol: 0.05, a: 0.05, d: 0.6 }); s.nz({ at: 0.68, type: 'lowpass', f: 2000, vol: 0.4, d: 0.12 }); s.thud(0.68, 0.45, 70); s.nz({ at: 0.68, f: 3500, q: 1, vol: 0.18, d: 0.05 }); s.osc({ at: 1.0, f: 1000, vol: 0.05, d: 0.12 }); s.osc({ at: 1.35, f: 1000, vol: 0.05, d: 0.12 }); },   // charge whine, CLEAR thump, then the monitor beeps
     drift: s => s.nz({ f: 2600, f2: 2300, q: 5, vol: 0.05, d: 0.12 })
   });
   /* gunshots: the same layers as before, plus the echo off the world and the shooter's action cycling */

@@ -113,7 +113,7 @@ class SeasonHubScene extends ListMenuScene {
     panel(this, x0 - 20, 135, 570, 545);
     badge(this, x0 + 55, 205, s.team, 100);
     this.add.text(x0 + 130, 165, TEAMS[s.team].name.toUpperCase(), { ...STYLE.hud, fontSize: '46px', color: teamColorHex(s.team) });
-    this.add.text(x0 + 130, 217, `${lineText(null, row)}   ${row.pts} pts   ${ordinal(row.rank)} of ${SEASON_N}`, { ...STYLE.hint, fontSize: '26px', color: '#e8eef2' });
+    this.add.text(x0 + 130, 217, `${lineText(null, row)}   ${row.pts} pts   ${ordinal(row.rank)} of ${Season.ids(s).length}`, { ...STYLE.hint, fontSize: '26px', color: '#e8eef2' });
     this.add.text(x0, 277, stageText(s), { ...STYLE.hud, fontSize: '30px', color: '#f2c200' });
     let y = 322;
     if (done) {
@@ -145,7 +145,7 @@ class SeasonHubScene extends ListMenuScene {
 class StandingsScene extends Phaser.Scene {
   constructor() { super('Standings'); }
   create() {
-    const s = Season.cur; menuBackdrop(this); const rows = Season.standings(s), Q = Season.qualifiers();
+    const s = Season.cur; menuBackdrop(this); const rows = Season.standings(s), Q = Season.qualifiers(s);
     this.add.text(CX, 44, 'STANDINGS', { ...STYLE.title, fontSize: '52px' }).setOrigin(0.5); this.add.rectangle(CX, 82, 130, 4, THEME.gold, 0.95);
     const x0 = 250, y0 = 112, h = 33;
     panel(this, x0 - 30, y0 - 12, 800, h * (rows.length + 1) + 36, { depth: -40 });
@@ -203,7 +203,7 @@ class BracketScene extends Phaser.Scene {
   constructor() { super('Bracket'); }
   init(data) { this.intro = !!(data && data.intro); }
   create() {
-    const s = Season.cur; menuBackdrop(this); const Q = Season.qualifiers(), rounds = Math.log2(Q), P = s.playoffs;
+    const s = Season.cur; menuBackdrop(this); const Q = Season.qualifiers(s), rounds = Math.log2(Q), P = s.playoffs;
     this.add.text(CX, 40, s.stage === 'regular' ? 'PLAYOFF PICTURE' : CONFIG.season.cupName.toUpperCase(), { ...STYLE.title, fontSize: '50px' }).setOrigin(0.5); this.add.rectangle(CX, 76, 130, 4, THEME.gold, 0.95);
     let shown = [];
     if (P) shown = P.rounds;

@@ -9,14 +9,14 @@ const Season = {
   levels() { return Object.keys(CONFIG.difficulties); },
 
   /* ---- creating a season ---- */
-  create({ team, difficulty, periodSeconds, double, year, ratings, history }) {
-    const n = SEASON_N, rt = ratings ? ratings.slice() : TEAMS.slice(0, SEASON_N).map(t => t.rating);
-    const rounds = this.schedule(n, !!double);
-    return { v: 1, year: year || 1, team, difficulty: difficulty || 'Normal', periodSeconds: periodSeconds || 300, double: !!double,
+  create({ team, difficulty, periodSeconds, double, year, ratings, history, league }) {
+    const lg = league || TEAMS[team].league, ids = leagueTeams(lg), rt = ratings ? ratings.slice() : TEAMS.map(t => t.rating);   /* (v13.5: a season is one league's teams; ratings are indexed by team) */
+    const rounds = this.schedule(ids, !!double);
+    return { v: 1, league: lg, ids, year: year || 1, team, difficulty: difficulty || 'Normal', periodSeconds: periodSeconds || 300, double: !!double,
              ratings: rt, rounds, day: 0, stage: 'regular', playoffs: null, champion: null, userPlayoffResult: '', log: [], settings: { cup: this.C().cupName } };
   },
-  schedule(n, double) {                                 // the circle method: every team plays every other once, one team sits out each round when n is odd
-    const ids = Array.from({ length: n }, (_, i) => i); if (n % 2) ids.push(-1);
+  schedule(teams, double) {                             // the circle method: every team plays every other once, one team sits out each round when n is odd
+    const ids = Array.isArray(teams) ? teams.slice() : Array.from({ length: teams }, (_, i) => i), n = ids.length; if (n % 2) ids.push(-1);
     const m = ids.length, rounds = [];
     for (let r = 0; r < m - 1; r++) {
       const fx = [];
@@ -33,7 +33,7 @@ const Season = {
 
   /* ---- results and the table ---- */
   standings(s) {
-    const row = {}; TEAMS.slice(0, SEASON_N).forEach((_, t) => { row[t] = { t, gp: 0, w: 0, l: 0, otl: 0, pts: 0, gf: 0, ga: 0, form: [] }; });
+    const row = {}; this.ids(s).forEach(t => { row[t] = { t, gp: 0, w: 0, l: 0, otl: 0, pts: 0, gf: 0, ga: 0, form: [] }; });
     const C = this.C();
     for (const fx of s.rounds.flat()) {
       if (!fx.done) continue;
@@ -56,7 +56,7 @@ const Season = {
   },
   /* How sharp the CPU plays for a team in games you play: your chosen difficulty, a step up for the strongest teams and a step down for the weakest. */
   levelFor(s, team) {
-    const L = this.levels(), base = Math.max(0, L.indexOf(s.difficulty)), sorted = s.ratings.slice().sort((a, b) => b - a), r = s.ratings[team];
+    const L = this.levels(), base = Math.max(0, L.indexOf(s.difficulty)), sorted = this.ids(s).map(t => s.ratings[t]).sort((a, b) => b - a), r = s.ratings[team];
     const shift = r >= sorted[Math.floor(sorted.length * 0.25)] ? 1 : r <= sorted[Math.floor(sorted.length * 0.7)] ? -1 : 0;
     return L[Math.max(0, Math.min(L.length - 1, base + shift))];
   },
@@ -107,11 +107,12 @@ const Season = {
   },
 
   /* ---- the playoffs ---- */
-  qualifiers() { let q = 1; while (q * 2 <= Math.min(this.C().qualifiers, SEASON_N)) q *= 2; return q; },
+  qualifiers(s) { const n = s ? this.ids(s).length : leagueTeams(TEAMS[Settings.seasonTeam] ? TEAMS[Settings.seasonTeam].league : 'premier').length; let q = 1; while (q * 2 <= Math.min(this.C().qualifiers, n)) q *= 2; return q; },
+  ids(s) { return s.ids || (s.ids = leagueTeams('premier')); },        // (saves from before v13.5 are Premier League seasons)
   seriesLength(round, rounds) { const L = this.C().series; return L[Math.max(0, L.length - (rounds - round))] || 3; },   // the last round is always the last length in the list
   roundName(round, rounds) { const left = rounds - round; return left === 1 ? CONFIG.season.cupName + ' Final' : left === 2 ? 'Semifinal' : left === 3 ? 'Quarterfinal' : 'Round of ' + Math.pow(2, left); },
   startPlayoffs(s) {
-    const Q = this.qualifiers(), seeds = this.standings(s).slice(0, Q).map(r => r.t);
+    const Q = this.qualifiers(s), seeds = this.standings(s).slice(0, Q).map(r => r.t);
     s.seeds = seeds; s.stage = 'playoffs'; s.playoffs = { round: 0, rounds: [], total: Math.log2(Q) };
     const first = [];
     for (let i = 0; i < Q / 2; i++) first.push(this.series(s, seeds[i], seeds[Q - 1 - i], 0));
@@ -138,11 +139,11 @@ const Season = {
 
   /* ---- keeping it ---- */
   next(s) {                                              // the next season: the same team and settings, ratings drift a little
-    const D = this.C().drift, ratings = s.ratings.map(r => Math.round(Math.max(45, Math.min(95, r + (Math.random() * 2 - 1) * D))));
-    return this.create({ team: s.team, difficulty: s.difficulty, periodSeconds: s.periodSeconds, double: s.double, year: s.year + 1, ratings });
+    const D = this.C().drift, ratings = s.ratings.map(r => r == null ? r : Math.round(Math.max(45, Math.min(95, r + (Math.random() * 2 - 1) * D))));
+    return this.create({ team: s.team, difficulty: s.difficulty, periodSeconds: s.periodSeconds, double: s.double, year: s.year + 1, ratings, league: s.league || 'premier' });
   },
   save(s) { try { localStorage.setItem(this.key, JSON.stringify(s)); } catch (e) { /* storage blocked */ } if (typeof Account !== 'undefined') Account.changed(); },   // logged in: also saved online
-  load() { try { const s = JSON.parse(localStorage.getItem(this.key) || 'null'); return s && s.v === 1 && Array.isArray(s.rounds) && s.ratings && s.ratings.length === SEASON_N ? s : null; } catch (e) { return null; } },
+  load() { try { const s = JSON.parse(localStorage.getItem(this.key) || 'null'); return s && s.v === 1 && Array.isArray(s.rounds) && s.ratings && s.ratings.length >= this.ids(s).length && this.ids(s).every(t => s.ratings[t] != null) ? s : null; } catch (e) { return null; } },
   clear() { try { localStorage.removeItem(this.key); } catch (e) { /* storage blocked */ } if (typeof Account !== 'undefined') Account.changed(); },
   history() { try { const h = JSON.parse(localStorage.getItem(this.historyKey) || '[]'); return Array.isArray(h) ? h : []; } catch (e) { return []; } },
   addHistory(s) {

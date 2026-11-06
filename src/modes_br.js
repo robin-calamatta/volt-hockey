@@ -12,7 +12,7 @@ const BR = { H: 2.2, hp: 100, maxShield: 100, slots: 5, grace: 4, grav: 15, jump
 const BR_AIM = { min: -0.5, max: 0.7, rate: 1.4, back: 0.45, idle: 1.4 };
 function brAimInput(p, src, dt) {
   if (!p || !src) return; const h = src.held || {}, ly = (src.ry || 0) * (Settings.invertLook ? -1 : 1), k = (h.aimUp ? 1 : 0) - (h.aimDown ? 1 : 0) - (Math.abs(ly) > 0.15 ? ly : 0);
-  let a = p.brAp || 0; if (k) { a += k * BR_AIM.rate * (Settings.lookV || 1) * dt; p.brAimT = 0; } else { p.brAimT = (p.brAimT || 0) + dt; if (p.brAimT > BR_AIM.idle) a -= Math.sign(a) * Math.min(Math.abs(a), BR_AIM.back * dt); }
+  let a = p.brAp || 0; p.brAk = (p.brAk || 0) + (k - (p.brAk || 0)) * (1 - Math.exp(-(p.brAds ? 8 : 20) * dt)); if (Math.abs(k) > 0.001 || Math.abs(p.brAk) > 0.02) { a += p.brAk * BR_AIM.rate * (Settings.lookV || 1) * (p.brAds ? 0.5 : 1) * dt; p.brAimT = 0; } else { p.brAimT = (p.brAimT || 0) + dt; if (p.brAimT > BR_AIM.idle) a -= Math.sign(a) * Math.min(Math.abs(a), BR_AIM.back * dt); }
   p.brAp = Math.max(BR_AIM.min, Math.min(BR_AIM.max, a));
 }
 function brAds(c) { return c.player && c.player.brAds !== undefined ? c.player.brAds : (c.gs && c.gs.ads) || 0; }   // LT held: aiming down the sights
@@ -443,4 +443,4 @@ GAME_INFO.br = { name: 'Battle Royale', cat: 'sneaky', noCarts: true, blurb: 'Lo
     'Switch item: LB / RB  /  Z / R or the mouse wheel  /  [ / ]  /  touch ◀ ▶', 
     'Bag (and the map): tap D-pad ▲  /  H  /  M  /  touch BAG.  Hold it for the emoji and action wheel', 'Aim up and down: right stick  /  I and K  /  Page Up and Page Down', 'When you are out: LB / RB switch whose view you watch, ▼ first / third person, Y takes over a CPU team-mate', CTRL.pause],
   opts: [{ key: 'map', label: 'Map', values: ['downtown', 'jungle', 'port', 'suburbs', 'canyon'], names: ['Downtown', 'The Jungle', 'The Port', 'The Suburbs', 'The Canyon'], def: 'downtown', hint: () => (BR_MAPS[modeOpts('br').map] || BR_MAPS.downtown).blurb },
-    { key: 'squad', label: 'Teams', values: [1, 2, 3], names: ['Solo', 'Duos (teams of 2)', 'Trios (teams of 3)'], def: 1 }, { key: 'carts', label: 'Carts', values: [6, 8, 10, 12], def: 10, hint: 'Carts nobody drives are played by the CPU.' }] };
+    { key: 'squad', label: 'Teams', values: [1, 2, 3, 4, 5], names: ['Solo', 'Duos (teams of 2)', 'Trios (teams of 3)', 'Squads (teams of 4)', 'Fives (teams of 5)'], def: 1 }, { key: 'carts', label: 'Carts', values: [6, 8, 10, 12, 16, 20], def: 12, hint: 'Carts nobody drives are played by the CPU.' }, { key: 'music', label: 'Music', values: [0, 1], names: ['Off', 'On'], def: 0, hint: 'Game music while you play (your songs in assets/music/game/). Off by default.' }] };

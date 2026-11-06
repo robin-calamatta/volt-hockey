@@ -82,3 +82,40 @@ class SparklerIntro {
   get running() { return !this.ended; }
 }
 SparklerIntro.played = false;
+
+/* v13.5.1: the sparkler SIZZLES while it burns the logo in: a hiss of bright noise that flickers, little crackles and pops,
+   a whoosh when the logo flares, and it fizzles away as the title shows. (Browsers only let a page make sound after you've
+   clicked or pressed something, so on a first visit with no click yet the opening may be silent.) */
+const Sizzle = {
+  start() {
+    const S = Sound; try { S.resume(); } catch (e) { return; } const c = S.ctx; if (!c || !S.noiseBuffer || this.on) return;
+    const src = c.createBufferSource(); src.buffer = S.noiseBuffer; src.loop = true;
+    const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3200;
+    const pk = c.createBiquadFilter(); pk.type = 'peaking'; pk.frequency.value = 6500; pk.Q.value = 1.4; pk.gain.value = 8;
+    const g = c.createGain(); g.gain.value = 0.0001; src.connect(hp); hp.connect(pk); pk.connect(g); g.connect(S.sfxBus); src.start();
+    this.on = { src, g, pk, c }; this.level = 0;
+  },
+  update(level) {                                                    // level 0..1: how hard it is burning; flickers like the real thing
+    const o = this.on; if (!o) return; const t = o.c.currentTime, v = level * (0.07 + Math.random() * 0.05);
+    o.g.gain.cancelScheduledValues(t); o.g.gain.setTargetAtTime(Math.max(0.0001, v), t, 0.02); o.pk.frequency.setTargetAtTime(5200 + Math.random() * 3000, t, 0.03);
+    if (level > 0.2 && Math.random() < 0.35 * level) Sound.nz({ type: 'bandpass', f: 2500 + Math.random() * 5000, q: 3, vol: 0.05 + Math.random() * 0.08, a: 0.001, d: 0.008 + Math.random() * 0.02 });   // crackles
+    if (level > 0.5 && Math.random() < 0.04) Sound.nz({ type: 'bandpass', f: 1400 + Math.random() * 900, q: 2, vol: 0.12, a: 0.001, d: 0.03 });                                  // a pop
+  },
+  flare() { if (!this.on) return; Sound.nz({ type: 'bandpass', f: 800, f2: 6000, q: 0.8, vol: 0.16, a: 0.08, d: 0.5, wet: 0.3 }); Sound.nz({ type: 'highpass', f: 5000, vol: 0.1, a: 0.01, d: 0.9 }); },
+  stop(fast) { const o = this.on; if (!o) return; this.on = null; const t = o.c.currentTime; o.g.gain.cancelScheduledValues(t); o.g.gain.setTargetAtTime(0.0001, t, fast ? 0.03 : 0.35); try { o.src.stop(t + (fast ? 0.2 : 1.8)); } catch (e) { /* already stopped */ } }
+};
+{ const P = SparklerIntro.prototype, up = P.update, sk = P.skip, fin = P.finish;
+  P.update = function (dt) {
+    if (!this.done) {
+      if (!this.sizzled) { this.sizzled = true; Sizzle.start(); this.sc.events.once('shutdown', () => { this.sizzleOut = true; Sizzle.stop(true); }); MUSIC_READY.then(() => { if (PLAYLISTS.intro.length && !this.introSong) { this.introSong = true; Sound.playMusic('intro'); } }); }   /* (a song from assets/music/intro/ behind the opening, if there are any) */
+      const burning = this.ends.some(([a, z]) => this.t >= a && this.t < z), fizz = this.t >= this.flashAt ? Math.max(0, 1 - (this.t - this.flashAt) / (INTRO.flash + INTRO.fade)) * 0.6 : 0;
+      if (!Sizzle.on && this.t < this.flashAt) Sizzle.start();       // (sound unlocked part-way through: join in)
+      Sizzle.update(burning ? 1 : fizz);
+      if (this.t >= this.flashAt && !this.sizzleFlare) { this.sizzleFlare = true; Sizzle.flare(); }
+      if (this.t >= this.fadeAt + INTRO.fade && !this.sizzleOut) { this.sizzleOut = true; Sizzle.stop(false); }
+    }
+    return up.call(this, dt);
+  };
+  P.skip = function () { Sizzle.stop(true); return sk.call(this); };
+  P.finish = function (...a) { if (!this.sizzleOut) { this.sizzleOut = true; Sizzle.stop(false); } return fin.apply(this, a); };
+}

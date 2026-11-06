@@ -130,7 +130,8 @@ class LobbyStage {
     const p = this.sparks.geometry.attributes.position; for (let i = 0; i < p.count; i++) { let y = p.getY(i) + dt * (0.15 + (i % 7) * 0.05); if (y > 8) y = 0; p.setY(i, y); } p.needsUpdate = true;
     this.ring.material.color.setHSL(0.53 + 0.06 * Math.sin(performance.now() / 900), 1, 0.65);
     const k = 1 - Math.exp(-6 * dt); this.offX += ((frame.x - 0.5) - this.offX) * k; this.zoom += ((frame.zoom || 1) - this.zoom) * k;
-    const cam = this.cam, d = 4.9 / this.zoom; cam.aspect = w / h; cam.position.set(d * 0.92, 1.25 + 0.2 / this.zoom, d * 0.38); cam.lookAt(-0.2, 0.68, 0);
+    const pt = this.mates && this.mates.size && frame.zoom <= 1.02 ? 1 : 0; this.pk = (this.pk || 0) + (pt - (this.pk || 0)) * k; const pk = this.pk;   /* (your party behind you: the camera rises and steps back to frame the V) */
+    const cam = this.cam, d = 4.9 / this.zoom + 3.2 * pk; cam.aspect = w / h; cam.position.set(d * 0.92, 1.25 + 0.2 / this.zoom + 2.0 * pk, d * 0.38); cam.lookAt(-0.2 - 1.75 * pk, 0.68 + 0.2 * pk, -0.72 * pk);
     cam.setViewOffset(w, h, -this.offX * w, 0, w, h); cam.updateProjectionMatrix();
     r.setScissorTest(true); r.setViewport(0, 0, w, h); r.setScissor(0, 0, w, h); r.setClearColor(0x07091a, 1); r.clear(); r.render(this.scene, cam);
   }

@@ -80,7 +80,7 @@ Object.assign(GameScene.prototype, {
     if (this.flat || !vp || !vp.chair || !this.v3) { p.steer = null; return; }
     const S = CONFIG.view3d.steer, ch = vp.chair, ax = src.ax || 0, ay = src.ay || 0;
     if (vp.mode === 'broadcast') { const A = this.v3.screenAxes(vp); p.steer = { x: A.right.x * ax - A.up.x * ay, y: A.right.y * ax - A.up.y * ay }; return; }
-    const h = ch.heading, rate = CONFIG.chair.baseTurnRate * Settings.turnSpeed * (Settings.lookH || 1), fwd = -ay, turn = ax;   /* (lookH: the left / right sensitivity) */
+    const h = ch.heading, rate = CONFIG.chair.baseTurnRate * Settings.turnSpeed * (Settings.lookH || 1) * (p.brAds ? 0.45 : 1), fwd = -ay; p._turnS = (p._turnS || 0) + (ax - (p._turnS || 0)) * (1 - Math.exp(-(p.brAds ? 9 : 30) * dt)); const turn = p.brAds ? p._turnS : ax;   /* (aiming: slower and smoothed) */   /* (lookH: the left / right sensitivity) */
     if (p._aim === undefined || p._aimChair !== ch) { p._aim = h; p._aimChair = ch; p._lastH = h; }
     const jump = normalizeAngle(h - p._lastH); p._lastH = h;
     if (Math.abs(jump) > rate * dt + 0.03 || ch.spinLeft > 0) p._aim += jump;                     // a spin shot (or a knock) turned the cart: the aim turns with it
