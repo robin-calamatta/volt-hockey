@@ -1,7 +1,9 @@
 /* v13.5: local players join in the lobby and come along into every game.
    - In the lobby: press START on a second controller (or ＋ PLAYER, then A on the new player's controller). Hold B on their controller to leave.
-   - They stand on the stage with you and play every game with you: hockey (on your team), seasons, minigames, Battle Royale (your squad),
-     and online rooms and party games (they join as your local guests). There is no controller screen after picking a game any more. */
+   - They stand on the stage with you and play every game with you: hockey, seasons, minigames, Battle Royale (your squad),
+     and online rooms and party games (they join as your local guests).
+   - Games with two teams (Volt Hockey matches and practice, team minigames) still open the side picker, with you and them already on it
+     (in the middle to start with: ◀ ▶ picks a side, X locks you to one cart, START plays; anyone left in the middle doesn't play). Seasons, free-for-alls and Battle Royale go straight in. */
 const Locals = {
   list: [], max: 3, primary: null,                                       // primary: the device you (the main player) last used
   live() { const L = Controls.list(); this.list = this.list.filter(l => L.includes(l.src)); return this.list; },
@@ -23,6 +25,12 @@ const Locals = {
 /* ---- no controller screen: the game starts with you and your local players ---- */
 { const P = LobbyScene.prototype, cr = P.create;
   P.create = function () {
+    if (!this.season && !this.br && (!this.mini || this.mini.mode === 'teams')) {   /* games with two teams: pick your side (you and your local players are already on the screen) */
+      cr.call(this); const me = Locals.primary && !Locals.has(Locals.primary) && Controls.list().includes(Locals.primary) ? Locals.primary : null;
+      const join = (src, name, look) => { this.players.push({ src, side: null, chair: null, spinQueued: 0, speedLevel: Settings.speedLevel, name, look, squad: 0, x: this.colX[1] }); };
+      if (me) join(me, Settings.myName() || this.firstName()); for (const l of Locals.live()) join(l.src, l.name, l.look);
+      return;
+    }
     const n = 1 + Locals.live().length, sz = this.sizes || [3, 3];
     let side;
     if (this.season) side = () => this.season.side;

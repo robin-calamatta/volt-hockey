@@ -3,6 +3,21 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v13.6: the online room, redone
+- **Teams first (host):** a new room opens on the same team cards as Play now and Practice. Each card has the logo and stats, ◀ ▶ picks the team, LB / RB picks the league (Premier League, National Teams, Cities), and ▲ ▼ sets the carts. X opens the room settings: public or private, lobby name, game, CPU skill, practice, carts and Close room. The match rules are one level in, under **Rules ▸**. A goes on to the side picker.
+- **Side picker (everyone):** three columns, like the local controller screen: your team's logo on each side and **everyone starts in the middle**.
+  - Each player pushes ◀ ▶ (or taps a column) to pick a side, X locks them to one cart, and ▲ ▼ changes their name.
+  - Local guests move themselves on their own controllers, and B on a guest's controller removes them.
+  - The host has Y for settings, LB to go back to the teams, and START to play.
+  - Online everyone plays, so anyone still in the middle at START is moved to the side with room. The host gets a warning first and presses START again to go.
+- **Minigames and Battle Royale** with no sides show one list of who's in.
+- **After a game** the room comes back on the side picker.
+
+## v13.5.6: pick your side again (everyone starts in the middle)
+- Volt Hockey matches, practice and the team minigames (Paintball and Capture the Flag in Teams mode, Multiball, Giant Ball...) open the side picker again after you choose the teams.
+- You and your local players are already on it, in the middle. Each player pushes ◀ ▶ to pick a side, and X locks them to one cart (or leaves them free to switch carts). START plays. Anyone still in the middle doesn't play. Other controllers can still join with A.
+- Seasons (you always play for your team), free-for-all minigames and Battle Royale go straight in.
+
 ## v13.5.5: no more music 404s on Netlify
 - Netlify now writes `assets/music/playlist.json` itself on every deploy (the build command runs `tools/make-playlist.js`). Push your songs in `assets/music/menu/`, `game/` and `intro/`, and they're found.
 - The game only asks for folder listings (`menu/`, `game/`, `match/`, `intro/`, `music/`) on your own computer or home network with no playlist. Public hosts always answered those with 404s.

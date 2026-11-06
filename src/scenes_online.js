@@ -166,7 +166,7 @@ class RoomScene extends ListMenuScene {
     const host = this.role === 'host'; this.opening = false;
     if (host && !this.session) {
       this.opening = true; this.session = new HostSession(new PeerTransport());
-      if (this.preset) { this.session.preset = this.preset; const { seasonFx, ...cfg } = this.preset; Object.assign(this.session.cfg, cfg); this.session.seasonFx = seasonFx || null; if (cfg.season) this.session.roster[0].side = cfg.season.side; }
+      if (this.preset) { this.session.preset = this.preset; const { seasonFx, ...cfg } = this.preset; Object.assign(this.session.cfg, cfg); this.session.seasonFx = seasonFx || null; if (cfg.season) { this.session.roster[0].side = cfg.season.side; this.session.roster[0].mid = false; } }
       this.session.open().then(() => { this.opening = false; }).catch(e => this.fail(e));
     }
     const cycle = (key, d) => { const cfg = this.session.cfg, other = key === 'teamA' ? cfg.teamB : cfg.teamA; let i = cfg[key]; do { i = (i + d + TEAMS.length) % TEAMS.length; } while (i === other); this.session.setConfig({ [key]: i }); };

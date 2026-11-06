@@ -160,7 +160,7 @@ class HostSession {
   constructor(transport) {
     this.transport = transport; this.code = null; this.myId = 1; this.state = 'lobby'; this.entries = new Map(); this.nextId = 2; this.match = null; this.guestSrc = new Map();      // guestSrc: the devices of this machine's local guests (id -> input source)
     this.cfg = { teamA: Settings.teamA, teamB: Settings.teamB, sizes: [CONFIG.match.chairsPerTeam, CONFIG.match.chairsPerTeam], difficulty: Settings.difficulty, practice: false };
-    this.roster = [{ id: 1, name: Settings.myName() || 'Player 1', side: 0, host: true, ...accountTag() }]; this.snapAcc = 0;   // accountTag: username, adult, voice id (for chat and voice rules) this.tickNo = 0; this.closed = false;
+    this.roster = [{ id: 1, name: Settings.myName() || 'Player 1', side: 0, mid: true, host: true, ...accountTag() }]; this.snapAcc = 0;   // accountTag: username, adult, voice id (for chat and voice rules) this.tickNo = 0; this.closed = false;
     this.onChange = null; this.onPlayerLeft = null; this.onError = null;
     this.visibility = 'private'; this.lobbyName = DIR().names[0]; this.directory = null;       // public rooms appear in everyone's Browse list
   }
@@ -198,7 +198,7 @@ class HostSession {
   addGuest(owner, name, k, preferSide) {
     if (this.state !== 'lobby' || this.roster.length >= CONFIG.online.maxPlayers || this.guestsOf(owner).length >= CONFIG.online.maxGuests) return null;
     const side = preferSide !== undefined && this.count(preferSide) < this.cfg.sizes[preferSide] ? preferSide : this.openSide(); if (side === undefined) return null;
-    const g = { id: this.nextId++, name: this.uniqueName(Settings.cleanName(name) || this.guestName(this.roster.map(r => r.name))), side, own: owner, guest: true, k: k || 0 };
+    const g = { id: this.nextId++, name: this.uniqueName(Settings.cleanName(name) || this.guestName(this.roster.map(r => r.name))), side, mid: !this.cfg.season, own: owner, guest: true, k: k || 0 };   // mid: still in the middle of the side picker (v13.6)
     this.roster.push(g); this.sendRoster(); return g;
   }
   addLocalGuest(src) {                                            // the host's own guests: same side as the host if there is room
@@ -230,12 +230,12 @@ class HostSession {
       if (this.roster.length >= CONFIG.online.maxPlayers || side === undefined) return this.reject(entry, 'full');
       if (this.cfg.mini && this.cfg.mini.kind === 'br' && (+msg.psize || 1) > (this.cfg.mini.squad || 1)) return this.reject(entry, 'party-too-big');   // Battle Royale: your party plays as one squad
       entry.id = this.nextId++; clearTimeout(entry.hello);
-      this.roster.push({ id: entry.id, name: this.uniqueName(Settings.cleanName(msg.name) || 'Player ' + (this.roster.length + 1)), side, look: Avatar.cleanLook(msg.look), party: cleanText(msg.party, 80), acct: cleanText(msg.acct, 20), adult: !!msg.adult, vid: cleanText(msg.vid, 80) });
+      this.roster.push({ id: entry.id, name: this.uniqueName(Settings.cleanName(msg.name) || 'Player ' + (this.roster.length + 1)), side, mid: !this.cfg.season, look: Avatar.cleanLook(msg.look), party: cleanText(msg.party, 80), acct: cleanText(msg.acct, 20), adult: !!msg.adult, vid: cleanText(msg.vid, 80) });
       entry.conn.send({ t: 'welcome', id: entry.id, code: this.code, roster: this.roster, cfg: this.cfg });
       return this.sendRoster();
     }
     switch (msg.t) {
-      case 'side': if (this.state === 'lobby') { const p = this.canEdit(entry, msg.id === undefined ? entry.id : msg.id); if (p) this.setSide(p.id, msg.side); } break;
+      case 'side': if (this.state === 'lobby') { const p = this.canEdit(entry, msg.id === undefined ? entry.id : msg.id); if (p) { if (msg.side === -1) this.setMid(p.id); else this.setSide(p.id, msg.side); } } break;
       case 'lock': if (this.state === 'lobby') { const p = this.canEdit(entry, msg.id === undefined ? entry.id : msg.id); if (p) this.setLock(p.id, msg.lock); } break;
       case 'name': if (this.state === 'lobby') { const p = this.canEdit(entry, msg.id === undefined ? entry.id : msg.id); if (p) this.setName(p.id, msg.name); } break;
       case 'addGuest': this.addGuest(entry.id, msg.name, +msg.k || 0); break;
@@ -257,10 +257,12 @@ class HostSession {
   }
   sendChat(text, q, to) { this.relayChat(this.myId, { text, q, to }); }
   setVid(vid) { const me = this.roster.find(r => r.id === this.myId); if (me) { me.vid = vid; this.sendRoster(); } }
+  setMid(id) { const p = this.roster.find(r => r.id === id); if (!p || this.cfg.season || p.mid) return false; p.mid = true; this.sendRoster(); return true; }   // back to the middle: not picked a side yet
   setSide(id, side) {
     const p = this.roster.find(r => r.id === id);
+    if (p && p.mid && p.side === side && !(this.cfg.season && side !== this.cfg.season.side)) { p.mid = false; this.sendRoster(); return true; }   // out of the middle onto the side you were held for
     if (!p || (side !== 0 && side !== 1) || p.side === side || this.count(side) >= this.cfg.sizes[side] || (this.cfg.season && side !== this.cfg.season.side)) return false;
-    p.side = side; this.sendRoster(); return true;
+    p.side = side; p.mid = false; this.sendRoster(); return true;
   }
   setConfig(patch) {                                              // host menu: teams, sizes, difficulty...
     Object.assign(this.cfg, patch);
