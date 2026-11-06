@@ -118,7 +118,7 @@ Object.assign(GameScene.prototype, {
     if (c && c.out) { const s = vp && vp.spect, cpuMate = s && !s.player && s.gs.team === c.gs.team; X.spec.setText(s ? `ELIMINATED  -  watching ${m.name(s)}     LB / RB: switch     ▼: 1st / 3rd person${cpuMate ? '     Y: TAKE OVER this cart' : ''}` : 'ELIMINATED').setVisible(m.state !== 'over'); }
     if (X.prompt) X.prompt.setVisible(false);
     if (c && !c.out && m.state === 'play') this.brPrompts(m, c, p0, vp);
-    if (typeof TouchPad !== 'undefined' && TouchPad.relabel) TouchPad.relabel(BR_TOUCH);
+    /* (the touch buttons' names come from TouchPad.profile in touch.js) */
   };
   P.brHud = function (m) {
     const r = hud.call(this, m); if (!r) return r; const H = this.brH, c = ((this.setup.players || []).filter(p => !p.remote && p.chair)[0] || {}).chair; if (!c) return r; const G = c.gs;

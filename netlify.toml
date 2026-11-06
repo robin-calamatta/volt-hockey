@@ -4,7 +4,7 @@
 # (Drag-and-drop deploys do not include functions.)
 [build]
   publish = "."
-  command = "npm install --no-audit --no-fund"
+  command = "npm install --no-audit --no-fund && node tools/make-playlist.js"   # (writes assets/music/playlist.json from your music folders on every deploy)
 
 [functions]
   directory = "netlify/functions"

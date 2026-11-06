@@ -5,24 +5,30 @@
 const TOUCH = {
   baseWidth: 900, minUnit: 0.6, maxUnit: 1.5, stickDeadzone: 0.12, stickMenuThreshold: 0.55, edgeMargin: 0.04, opacity: 0.6, opacitySteps: [0.3, 0.45, 0.6, 0.8, 1], scaleStep: 0.15, scaleMin: 0.5, scaleMax: 2,
   /* x, y: centre as a fraction of the screen. size: pixels at the base screen size. button: the logical button it presses (see BUTTONS in input.js). */
-  gameOnly: ['spinCW', 'spinCCW', 'halfCW', 'halfCCW', 'x', 'y', 'speedUp', 'speedDown', 'camera', 'quick'],     // hidden in menus so they do not cover the menu items
+  gameOnly: ['spinCW', 'spinCCW', 'halfCW', 'halfCCW', 'x', 'y', 'speedUp', 'speedDown', 'camera', 'quick', 'aimUp', 'aimDown'],     // hidden in menus so they do not cover the menu items
   controls: {
     stick:    { kind: 'stick',  x: 0.14, y: 0.68, size: 176, name: 'Move stick' },
     spinCW:   { kind: 'button', x: 0.93, y: 0.60, size: 104, button: 'spinCW',   label: '↻', sub: 'SPIN',  name: 'Spin clockwise (RT)' },
     spinCCW:  { kind: 'button', x: 0.80, y: 0.76, size: 104, button: 'spinCCW',  label: '↺', sub: 'SPIN',  name: 'Spin counter-clockwise (LT)' },
     halfCW:   { kind: 'button', x: 0.80, y: 0.50, size: 66,  button: 'halfCW',   label: '↻', sub: 'HALF',  name: 'Half spin clockwise (RB)' },
     halfCCW:  { kind: 'button', x: 0.66, y: 0.74, size: 66,  button: 'halfCCW',  label: '↺', sub: 'HALF',  name: 'Half spin counter-clockwise (LB)' },
-    x:        { kind: 'button', x: 0.07, y: 0.45, size: 56,  button: 'x',        label: 'X', sub: 'PRESS', name: 'Full press on / off (X)' },
+    x:        { kind: 'button', x: 0.07, y: 0.40, size: 56,  button: 'x',        label: 'X', sub: 'PRESS', name: 'Full press on / off (X)' },
     a:        { kind: 'button', x: 0.94, y: 0.88, size: 62,  button: 'a',        label: 'A', sub: 'OK',    name: 'A: select / rematch' },
     b:        { kind: 'button', x: 0.64, y: 0.90, size: 56,  button: 'b',        label: 'B', sub: 'BACK',  name: 'B: back' },
     y:        { kind: 'button', x: 0.93, y: 0.36, size: 60,  button: 'y',        label: '⇄', sub: 'CART',  name: 'Switch cart (Y)' },
-    speedUp:  { kind: 'button', x: 0.07, y: 0.13, size: 54,  button: 'speedUp',  label: '+', sub: 'SPEED', name: 'Cart speed up (RB)' },
-    speedDown:{ kind: 'button', x: 0.07, y: 0.29, size: 54,  button: 'speedDown',label: '−', sub: 'SPEED', name: 'Cart speed down (LB)' },
+    speedUp:  { kind: 'button', x: 0.07, y: 0.25, size: 54,  button: 'speedUp',  label: '+', sub: 'SPEED', name: 'Cart speed up (RB)' },
+    speedDown:{ kind: 'button', x: 0.165, y: 0.25, size: 54,  button: 'speedDown',label: '−', sub: 'SPEED', name: 'Cart speed down (LB)' },
     camera:   { kind: 'button', x: 0.93, y: 0.235, size: 50, button: 'camera',   label: '◉', sub: 'VIEW',  name: 'Camera view (1st / 3rd person, broadcast, 2D)' },
     start:    { kind: 'button', x: 0.50, y: 0.92, size: 50,  button: 'start',    label: 'II', sub: '',     name: 'Pause' },
-    quick:    { kind: 'button', x: 0.07, y: 0.61, size: 54,  button: 'quick',    label: '😀', sub: 'EMOTE', name: 'Emotes (hold for the wheel); Battle Royale: tap for your bag' }
+    quick:    { kind: 'button', x: 0.165, y: 0.40, size: 54,  button: 'quick',    label: '😀', sub: 'EMOTE', name: 'Emotes (hold for the wheel); Battle Royale: tap for your bag' },
+    aimUp:    { kind: 'button', x: 0.68, y: 0.30, size: 52,  button: 'aimUp',    label: '▲', sub: 'AIM UP', name: 'Battle Royale: tilt your gun up' },
+    aimDown:  { kind: 'button', x: 0.68, y: 0.44, size: 52,  button: 'aimDown',  label: '▼', sub: 'AIM DOWN', name: 'Battle Royale: tilt your gun down' }
   }
 };
+
+/* Battle Royale has more buttons and a hotbar along the bottom right: its own starting spots for them */
+TOUCH.profilePos = { br: { spinCW: { x: 0.92, y: 0.52 }, spinCCW: { x: 0.79, y: 0.66 }, a: { x: 0.93, y: 0.75 }, b: { x: 0.66, y: 0.76 }, x: { x: 0.81, y: 0.42 }, y: { x: 0.93, y: 0.32 },
+  halfCCW: { x: 0.70, y: 0.21 }, halfCW: { x: 0.80, y: 0.21 }, camera: { x: 0.60, y: 0.21 }, aimUp: { x: 0.68, y: 0.36 }, aimDown: { x: 0.68, y: 0.50 }, speedUp: { x: 0.555, y: 0.79 }, quick: { x: 0.07, y: 0.40 } } };
 
 const TouchPad = {
   state: { held: {}, tapped: {}, ax: 0, ay: 0 }, els: {}, root: null, bar: null, hint: null, editing: false, selected: null, built: false,
@@ -54,7 +60,7 @@ const TouchPad = {
     this.built = true; this.sync();
   },
   unit() { return Math.max(TOUCH.minUnit, Math.min(TOUCH.maxUnit, Math.min(innerWidth, innerHeight * 1.8) / TOUCH.baseWidth)); },
-  layout(id) { const d = TOUCH.controls[id], o = (Settings.touchLayout || {})[id] || {}; return { x: o.x !== undefined ? o.x : d.x, y: o.y !== undefined ? o.y : d.y, scale: o.scale !== undefined ? o.scale : 1 }; },
+  layout(id) { const d0 = TOUCH.controls[id], pp = this.posProfile && TOUCH.profilePos[this.posProfile], d = pp && pp[id] ? { ...d0, ...pp[id] } : d0, o = (Settings.touchLayout || {})[id] || {};   /* (a game's own starting spots, until you move a button yourself) */ return { x: o.x !== undefined ? o.x : d.x, y: o.y !== undefined ? o.y : d.y, scale: o.scale !== undefined ? o.scale : 1 }; },
   setLayout(id, patch) { Settings.touchLayout = Settings.touchLayout || {}; Settings.touchLayout[id] = { ...this.layout(id), ...patch }; },
   makeControl(id) {
     const d = TOUCH.controls[id], el = document.createElement('div'); el.className = 'tc ' + d.kind;
@@ -78,9 +84,10 @@ const TouchPad = {
     if (inGame !== this.inGame || this.editing !== this.wasEditing) {
       this.inGame = inGame; this.wasEditing = this.editing;
       // only in a match (or while adjusting them): every menu can be tapped, and the buttons would cover its rows
-      for (const id of Object.keys(TOUCH.controls)) this.els[id].style.display = (inGame || this.editing) ? (TOUCH.gameOnly.includes(id) ? 'flex' : '') : 'none';
-      if (!inGame && !this.editing) { this.clear(); this.relabel(null); }
+      if (!inGame && !this.editing) { for (const id of Object.keys(TOUCH.controls)) this.els[id].style.display = 'none'; this.clear(); this.relabel(null); this.press = null; this.profKey = null; this.posProfile = null; }
+      else if (this.editing) { for (const id of Object.keys(TOUCH.controls)) this.els[id].style.display = TOUCH.gameOnly.includes(id) ? 'flex' : ''; this.profKey = null; }
     }
+    if (inGame && !this.editing) this.applyProfile(sc.getScene('Game'));
   },
   clear() { this.state.held = {}; this.state.ax = this.state.ay = 0; for (const el of Object.values(this.els)) el.classList.remove('down'); const k = this.els.stick.querySelector('.knob'); k.style.transform = ''; },
   wire(id, el, d) {
@@ -95,7 +102,7 @@ const TouchPad = {
       e.preventDefault(); if (typeof Sound !== 'undefined') Sound.resume();
       if (this.editing) { drag = { dx: e.clientX - parseFloat(el.style.left), dy: e.clientY - parseFloat(el.style.top) }; this.selected = id; el.setPointerCapture(e.pointerId); this.place(); return; }
       if (pointer !== null) return; pointer = e.pointerId; el.setPointerCapture(e.pointerId); el.classList.add('down');
-      if (d.kind === 'stick') stickMove(e); else { this.state.held[d.button] = true; this.state.tapped[d.button] = true; }   // tapped: a quick tap between two frames still counts
+      if (d.kind === 'stick') stickMove(e); else { const bt = el.btn = (this.press && this.press[id]) || d.button; this.state.held[bt] = true; this.state.tapped[bt] = true; }   // tapped: a quick tap between two frames still counts (press: what this button does in the game being played)
     });
     el.addEventListener('pointermove', e => {
       if (this.editing && drag) { const m = TOUCH.edgeMargin; this.setLayout(id, { x: Math.min(1 - m, Math.max(m, (e.clientX - drag.dx) / innerWidth)), y: Math.min(1 - m, Math.max(m, (e.clientY - drag.dy) / innerHeight)) }); this.place(); return; }
@@ -103,7 +110,7 @@ const TouchPad = {
     });
     const end = e => {
       drag = null; if (e.pointerId !== pointer) return; pointer = null; el.classList.remove('down');
-      if (d.kind === 'stick') { this.state.ax = this.state.ay = 0; el.querySelector('.knob').style.transform = ''; } else this.state.held[d.button] = false;
+      if (d.kind === 'stick') { this.state.ax = this.state.ay = 0; el.querySelector('.knob').style.transform = ''; } else this.state.held[el.btn || d.button] = false;
     };
     el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end); el.addEventListener('lostpointercapture', end);
   },
@@ -133,6 +140,23 @@ const TouchPad = {
     this.place(); this.info();
   },
   toggle() { Settings.touch = !Settings.touch; Settings.save(); this.sync(); },
+  /* v13.5.4: every game gets the buttons it uses, named for what they do there, and no others.
+     hockey: SPIN on the two big buttons (LB / RB), PRESS (X), CART (Y), DRIFT (hold B), SPEED + / −
+     minigames: SPIN, DRIFT, SPEED, and X named for the game's action (USE an item, FIRE, ZAP) when it has one
+     Battle Royale: FIRE, AIM, JUMP, GRAB (X), AWAY (Y), DRIFT, MELEE, the bag, ITEM ◀ ▶, and AIM UP / DOWN */
+  profile(g) {
+    const m = g && g.match; if (!m) return null; const k = m.mini ? m.mini.kind : 'hockey', common = ['stick', 'a', 'b', 'start', 'camera', 'quick'];
+    if (k === 'br') return { key: 'br', show: [...common, 'spinCW', 'spinCCW', 'halfCW', 'halfCCW', 'x', 'y', 'speedUp', 'aimUp', 'aimDown'], press: {}, labels: typeof BR_TOUCH !== 'undefined' ? BR_TOUCH : {} };
+    const spin = { spinCW: 'halfCW', spinCCW: 'halfCCW' }, spinL = { spinCW: ['↻', 'SPIN'], spinCCW: ['↺', 'SPIN'], b: ['💨', 'DRIFT'], a: ['A', 'OK'] };
+    if (k === 'hockey') return { key: 'hockey', show: [...common, 'spinCW', 'spinCCW', 'x', 'y', 'speedUp', 'speedDown'], press: spin, labels: { ...spinL, x: ['X', 'PRESS'], y: ['⇄', 'CART'] } };
+    const lines = ((GAME_INFO[k] || {}).controls || []).join(' '), act = /Zap/.test(lines) ? ['⚡', 'ZAP'] : /Fire:/.test(lines) ? ['🎯', 'FIRE'] : lines.includes(CTRL.item) ? ['★', 'USE'] : null;
+    return { key: 'mini:' + k, show: [...common, 'spinCW', 'spinCCW', 'speedUp', 'speedDown', ...(act ? ['x'] : [])], press: spin, labels: { ...spinL, ...(act ? { x: act } : {}) } };
+  },
+  applyProfile(g) {
+    const P = this.profile(g); if (!P) return; const m = g.match, wait = m.state === 'over' || !!m.readyText; if (wait) P.labels = { ...P.labels, a: ['A', m.state === 'over' ? 'AGAIN' : 'READY'], ...(m.state === 'over' ? { b: ['B', 'LOBBY'] } : {}) };   /* (the result and ready screens) */
+    if (P.key !== this.profKey) { this.profKey = P.key; this.press = P.press; this.posProfile = P.key === 'br' ? 'br' : null; this.place(); for (const id of Object.keys(TOUCH.controls)) this.els[id].style.display = P.show.includes(id) ? 'flex' : 'none'; this.clear(); }
+    this.relabel(P.labels);
+  },
   relabel(map) {                                                               // a game can rename the buttons (Battle Royale: FIRE, AIM, JUMP...); null puts them back
     const key = map ? JSON.stringify(map) : ''; if (key === this.lblKey || !this.built) return; this.lblKey = key;
     for (const id of Object.keys(TOUCH.controls)) { const d = TOUCH.controls[id], el = this.els[id]; if (!el || d.kind === 'stick') continue; const r = (map && map[id]) || [d.label, d.sub], l = el.querySelector('.l'), s = el.querySelector('.s'); if (l) l.textContent = r[0]; if (s) s.textContent = r[1] || ''; }

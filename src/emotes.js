@@ -10,7 +10,7 @@ const Emotes = {
   },
   wheel() { return Progress.P.wheel; },
   frame(sc) {
-    const m = sc.match; if (!m || sc.demo || sc.scene.key !== 'Game') return; if (m.kind !== 'br' && typeof TouchPad !== 'undefined' && TouchPad.relabel) TouchPad.relabel(null); const now = performance.now(), live = m.state !== 'over';
+    const m = sc.match; if (!m || sc.demo || sc.scene.key !== 'Game') return; /* (touch button names: TouchPad.profile) */ const now = performance.now(), live = m.state !== 'over';
     for (const p of Progress.mine(sc)) {
       const src = this.srcOf(sc, p); if (!src || !src.held) continue; const st = this.st.get(p) || {}; this.st.set(p, st);
       if (src.held.quick && live) { if (!st.t0) st.t0 = now; if (!st.open && now - st.t0 > this.holdMs) { st.open = true; st.sel = -1; Sound.play('blip'); } }

@@ -3,6 +3,20 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v13.5.5: no more music 404s on Netlify
+- Netlify now writes `assets/music/playlist.json` itself on every deploy (the build command runs `tools/make-playlist.js`). Push your songs in `assets/music/menu/`, `game/` and `intro/`, and they're found.
+- The game only asks for folder listings (`menu/`, `game/`, `match/`, `intro/`, `music/`) on your own computer or home network with no playlist. Public hosts always answered those with 404s.
+
+## v13.5.4: touch controls for every game
+- The on-screen controller now shows only the buttons a game uses, each named for what it does there:
+  - **Volt Hockey**: SPIN ↻ / ↺ on the two big buttons (they used to press the triggers, which no longer spin), PRESS, CART, DRIFT (hold), SPEED + / −, VIEW, EMOTE, A.
+  - **Minigames**: SPIN, DRIFT, SPEED, VIEW, EMOTE, and the X button as the game's action: USE (an item), FIRE (Paintball) or ZAP (Imposter). Games with no action hide it.
+  - **Battle Royale**: FIRE, AIM, JUMP, GRAB, AWAY, DRIFT, MELEE, BAG, ◀ ITEM ▶, VIEW, and new **AIM UP / AIM DOWN** buttons (there was no way to tilt your gun on a phone). Battle Royale has its own starting spots so nothing sits on the hotbar.
+- A says READY on the ready screen. At the end of a game, A says AGAIN and B says LOBBY.
+- The left-hand buttons no longer overlap the stick or the 😀 button.
+- Buttons you've moved yourself stay where you put them.
+- The how-to-play pages name the touch buttons, and the spin lines that still said "triggers" now say LB / RB.
+
 ## v13.5.3: cart driving sound
 - **Settings > Sound** has **Cart driving sound** (On / Off) and **Cart driving volume** (10% to 200%).
 - The motor whine is quieter: at 100% it is about 40% as loud as before.
@@ -15,7 +29,7 @@ Phaser loads from a CDN; download `phaser.min.js` and change the first script ta
 ## v13.5.1: music folders, a sizzling opening
 - `assets/music/menu/` plays in the menus and the lobby, `assets/music/game/` in the games, and `assets/music/intro/` behind the opening splash (one song picked at random, which keeps playing on the title screen). Each folder is shuffled on its own, carries on with its next song when you come back to it, and plays every song before any repeats.
 - Battle Royale has a **Music** option (Off by default).
-- Run `node tools/make-playlist.js` before uploading to Netlify. It now writes all three lists.
+- `tools/make-playlist.js` writes all three lists.
 - The opening sparkler sizzles, crackles and pops as it burns the logo in, whooshes when the logo flares, then fizzles out. (Browsers only allow sound after a click or key press, so on a first visit with no click yet the opening can be silent.)
 
 ## v13.5: local players in the lobby, ready up, play again, jerseys, any-league seasons
@@ -367,7 +381,7 @@ Settings menu (also in the pause menu): volumes, cart turning speed, game clock 
 ## Your own music
 Drop mp3/ogg/wav/m4a/flac files into `assets/music/menu/` (the menus and the lobby), `assets/music/game/` (every game) and `assets/music/intro/` (the opening splash). Each folder shuffles on its own and carries on where it left off, so every song plays before any repeats. Battle Royale only plays game music if its **Music** option is On; it's Off by default. (The older `match/` folder still counts as game music. Songs loose in `assets/music/` play in both.)
 - **Local dev server** (`npx serve`, `python3 -m http.server`): the game reads the folders itself. Nothing to do.
-- **Public hosting** (Netlify, GitHub Pages, Wix...): hosts hide folder listings, so run `node tools/make-playlist.js` before uploading.
+- **Public hosting**: hosts hide folder listings, so the game reads `assets/music/playlist.json`. **Netlify** builds it by itself on every deploy (netlify.toml runs `node tools/make-playlist.js`), so you only push your songs. On other hosts (GitHub Pages, Wix...) run `node tools/make-playlist.js` before uploading.
   It writes `assets/music/playlist.json`, which the game reads. Re-run it whenever you add or remove songs.
 - Or list file names by hand in `MUSIC_FILES` in `src/music.js`.
 The title screen says how many songs were found. No songs found (or none loadable) = the built-in 8-bit tunes play.
