@@ -130,7 +130,7 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
       const same = inv.find(it => it.k === k);
       if (BR_GUNS[k] && same) { const A = BR_AMMO[BR_GUNS[k].type]; if (G.am[A.i] >= A.max || a <= 0) return false; G.am[A.i] = Math.min(A.max, G.am[A.i] + a); if (c.player) this.say(m, c, `+${a} ${A.name}`); return true; }   // the same gun again: its bullets
       if (BR_ITEMS[k] && same && same.a < BR_ITEMS[k].stack) { const n = Math.min(a, BR_ITEMS[k].stack - same.a); same.a += n; L[5] -= n; if (c.player) this.say(m, c, `${BR_ITEMS[k].name} x${same.a}`); return L[5] <= 0; }
-      if (inv.length >= BR.slots) { if (c.player && !(G.fullAt > m.simTime)) { G.fullAt = m.simTime + 2.5; this.say(m, c, 'BAG FULL: hold B to swap it for what you hold'); } G.swapL = L[0]; return false; }
+      if (inv.length >= BR.slots) { if (c.player && !(G.fullAt > m.simTime)) { G.fullAt = m.simTime + 2.5; this.say(m, c, 'BAG FULL: X swaps it for what you hold'); } G.swapL = L[0]; return false; }
       inv.push({ k, a: BR_ITEMS[k] ? Math.min(a, BR_ITEMS[k].stack) : a }); if (BR_ITEMS[k] && a > BR_ITEMS[k].stack) { L[5] = a - BR_ITEMS[k].stack; return false; }
       if (c.player) { m.sfx('select'); this.say(m, c, (BR_GUNS[k] || BR_ITEMS[k]).name); if (G.hol) { G.last = inv.length - 1; } }
       if (!c.player) G.sel = this.bestSlot(c, 99);
@@ -186,7 +186,7 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
         if (G.rl > 0) { const it = G.inv[G.rlS]; if (!it || G.sel !== G.rlS || G.hol || G.down) G.rl = 0; else if ((G.rl -= h) <= 0) { const gun = BR_GUNS[it.k], A = BR_AMMO[gun.type], n = Math.min(gun.shell ? 1 : gun.mag - it.a, G.am[A.i]); it.a += n; G.am[A.i] -= n; G.rl = 0;
           if (gun.shell) { G.rlN = (G.rlN || 0) + 1; if (it.a < gun.mag && G.am[A.i] > 0) { G.rl = G.rlT = gun.rl; if (c.player) m.sfx('rl_shell'); } else { G.pumpT = m.gs.t; if (c.player) m.sfx('rl_pump'); } } } }   // shell by shell, then a pump
         if (G.use) { const U = G.use, it = G.inv[U.s], t = U.tk >= 0 ? m.chairs[U.tk] : c;   // a heal in progress (on you or a team-mate)
-          if (!it || it.k !== U.k || G.sel !== U.s || G.hol || G.down || !t || t.out || t.gs.down || (t !== c && (MH.dist(c, t) > BR.mateRange + 0.5 || (c.player && U.tk >= 0 && !G.ads)))) { if (it && it.k === U.k && U.left < U.tot * 0.9) this.spend(c, U.s); G.use = null; }   // stopped part-way: what went on stays on, and the item is used up
+          if (!it || it.k !== U.k || G.sel !== U.s || G.hol || G.down || !t || t.out || t.gs.down || (t !== c && (MH.dist(c, t) > BR.mateRange + 0.5 || (c.player && U.tk >= 0 && !G.ads)))) { if (it && it.k === U.k && U.left < U.tot) this.spend(c, U.s); G.use = null; }   // stopped part-way: what went on stays on, and the item is used up
           else { const I = BR_ITEMS[U.k], T = t.gs, f = Math.min(h, U.left) / U.tot;   // health and armour go on bit by bit while you apply it
             if (I.hp && T.hp < (I.cap || 100)) T.hp = Math.min(I.cap || 100, T.hp + I.hp * f); if (I.sh) T.sh = Math.min(BR.maxShield, T.sh + I.sh * f);
             if ((U.left -= h) <= 0) { T.hp = Math.round(T.hp); T.sh = Math.round(T.sh); this.spend(c, U.s); G.use = null; m.sfx('select'); if (t !== c && c.player && !c.player.remote) Progress.ev('healMate'); } } }

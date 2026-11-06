@@ -76,6 +76,8 @@ const SETTINGS_PAGES = {
   'Controls and screen': sc => [
     { label: () => 'Controls guide', hint: 'What every button does on a gamepad, keyboard and touch', select: () => sc.scene.start('ControlsGuide', { ctx: sc.ctx, page: 'Controls and screen' }) },
     { label: () => `Invert right stick Y axis   ◀ ${Settings.invertLook ? 'On' : 'Off'} ▶`, hint: 'On: push the right stick up to look (and aim) down, like a flight game. Works in every game and view.', change: () => Settings.toggle('invertLook'), select: () => Settings.toggle('invertLook') },
+    { ...slider('Look sensitivity: left / right', 'lookH', v => Math.round(v * 100) + '%'), hint: 'How fast you turn and look left and right in first and third person (lower is slower)' },
+    { ...slider('Look sensitivity: up / down', 'lookV', v => Math.round(v * 100) + '%'), hint: 'How fast you aim up and down (Battle Royale) with the right stick or I / K' },
     { label: () => `Touch controls   ◀ ${Settings.touch ? 'On' : 'Off'} ▶`, change: () => TouchPad.toggle(), select: () => TouchPad.toggle() },
     { label: () => 'Adjust touch buttons', select: () => TouchPad.edit() },
     { label: () => `Fullscreen   ◀ ${isFullscreen() ? 'On' : 'Off'} ▶`, change: () => toggleFullscreen(), select: () => toggleFullscreen() },

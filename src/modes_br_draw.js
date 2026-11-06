@@ -36,7 +36,7 @@ Object.assign(View3D.prototype, {
     gg.setAttribute('color', new THREE.Float32BufferAttribute(gc, 3));
     const ground = new THREE.Mesh(gg, new THREE.MeshStandardMaterial({ map: gt, roughness: 0.95, vertexColors: true })); ground.position.set(W / 2, -0.01, D / 2); ground.receiveShadow = true; g.add(ground);
     for (const [x0, y0, x1, y1] of [[-0.4, -0.4, W + 0.4, 0], [-0.4, D, W + 0.4, D + 0.4], [-0.4, 0, 0, D], [W, 0, W + 0.4, D]]) put(0x5a5f66, new THREE.BoxGeometry(x1 - x0, 1.2, y1 - y0).translate((x0 + x1) / 2, 0.6, (y0 + y1) / 2));   // the fence round the map
-    for (const w of M.walls) { const h = w.h || BR_WALLH[w.kind] || H; put(BR_COLS[w.kind] || 0xb8b2a6, new THREE.BoxGeometry(w.x1 - w.x0, h, w.y1 - w.y0).translate((w.x0 + w.x1) / 2, w.lv * H + h / 2, (w.y0 + w.y1) / 2)); }
+    for (const w of M.walls) { if (w.kind === 'door') continue; const h = w.h || BR_WALLH[w.kind] || H;   /* (doors are drawn on their own: modes_br_draw3.js) */ put(BR_COLS[w.kind] || 0xb8b2a6, new THREE.BoxGeometry(w.x1 - w.x0, h, w.y1 - w.y0).translate((w.x0 + w.x1) / 2, w.lv * H + h / 2, (w.y0 + w.y1) / 2)); }
     for (const f of M.floors) { for (const q of brRectMinus(f, M.ramps.filter(r => r.lv + 1 === f.lv).map(r => ({ x0: r.x0 - 0.05, y0: r.y0 - 0.05, x1: r.x1 + 0.05, y1: r.y1 + 0.05 })))) put(BR_FLOORS[f.kind] || 0x8e949b, new THREE.BoxGeometry(q.x1 - q.x0, 0.22, q.y1 - q.y0).translate((q.x0 + q.x1) / 2, f.lv * H - 0.11, (q.y0 + q.y1) / 2));
       for (const [ax, ay, bx, by] of [[f.x0, f.y0, f.x1, f.y0], [f.x0, f.y1, f.x1, f.y1], [f.x0, f.y0, f.x0, f.y1], [f.x1, f.y0, f.x1, f.y1]]) put(0xb59a3e, new THREE.BoxGeometry(Math.max(0.08, bx - ax), 0.02, Math.max(0.08, by - ay)).translate((ax + bx) / 2, f.lv * H + 0.01, (ay + by) / 2)); }   // a worn painted line at the edge
     for (const r of M.ramps) {                                             // ramps: a sloping deck with rails
@@ -194,7 +194,7 @@ Object.assign(GameScene.prototype, {
     const hpk = Math.max(0, G.hp) / BR.hp; g.fillStyle(0x3a2025, 1).fillRect(bx, by - 2, bw, 11).fillStyle(hpk > 0.5 ? 0x5ad45a : hpk > 0.25 ? 0xffc23d : 0xff4d4d, 1).fillRect(bx, by - 2, bw * hpk, 11);
     H.hp.setText(`${Math.ceil(G.hp)}  |  ${Math.ceil(G.sh)}${G.boost > 0 ? '   🚀' : ''}`).setPosition(bx + bw + 14, by - 4);
     for (let i = 0; i < BR.slots; i++) {
-      const s = H.slots[i], it = G.inv[i], x = x0 + i * (sw + gap), sel = i === G.sel && it;
+      const s = H.slots[i], it = brSlotItem(G, i), x = x0 + i * (sw + gap), sel = it && it === G.inv[G.sel] && !G.hol;   /* (slots keep their place: gaps stay gaps) */
       g.fillStyle(sel ? 0x2a3a48 : 0x0d151b, sel ? 0.92 : 0.7).fillRoundedRect(x, y0, sw, sh, 8).lineStyle(sel ? 3 : 1.5, sel ? 0xffd23f : 0x3a4a58, 1).strokeRoundedRect(x, y0, sw, sh, 8);
       s.key.setPosition(x + 6, y0 + 3);
       if (!it) { s.img.setVisible(false); s.txt.setText(''); continue; }
@@ -282,11 +282,11 @@ class BRInvScene extends Phaser.Scene {
     this.events.once('shutdown', () => { this.d.p.invOpen = false; });
   }
   press(k) {
-    const inv = this.d.chair.gs.inv, act = this.d.act;
+    const G0 = this.d.chair.gs, at = i => brSlotItem(G0, i), act = this.d.act;
     if (k === 'b') { Sound.play('back'); this.d.p.invOpen = false; this.scene.stop(); return; }
-    if (k === 'a') { if (this.pick < 0) { if (inv[this.cur]) { this.pick = this.cur; Sound.play('select'); } } else { if (this.pick !== this.cur) act({ op: 'swap', a: this.pick, b: this.cur }); this.pick = -1; Sound.play('blip'); } }
-    if (k === 'y' && inv[this.cur]) { act({ op: 'sel', a: this.cur }); Sound.play('select'); }
-    if (k === 'x' && inv[this.cur]) { act({ op: 'drop', a: this.cur }); this.pick = -1; Sound.play('back'); }
+    if (k === 'a') { if (this.pick < 0) { if (at(this.cur)) { this.pick = this.cur; Sound.play('select'); } } else { if (this.pick !== this.cur) act({ op: 'swap', a: this.pick, b: this.cur }); this.pick = -1; Sound.play('blip'); } }
+    if (k === 'y' && at(this.cur)) { act({ op: 'sel', a: this.cur }); Sound.play('select'); }
+    if (k === 'x' && at(this.cur)) { act({ op: 'drop', a: this.cur }); this.pick = -1; Sound.play('back'); }
   }
   update() {
     const d = this.d, c = d.chair, G = c.gs, src = d.src; if (!this.d.game.scene.isActive() || c.out || d.game.match.state !== 'play') { this.d.p.invOpen = false; return this.scene.stop(); }
@@ -294,11 +294,11 @@ class BRInvScene extends Phaser.Scene {
     if (P.left) { this.cur = (this.cur + BR.slots - 1) % BR.slots; Sound.play('blip'); } if (P.right) { this.cur = (this.cur + 1) % BR.slots; Sound.play('blip'); }
     for (const k of ['a', 'b', 'x', 'y']) if (P[k]) this.press(k); if (P.start) this.press('b');
     const g = this.g; g.clear();
-    this.slots.forEach((s, i) => { const it = G.inv[i], cur = i === this.cur, held = i === G.sel && it, pk = i === this.pick, y = s.y - (pk ? 12 : 0);
+    this.slots.forEach((s, i) => { const it = brSlotItem(G, i), cur = i === this.cur, held = it && it === G.inv[G.sel], pk = i === this.pick, y = s.y - (pk ? 12 : 0);
       g.fillStyle(cur ? 0x2a3a48 : 0x14202a, 1).fillRoundedRect(s.x - 68, y - 52, 136, 104, 10).lineStyle(cur ? 4 : 2, pk ? 0x3dd6ff : cur ? 0xffd23f : held ? 0x7dff6a : 0x3a4a58, 1).strokeRoundedRect(s.x - 68, y - 52, 136, 104, 10);
       if (held) g.fillStyle(0x7dff6a, 1).fillCircle(s.x + 56, y - 40, 5);
       s.img.setVisible(!!it).setY(y - 6); s.t.setY(y + 44); if (it) { s.img.setTexture(d.game.brIcon(it.k)).setDisplaySize(124, 70); s.t.setText(BR_GUNS[it.k] ? String(it.a) : 'x' + it.a); } else s.t.setText(''); });
-    const it = G.inv[this.cur], gun = it && BR_GUNS[it.k];
+    const it = brSlotItem(G, this.cur), gun = it && BR_GUNS[it.k];
     this.info.setText(!it ? (this.pick >= 0 ? 'Empty slot: A puts it here' : 'Empty slot') : gun ? `${gun.name}   ammo ${it.a}     damage ${gun.dmg}${gun.pellets ? ' x' + gun.pellets : ''}   ${(1 / gun.cd).toFixed(1)} shots/s   range ${gun.range} m${gun.auto ? '   (hold to fire)' : ''}` : `${BR_ITEMS[it.k].name} x${it.a}     ${{ med: 'heals 50', pot: '+50 shield', boost: '3 s of speed', wall: 'a wall that stops bullets' }[it.k] || ''}`);
   }
 }

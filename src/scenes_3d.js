@@ -80,7 +80,7 @@ Object.assign(GameScene.prototype, {
     if (this.flat || !vp || !vp.chair || !this.v3) { p.steer = null; return; }
     const S = CONFIG.view3d.steer, ch = vp.chair, ax = src.ax || 0, ay = src.ay || 0;
     if (vp.mode === 'broadcast') { const A = this.v3.screenAxes(vp); p.steer = { x: A.right.x * ax - A.up.x * ay, y: A.right.y * ax - A.up.y * ay }; return; }
-    const h = ch.heading, rate = CONFIG.chair.baseTurnRate * Settings.turnSpeed, fwd = -ay, turn = ax;
+    const h = ch.heading, rate = CONFIG.chair.baseTurnRate * Settings.turnSpeed * (Settings.lookH || 1), fwd = -ay, turn = ax;   /* (lookH: the left / right sensitivity) */
     if (p._aim === undefined || p._aimChair !== ch) { p._aim = h; p._aimChair = ch; p._lastH = h; }
     const jump = normalizeAngle(h - p._lastH); p._lastH = h;
     if (Math.abs(jump) > rate * dt + 0.03 || ch.spinLeft > 0) p._aim += jump;                     // a spin shot (or a knock) turned the cart: the aim turns with it
@@ -177,8 +177,9 @@ Object.assign(GameScene.prototype, {
     for (const n of m.nets) { const [x, y] = P(Math.min(n.backX, n.mouthX), n.y1); g.fillStyle(0xd8392b, 1).fillRect(x, y, CONFIG.net.depth * s, (n.y2 - n.y1) * s); }
     }
     const mine = new Set((this.vps || []).map(v => v.chair).filter(Boolean));
+    const brTeams = m.kind === 'br' ? new Set([...mine].map(c => c.gs && c.gs.team)) : null;   // (Battle Royale: only you and your team-mates, never enemies)
     for (const c of m.chairs) {
-      if (c.benched) continue; const [x, y] = P(c.x, c.y), col = TEAMS[m.teams[c.side]].color, hx = Math.cos(c.heading), hy = Math.sin(c.heading);
+      if (c.benched) continue; if (brTeams && (c.out || !brTeams.has(c.gs && c.gs.team))) continue; const [x, y] = P(c.x, c.y), col = TEAMS[m.teams[c.side]].color, hx = Math.cos(c.heading), hy = Math.sin(c.heading);
       if (mine.has(c)) g.fillStyle(0xffffff, 0.16).slice(x, y, 26, c.heading - 0.6, c.heading + 0.6).fillPath();     // where you are looking
       g.fillStyle(col, 1).fillCircle(x, y, 3.6).lineStyle(mine.has(c) ? 2 : 1, mine.has(c) ? 0xffffff : 0x0d151b, 1).strokeCircle(x, y, mine.has(c) ? 5 : 3.6);
       g.lineStyle(2, mine.has(c) ? 0xffffff : col, 1).lineBetween(x, y, x + hx * 7, y + hy * 7);

@@ -59,7 +59,7 @@
 }
 
 /* ---- the HUD ---- */
-const BR_TOUCH = { spinCW: ['🔫', 'FIRE'], spinCCW: ['🎯', 'AIM'], halfCW: ['▶', 'ITEM'], halfCCW: ['◀', 'ITEM'], a: ['⤒', 'JUMP'], x: ['⟳', 'RELOAD'], y: ['✊', 'AWAY'], b: ['✋', 'REVIVE'], quick: ['🎒', 'BAG'] };
+const BR_TOUCH = { spinCW: ['🔫', 'FIRE'], spinCCW: ['🎯', 'AIM'], halfCW: ['▶', 'ITEM'], halfCCW: ['◀', 'ITEM'], a: ['⤒', 'JUMP'], x: ['✋', 'GRAB'], y: ['✊', 'AWAY'], b: ['💨', 'DRIFT'], speedUp: ['👊', 'MELEE'], quick: ['🎒', 'BAG'] };
 Object.assign(GameScene.prototype, {
   brFaceKey(c) {                                                           // a little round face for the team panel (skin, hair, hat colour)
     const L = Avatar.lookFor(c, this) || LOOK0, key = 'brface-' + [L.skin, L.hair, L.hat, L.hatCol, L.face].join('-'); if (this.textures.exists(key)) return key;
@@ -89,16 +89,20 @@ Object.assign(GameScene.prototype, {
     let txt = '', M = MODES.br; const mates = m.chairs.filter(o => o !== c && !o.out && o.gs.team === G.team);
     if (G.down) { txt = `✚ YOU'RE DOWN  ${Math.ceil(G.dhp / BR.downHp * BR.bleed)} s   crawl to a team-mate so they can revive you`; bar(G.dhp / BR.downHp, 0xff2a2a); G2.fillStyle(0x5a0000, 0.18 + 0.08 * Math.sin(this.time.now / 200)).fillRect(0, 0, V.width, V.height); }
     else if (G.rl > 0) { const it = G.inv[G.rlS], gun = it && BR_GUNS[it.k]; txt = gun && gun.shell ? bar((it.a + 1 - G.rl / (G.rlT || 1)) / gun.mag, 0xffd23f, `LOADING SHELLS  ${it.a}/${gun.mag}   RT: fire`) : bar(1 - G.rl / (G.rlT || 1), 0xffd23f, 'RELOADING'); }
-    else if (G.use) { const U = G.use, I = BR_ITEMS[U.k], t = U.tk >= 0 ? m.chairs[U.tk] : null; txt = bar(1 - U.left / U.tot, I.sh && !I.hp ? 0x3d8bff : 0x5ad45a, `${I.name} ${t ? '→ ' + (MG.pname(t) || m.name(t)) : ''}  ${Math.ceil(U.left)} s`); }
+    else if (G.use) { const U = G.use, I = BR_ITEMS[U.k], t = U.tk >= 0 ? m.chairs[U.tk] : null; txt = bar(1 - U.left / U.tot, I.sh && !I.hp ? 0x3d8bff : 0x5ad45a, `${I.name} ${t ? '→ ' + (MG.pname(t) || m.name(t)) : ''}`); }
     else if (G.rv) { const t = m.chairs[G.rvk]; txt = bar(G.rv, 0x7dff6a, `REVIVING ${t ? MG.up(MG.pname(t) || m.name(t)) : ''}`); }
     else if (G.rz > 0) txt = bar(G.rz / BR.rezTime, 0x7dff6a, `BRINGING BACK ${G.cards.map(k => MG.up(MG.pname(m.chairs[k]) || m.name(m.chairs[k]))).join(' + ')}  stay inside`);
     else { const dn = M.reviveTarget(m, c), it = G.inv[G.sel], I = it && BR_ITEMS[it.k], gun = it && BR_GUNS[it.k], sw = G.swapL && (g.L || []).find(L => L[0] === G.swapL && Math.hypot(L[2] - c.x, L[3] - c.y) < R_CART() + 0.6);
-      if (dn) txt = `HOLD B: revive ${MG.pname(dn) || m.name(dn)}`;
+      if (dn) txt = `HOLD X: revive ${MG.pname(dn) || m.name(dn)}`;
+      else if (G.op > 0) txt = bar(G.op, 0xffd23f, (g.L || []).some(L => L[0] === G.opL && L[1] === 'ammo') ? 'OPENING THE AMMO CRATE' : 'OPENING THE CHEST');
+      else if (G.foc > 0) { const L = (g.L || []).find(x => x[0] === G.foc), k = L && L[1], full = G.inv.length >= BR.slots && !G.inv.some(it => it.k === k);
+        txt = !L ? '' : k === 'chest' ? 'HOLD X: open the chest' : k === 'ammo' ? 'HOLD X: open the ammo crate' : `X: ${full ? 'swap for' : 'pick up'} ${(BR_GUNS[k] || BR_ITEMS[k] || { name: k }).name}${BR_ITEMS[k] && L[5] > 1 ? ' x' + L[5] : ''}`; }
+      else if (G.foc < 0) { const i = -1 - G.foc; txt = g.dr && g.dr[i] === 1 ? 'X: shut the door' : 'X: open the door    R3: bash it'; }
       else if (G.cards && G.cards.length) { const i = (M.map(m).rez || []).findIndex(q => c.x > q.x0 && c.x < q.x1 && c.y > q.y0 && c.y < q.y1); txt = i >= 0 && g.gar[i] > g.t ? `THIS REZ GARAGE IS RECHARGING: ${Math.ceil(g.gar[i] - g.t)} s` : `🎴 Take the rez card to a REZ GARAGE (green on the map)`; }
-      else if (sw) txt = `BAG FULL   HOLD B: swap for ${(BR_GUNS[sw[1]] || BR_ITEMS[sw[1]] || { name: sw[1] }).name}`;
+      else if (sw) txt = `BAG FULL   X: swap for ${(BR_GUNS[sw[1]] || BR_ITEMS[sw[1]] || { name: sw[1] }).name}`;
       else if (I && I.heal && mates.some(o => !o.gs.down && MH.dist(c, o) < BR.mateRange && M.helps(o, I))) txt = `RT: use ${I.name}    LT: use it on your team-mate`;
       else if (gun && it.a <= 0) txt = G.am[BR_AMMO[gun.type].i] > 0 ? 'X: RELOAD' : `NO ${BR_AMMO[gun.type].name}: find some`;
-      else if (gun && it.a <= Math.ceil(gun.mag * 0.2) && G.am[BR_AMMO[gun.type].i] > 0) txt = 'X: reload'; }
+      else if (gun && gun.mag > 2 && it.a < gun.mag && it.a <= Math.ceil(gun.mag * 0.2) && G.am[BR_AMMO[gun.type].i] > 0) txt = 'X: reload'; }   /* (not for one-shot guns like the rocket launcher: they say it when empty) */
     const S = g.st, inStorm = S && Math.hypot(c.x - S.x, c.y - S.y) > S.r;
     if (inStorm && !G.down) { G2.lineStyle(60, 0x7b3dff, 0.22 + 0.12 * Math.sin(this.time.now / 180)).strokeRect(0, 0, V.width, V.height); if (!txt) txt = `🌀 YOU'RE IN THE STORM: get inside the circle!  (-${[1, 2, 4, 6, 8, 12, 20][Math.min(6, S.ph)]} a second)`; }
     X.prompt.setText(txt).setVisible(!!txt && m.state === 'play');
@@ -115,7 +119,7 @@ Object.assign(GameScene.prototype, {
   };
   P.brHud = function (m) {
     const r = hud.call(this, m); if (!r) return r; const H = this.brH, c = ((this.setup.players || []).filter(p => !p.remote && p.chair)[0] || {}).chair; if (!c) return r; const G = c.gs;
-    for (let i = 0; i < BR.slots; i++) { const it = G.inv[i], s = H.slots[i]; if (!it) continue; const gun = BR_GUNS[it.k]; if (gun) s.txt.setText(`${it.a}/${G.am[BR_AMMO[gun.type].i]}`).setColor(it.a <= 0 ? '#ff6b6b' : '#ffffff'); s.img.setAlpha(G.hol ? 0.45 : gun && it.a <= 0 && G.am[BR_AMMO[gun.type].i] <= 0 ? 0.35 : 1); }
+    for (let i = 0; i < BR.slots; i++) { const it = brSlotItem(G, i), s = H.slots[i]; if (!it) continue; const gun = BR_GUNS[it.k]; if (gun) s.txt.setText(`${it.a}/${G.am[BR_AMMO[gun.type].i]}`).setColor(it.a <= 0 ? '#ff6b6b' : '#ffffff'); s.img.setAlpha(G.hol ? 0.45 : gun && it.a <= 0 && G.am[BR_AMMO[gun.type].i] <= 0 ? 0.35 : 1); }
     const it = G.inv[G.sel], gun = it && BR_GUNS[it.k];
     H.name.setText(G.down ? '' : G.hol || !it ? (G.inv.length ? 'Hands free: driving faster    Y: take your item out' : 'Empty-handed: drive into a CHEST for a gun') : `${(gun || BR_ITEMS[it.k]).name}${gun ? `  ${it.a}/${gun.mag}` : ''}    RT ${gun ? 'fire' : 'use'} · LT ${gun ? 'aim' : BR_ITEMS[it.k].heal ? 'heal a team-mate' : 'aim'} · X reload · Y put away · A jump`);
     return r;

@@ -3,6 +3,32 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v13.3: Battle Royale interaction, melee, doors, new items, headshots, squad stats, realistic sound
+
+- **Fixed the crash at the end of a Battle Royale** (`S is not defined` in progress.js).
+- **Buttons in Battle Royale**:
+  - **X** picks up the gun or item in front of you (a prompt says what), opens or shuts doors, and swaps when your bag is full. **Hold X** to open a chest or ammo crate, or to revive. With nothing to grab, X reloads.
+  - **B** (hold while turning) drifts, with no jump needed.
+  - **Melee bash**: R3 (click the right stick), the B key on keyboard 1, the middle mouse button, or touch MELEE. It does 20 damage, knocks the target back and breaks doors.
+  - Driving over loot only picks up ammo, rez cards, and items that top up a stack you already have.
+- **Your bag keeps its slots**: using or dropping something leaves a gap, and the other items don't move.
+- **Chests and ammo crates** sit on the ground. Hold X and the lid opens; the loot flies out in an arc and bounces. An opened box stays (empty) for a minute. Loot from an eliminated cart flies out the same way.
+- **Doors** on houses: X opens and shuts them (CPUs open them as they arrive). Shooting or bashing breaks them into splinters, and a broken door is rebuilt after 30 s.
+- **New items**:
+  - **Riot shield**: hold it and hits from the front go into the shield (220 HP) until it breaks. You drive a little slower, and RT does a shield bash (28).
+  - **Bubble**: a dome you can drive through but bullets can't, which fades after 12 s.
+- **Headshots**: hit the top of a driver (aim a little up). The sniper now does **105, or 210 to the head**; other guns do ×1.4–1.6 to the head. A "tink" plays on a headshot.
+- **Damage numbers** float over whoever you hit (only you see yours): blue for armour, white for health, yellow and HEADSHOT for headshots, grey for hits blocked by a riot shield.
+- **Heals** stop as soon as you're full, and that one item is used up (not the stack). Cancelling part-way still uses it. The heal bar has no countdown.
+- **Rez garages** have a big turning ✚ and a tall beam (green when ready, red while recharging). Carrying a card puts a ✚ marker with the distance on screen. **Your teammates' rez cards** have a tall blue beam and a 🎴 marker with name and distance (an arrow at the edge of the screen when off-screen).
+- **The minimap and the bag map** no longer show enemies, only you and your squad.
+- **Storm warnings** flash across the screen in big letters ("STORM CLOSING IN 30 SECONDS", "THE STORM IS CLOSING IN!") with a rising siren-like swell; when the storm starts moving, thunder and wind.
+- **End of a match**: VICTORY ROYALE or your placing (#3 of 6), then a card for each squad member with eliminations, knocks, assists, damage, revives, rezzes and time alive (★ on the squad's best), and squad totals.
+- The rocket launcher no longer always says "X: reload".
+- **Look sensitivity**: Settings › Controls and screen has separate left/right and up/down sliders. Left/right defaults to 70%, so turning to look is slower than before.
+- **First person**: an emote's arms come out in front of you, so you can see them.
+- **Sound** (src/audio2.js): loud sounds now echo through a shared reverb. Wood knocks and metal clangs are built from real resonant partials. New realistic sounds cover chests, crates, doors (creaking hinges), splintering wood, punches, shield clangs, the bubble, the storm siren and thunder. The goal horn, whistle, collisions, explosions and menu clicks are redone, and a quiet electric-motor whine under your own cart follows its speed.
+
 ## v13.2: team leagues, team and controller select screens, drift meter, CPU revives
 
 - **Leagues**: teams are grouped into the **Premier League** (the original 15), **National Teams** (Sweden, Denmark, USA, Canada, France, England, Malta, Australia, Finland, Norway, Germany, Italy, Switzerland, Czechia, Japan, Ireland, Netherlands) and **Cities** (Barrie, Toronto, London, Kitchener, Niagara, Ottawa, Hamilton, Montreal, Vancouver, Waterloo, Guelph, Orillia, Sudbury, Windsor, Oshawa, Kingston). Every new team has its own logo (flags for the nations, crests for the cities, made by `tools/gen_logos.mjs`). Season mode is played in the Premier League.

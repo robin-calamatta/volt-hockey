@@ -316,7 +316,8 @@ class HostSession {
       else if ((ev === 'cyc:1' || ev === 'cyc:-1') && p.chair && !p.chair.out && modeOf(this.match) && modeOf(this.match).cycle) modeOf(this.match).cycle(p.chair, this.match, ev === 'cyc:-1' ? -1 : 1);
       else if ((ev === 'ads:1' || ev === 'ads:0') && p.chair && p.chair.gs) { p.brAds = ev === 'ads:1' ? 1 : 0; p.chair.gs.ads = p.brAds; }
       else if ((ev === 'dr:1' || ev === 'dr:0') && p.chair) p.chair.driftHeld = ev === 'dr:1';   // drifting
-      else if (ev === 'rl' && p.chair && modeOf(this.match) && modeOf(this.match).reload) modeOf(this.match).reload(p.chair, this.match);
+      else if (ev === 'rl' && p.chair && modeOf(this.match) && (modeOf(this.match).xPress || modeOf(this.match).reload)) (modeOf(this.match).xPress || modeOf(this.match).reload).call(modeOf(this.match), p.chair, this.match);
+      else if (ev === 'mel' && p.chair && modeOf(this.match) && modeOf(this.match).melee) modeOf(this.match).melee(p.chair, this.match);
       else if ((ev === 'int:1' || ev === 'int:0') && p.chair) { if (ev === 'int:1' && !p.chair.wantInt) p.chair.intPress = true; p.chair.wantInt = ev === 'int:1'; }
       else if (typeof ev === 'string' && ev.startsWith('take:') && p.chair && this.match.kind === 'br') { const sc = window.voltGame && voltGame.scene.getScene('Game'); if (sc && sc.brTakeOver) sc.brTakeOver(p, +ev.slice(5)); }
       else if (ev === 'jmp' && p.chair && modeOf(this.match) && modeOf(this.match).jump) modeOf(this.match).jump(p.chair, this.match);
@@ -441,7 +442,7 @@ class ClientSim {
     for (const L of this.locals) {
       const found = inputs.find(x => x.id === L.id), input = found ? found.input : { ax: 0, ay: 0, pressed: {} }, p = input.pressed || {}; let spin = 0;
       const MD = this.m.mini && modeOf(this.m), BRP = MD && MD.jumpOnA, SP = BRP;   // Battle Royale: its own buttons (modes_br2.js)
-      const dh = input.held && input.held.a && !(L.me && L.me.invOpen) ? 1 : 0; if (dh !== (L.drSent || 0)) { L.pending.push('dr:' + dh); L.drSent = dh; } if (L.me && L.me.chair) L.me.chair.driftHeld = !!dh;   // A (hold): drift
+      const dh = input.held && (BRP ? input.held.b : input.held.a) && !(L.me && L.me.invOpen) ? 1 : 0;   /* (Battle Royale drifts on B) */ if (dh !== (L.drSent || 0)) { L.pending.push('dr:' + dh); L.drSent = dh; } if (L.me && L.me.chair) L.me.chair.driftHeld = !!dh;   // A (hold): drift
       if (SP && L.me) { const ads = !L.me.invOpen && input.held && input.held.spinCCW ? 1 : 0; if (ads !== (L.me.brAds || 0)) L.pending.push('ads:' + ads); L.me.brAds = ads; }   // LT: aim (zoom, slower)
       if (SP) { if (!(L.me && L.me.invOpen) && (p.halfCW || p.halfCCW)) L.pending.push(p.halfCCW ? 'cyc:-1' : 'cyc:1'); }
       else { if (p.halfCW) { L.pending.push('hcw'); spin = 0.5; } if (p.halfCCW) { L.pending.push('hccw'); spin = -0.5; }

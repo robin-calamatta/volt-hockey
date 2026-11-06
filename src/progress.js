@@ -132,6 +132,7 @@ const Progress = {
     if (m.state === 'over' && !S.over) { S.over = true; this.matchOver(sc, m, mine); }
   },
   matchOver(sc, m, mine) {
+    const S = sc.prog || (sc.prog = {});   /* (the match counters from tick; this was missing and crashed the end of a Battle Royale) */
     const online = !!sc.online, cfg = sc.online && sc.online.session && sc.online.session.cfg, season = !!(sc.setup.season || (cfg && cfg.season)); let won = false;
     if (m.mini) {
       const kind = m.mini.kind, rows = (m.result && m.result.rows) || [], ks = new Set(mine.map(p => p.chair && p.chair.k)), sides = new Set(mine.map(p => p.side));
@@ -147,7 +148,7 @@ const Progress = {
     }
     if (online) this.ev('online');
     if (!sc.setup.practice || m.mini) {                                   // XP for playing: time, eliminations, goals, a win (quests give more)
-      const S = sc.prog || {}, mins = Math.min(30, (S.played || 0) / 60), parts = [[60, 'played'], [Math.round(mins * 25), Math.round(mins) + ' min'], [(S.kills || 0) * 30, (S.kills || 0) + ' eliminations'], [(S.goals || 0) * 15, (S.goals || 0) + ' goals'], [won ? 100 : 0, 'win'], [S.top3 && !won ? 50 : 0, 'top 3']].filter(([x]) => x > 0);
+      const mins = Math.min(30, (S.played || 0) / 60), parts = [[60, 'played'], [Math.round(mins * 25), Math.round(mins) + ' min'], [(S.kills || 0) * 30, (S.kills || 0) + ' eliminations'], [(S.goals || 0) * 15, (S.goals || 0) + ' goals'], [won ? 100 : 0, 'win'], [S.top3 && !won ? 50 : 0, 'top 3']].filter(([x]) => x > 0);
       this.addXp(parts.reduce((a, [x]) => a + x, 0), (won ? 'Match won: ' : 'Match played: ') + parts.slice(1).map(([, t]) => t).join(', '));
     }
   }

@@ -39,6 +39,7 @@ const kf = (keys, p) => { if (p <= keys[0][0]) return keys[0].slice(1); for (let
     if (name === 'reload') { const { tx } = this.K(), A = RELOADS[extra.item] || RELOADS.rifle, L = kf(A.L, extra.rp || 0), g = pose('gun', t, extra);
       return { R: [g.R[0] - 0.04, g.R[1] + 0.04, g.R[2] - 0.03], L: [tx + L[0], L[1], L[2]] }; }
     const P = pose(name, t, extra);
+    if (extra.fp && name.startsWith('a_')) { const { tx } = this.K(), f = q => q && [Math.max(q[0] + 0.32, tx + 0.42), Math.max(0.86, Math.min(q[1], 1.12)), q[2] * 0.7]; P.R = f(P.R); P.L = f(P.L); }   // (first person: in front of your eyes)
     if (name === 'gun') { const k = extra.kick || 0; if (k) { P.R = [P.R[0] - 0.07 * k, P.R[1] + 0.035 * k, P.R[2]]; P.L = [P.L[0] - 0.06 * k, P.L[1] + 0.03 * k, P.L[2]]; }
       if (extra.pump >= 0) { const b = Math.sin(extra.pump * Math.PI) * 0.09; P.L = [P.L[0] - b, P.L[1], P.L[2]]; } }   // the shotgun pump after the last shell
     return P;
@@ -60,7 +61,10 @@ const kf = (keys, p) => { if (p <= keys[0][0]) return keys[0].slice(1); for (let
   P.update = function (dt) {
     const r = upd.call(this, dt);
     if (this.m && this.m.kind === 'br') { const now = performance.now() / 1000;
-      for (const c of this.carts || []) { const p = Avatar.poseFor(c.ch, this.m, now); if (p.name === 'reload' || p.kick || p.pump >= 0) Rig.update(c.group, p.name, p.t, { layer: c.layer, item: p.item, pitch: p.pitch, sleeves: c.group.userData.sleeves, hide: c.ch.out, rp: p.rp, kick: p.kick, pump: p.pump }); } }
+      for (const c of this.carts || []) { const p = Avatar.poseFor(c.ch, this.m, now); if (p.name === 'reload' || p.name === 'melee' || p.kick || p.pump >= 0) Rig.update(c.group, p.name, p.t, { layer: c.layer, item: p.item, pitch: p.pitch, sleeves: c.group.userData.sleeves, hide: c.ch.out, rp: p.rp, kick: p.kick, pump: p.pump }); } }
+    if (this.sc && this.sc.vps) { const now = performance.now() / 1000;                   // first person: an emote's arms come out in front of you, where you can see them
+      for (const vp of this.sc.vps) { if (vp.mode !== 'first' || !vp.chair || vp.spect) continue; const c = (this.carts || []).find(k => k.ch === vp.chair); if (!c) continue; const p = Avatar.poseFor(c.ch, this.m, now);
+        if (p.name && p.name.startsWith('a_')) Rig.update(c.group, p.name, p.t, { layer: c.layer, item: p.item, pitch: p.pitch, sleeves: c.group.userData.sleeves, hide: c.ch.out, fp: true }); } }
     this.driftFx(dt); return r;
   };
   /* drift effects in the 3D view: a sideways slide, tyre smoke and bigger sparks */
@@ -95,6 +99,7 @@ const kf = (keys, p) => { if (p <= keys[0][0]) return keys[0].slice(1); for (let
   Emotes.driftBar = function (sc) {
     db(sc); const V = CONFIG.view, F = CONFIG.drift; if (!sc.drE || !sc.drE.scene) sc.drE = sc.add.graphics().setDepth(43); const g = sc.drE; g.clear();
     const live = new Set();
+    for (const p of Progress.mine(sc)) { const c = p.chair; if (c && !c.out && sc.match.state === 'play') Sound.motor((p.id || p.tag || 'p') + '', Math.hypot(c.vx, c.vy) / CONFIG.chair.maxSpeed); }   /* (the motor under your own cart) */
     for (const p of Progress.mine(sc)) { const c = p.chair, D = c && c.dr, id = (p.id || p.tag || 'p') + ''; if (!D || c.out || !D.on) continue; live.add(id);
       const vp = sc.vps && sc.vps.find(v => v.p === p), R = vp ? vp.rect : { x: 0, y: 0, w: V.width, h: V.height }, mode = vp ? vp.mode : Settings.camMode, col = F.colors[Math.max(1, D.lvl)] || 0xffffff;
       Sound.driftLoop(id, true, D.lvl);
