@@ -52,7 +52,8 @@ export function createApi(store, opts = {}) {
   const getUser = name => name ? store.get(key(name)) : null;
   const saveUser = u => store.set(key(u.name), u);
   const online = u => !!u && now() - (u.lastSeen || 0) < LIMITS.onlineMs;
-  const me = u => ({ name: u.name, adult: !!u.adult, created: u.created, email: u.email ? maskEmail(u.email) : '' });
+  const me = u => ({ name: u.name, adult: !!u.adult, br: canBR(u), created: u.created, email: u.email ? maskEmail(u.email) : '' });
+  const canBR = u => !!(u && (u.adult || u.over16 || u.brOk));   // Volt Royale: 16 or over, or let in by an admin (v14)
 
   async function auth(headers) {
     const h = headers.authorization || headers.Authorization || '', token = h.startsWith('Bearer ') ? h.slice(7).trim() : '';
@@ -84,7 +85,7 @@ export function createApi(store, opts = {}) {
     if (await getUser(name)) bad('That username is taken.', 409);
     const taken = await store.get(emailKey(email)); if (taken) bad('That email is already used by another account.', 409);
     const salt = crypto.randomBytes(16).toString('hex');
-    const u = { name, salt, hash: await scrypt(pass, salt), adult: age >= 18, created: now(), prefs: null, progress: null, friends: {}, blocked: [], invites: [], unread: {}, lastSeen: now(), status: null };
+    const u = { name, salt, hash: await scrypt(pass, salt), adult: age >= 18, over16: age >= 16, created: now(), prefs: null, progress: null, friends: {}, blocked: [], invites: [], unread: {}, lastSeen: now(), status: null };
     await claimEmail(u, email); await saveUser(u);
     const idx = await names(); idx[name.toLowerCase()] = { n: name, a: u.adult ? 1 : 0 }; await store.set('names', idx);
     return { token: await newSession(u), user: me(u) };
@@ -280,7 +281,7 @@ export function createApi(store, opts = {}) {
     let exp = 0; try { exp = JSON.parse(Buffer.from(payload, 'base64url').toString()).exp; } catch (e) { exp = 0; } if (exp < now()) bad('Admin login expired. Log in again.', 401);
   }
   const strip = u => { if (!u) return null; const { hash, salt, ...rest } = u; return rest; };
-  const row = u => { const c = (u.progress && u.progress.career) || {}; return { name: u.name, email: u.email || '', adult: !!u.adult, banned: !!u.banned, created: u.created, lastSeen: u.lastSeen, friends: Object.values(u.friends || {}).filter(x => x === 'friends').length, games: c.games || 0, wins: c.wins || 0, goals: c.goals || 0, cups: c.cups || 0 }; };
+  const row = u => { const c = (u.progress && u.progress.career) || {}; return { name: u.name, email: u.email || '', adult: !!u.adult, over16: !!(u.adult || u.over16), brOk: !!u.brOk, br: canBR(u), banned: !!u.banned, created: u.created, lastSeen: u.lastSeen, friends: Object.values(u.friends || {}).filter(x => x === 'friends').length, games: c.games || 0, wins: c.wins || 0, goals: c.goals || 0, cups: c.cups || 0 }; };
   const admin = {
     'GET /admin/stats': async () => { const idx = await names(), reports = await store.list('r/'); return { players: Object.keys(idx).length, reports: reports.length, leaderboard: Object.keys((await store.get('lb')) || {}).length }; },
     'GET /admin/users': async (b, q) => {
@@ -291,7 +292,7 @@ export function createApi(store, opts = {}) {
     'GET /admin/user': async (b, q) => { const u = await getUser(q.name); if (!u) bad('No such player.', 404); return { user: strip(u) }; },
     'POST /admin/user': async (b) => {                          // change age group, suspend, email or career totals
       const u = await getUser(b.name); if (!u) bad('No such player.', 404); const p = b.patch || {};
-      if ('adult' in p) u.adult = !!p.adult; if ('banned' in p) { u.banned = !!p.banned; if (u.banned) u.epoch = (u.epoch || 0) + 1; }
+      if ('adult' in p) u.adult = !!p.adult; if ('brOk' in p) u.brOk = !!p.brOk; if ('over16' in p) u.over16 = !!p.over16; if ('banned' in p) { u.banned = !!p.banned; if (u.banned) u.epoch = (u.epoch || 0) + 1; }
       if (p.email) await claimEmail(u, checkEmail(p.email));
       if (p.career && typeof p.career === 'object') { u.progress = u.progress || {}; u.progress.career = Object.fromEntries(Object.entries(p.career).map(([k, v]) => [k, num(v)])); }
       await saveUser(u); const idx = await names(); idx[u.name.toLowerCase()] = { n: u.name, a: u.adult ? 1 : 0 }; await store.set('names', idx); await updateLeaderboard(u);

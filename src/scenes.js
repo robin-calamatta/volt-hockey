@@ -13,7 +13,7 @@ const STYLE = {
 // The controls guide (Settings > Controls and screen > Controls guide). Edit freely: one block per device.
 const CONTROLS_GUIDE = [
   ['GAMEPAD', ['Left stick   drive  (1st / 3rd person: up = go, ◀ ▶ = turn)', 'B (hold, while turning)   drift: let go for a boost (bigger when the bar is purple)', 'Right stick   look around (springs back)', 'L3 (hold)   push to talk      D-pad ▲   tap: quick chat, hold: emoji wheel', 'D-pad ▼   camera      Select (View)   friends and party', 'RB / LB   half spin', 'D-pad ◀ ▶   speed down / up', 'X   full press on / off  (minigames: A or X uses a power-up)', 'Y   switch cart', 'Start   pause      A / B   select / back']],
-  ['KEYBOARD 1', ['WASD   drive', 'T   camera view', 'Tab chat   1-9 quick chat   G (hold) talk   ` friends   H (hold) emoji wheel', 'R / Z   half spin', 'X   full press  (minigames: Space or X = power-up)', 'V / C   speed up / down', 'F   switch cart', 'Esc   pause', 'Space / Backspace   select / back']],
+  ['KEYBOARD 1', ['WASD   drive', 'T   camera view', 'Tab chat   1-9 quick chat   G (hold) talk   ` friends   H (hold) emote wheel', 'R / Z   half spin', 'X   full press  (minigames: Space or X = power-up)', 'V / C   speed up / down', 'F   switch cart', 'Esc   pause', 'Space / Backspace   select / back']],
   ['KEYBOARD 2', ['Arrows   drive', 'P   camera view', 'L (hold)   push to talk', '. / ,   spin', '] / [   half spin', '\\   full press  (minigames: Right Shift or \\ = power-up)', "' / ;   speed up / down", '/   switch cart', 'Right Shift / Right Ctrl   select / back']],
   ['TOUCH', ['Stick   drive', 'VIEW   camera view', '💬   chat      🎙   talk (hold) / mic on-off (tap)', 'Spin buttons   spin', 'Small spin buttons   half spin', 'PRESS   full press  (minigames: A = power-up)', '+ / -   speed up / down', 'Cart button   switch cart', 'II   pause', 'Settings > Touch and screen   move the buttons']]
 ];
@@ -80,7 +80,7 @@ const SETTINGS_PAGES = {
     { label: () => 'Controls guide', hint: 'What every button does on a gamepad, keyboard and touch', select: () => sc.scene.start('ControlsGuide', { ctx: sc.ctx, page: 'Controls and screen' }) },
     { label: () => `Invert right stick Y axis   ◀ ${Settings.invertLook ? 'On' : 'Off'} ▶`, hint: 'On: push the right stick up to look (and aim) down, like a flight game. Works in every game and view.', change: () => Settings.toggle('invertLook'), select: () => Settings.toggle('invertLook') },
     { ...slider('Look sensitivity: left / right', 'lookH', v => Math.round(v * 100) + '%'), hint: 'How fast you turn and look left and right in first and third person (lower is slower)' },
-    { ...slider('Look sensitivity: up / down', 'lookV', v => Math.round(v * 100) + '%'), hint: 'How fast you aim up and down (Battle Royale) with the right stick or I / K' },
+    { ...slider('Look sensitivity: up / down', 'lookV', v => Math.round(v * 100) + '%'), hint: 'How fast you aim up and down (Volt Royale) with the right stick or I / K' },
     { label: () => `Touch controls   ◀ ${Settings.touch ? 'On' : 'Off'} ▶`, change: () => TouchPad.toggle(), select: () => TouchPad.toggle() },
     { label: () => 'Adjust touch buttons', select: () => TouchPad.edit() },
     { label: () => `Fullscreen   ◀ ${isFullscreen() ? 'On' : 'Off'} ▶`, change: () => toggleFullscreen(), select: () => toggleFullscreen() },
@@ -432,7 +432,7 @@ class LobbyScene extends Phaser.Scene {
     return Settings.nextName(CONFIG.playerNames[this.players.length % CONFIG.playerNames.length], 0, taken.concat(mine));
   }
   rename(p, name) { if (name && !this.players.some(q => q !== p && q.name === name)) { p.name = name; if (this.players[0] === p) Settings.setMyName(name); } }
-  get br() { return this.mini && this.mini.kind === 'br' && (this.mini.squad || 1) > 1; }   // Battle Royale with squads: pick your squad, not a team
+  get br() { return this.mini && this.mini.kind === 'br' && (this.mini.squad || 1) > 1; }   // Volt Royale with squads: pick your squad, not a team
   squadCount() { return Math.max(1, Math.ceil((this.sizes[0] + this.sizes[1]) / (this.mini.squad || 1))); }
   openSquad(from = 0, d = 1) { const n = this.squadCount(); for (let i = 1; i <= n; i++) { const s = ((from - 1 + d * i) % n + n) % n + 1; if (this.players.filter(q => q.squad === s).length < (this.mini.squad || 1)) return s; } return from || 1; }
   openSide() {                                              // side with room and the fewest players, or null when both are full
@@ -509,10 +509,10 @@ class GameScene extends Phaser.Scene {
       for (const o of [this.pauseBtn.bg, this.pauseBtn.t, this.pauseBtn.hit]) o.setDepth(60).setScrollFactor(0);
       this.pauseBtn.bg.setAlpha(0.8);
     }
-    if (!this.demo) { const mi = this.setup.mini || (this.online && this.online.match && this.online.match.mini); if (mi && mi.kind === 'br' && !mi.music) Sound.stopMusic(); else Sound.playMusic('match'); }   /* (Battle Royale: no music unless its Music option is On) */
+    if (!this.demo) { const mi = this.setup.mini || (this.online && this.online.match && this.online.match.mini); if (mi && mi.kind === 'br' && !mi.music) Sound.stopMusic(); else Sound.playMusic('match'); }   /* (Volt Royale: no music unless its Music option is On) */
     if (this.online) {                                         // leave cleanly if the host goes away or the room returns to its lobby
       const o = this.online;
-      if (o.role === 'client') { o.session.onClosed = reason => this.leaveOnline(netErrorText({ type: reason })); o.session.onLobby = () => this.scene.start('Room', { role: 'client', session: o.session }); }
+      if (o.role === 'client') { o.session.onClosed = reason => { if (['lost', 'timeout', 'peer-unavailable', 'ice', 'network'].includes(reason) && this.match && this.match.state !== 'over' && typeof Rejoin !== 'undefined' && Rejoin.get()) return this.leaveOnline('Connection to the host was lost. The game is still going: choose "Back into your game" to get back in your cart.'); this.leaveOnline(netErrorText({ type: reason })); }; o.session.onLobby = () => this.scene.start('Room', { role: 'client', session: o.session }); }
       else { o.idle = { ax: 0, ay: 0, pressed: {} }; o.session.onError = () => {}; }
     }
   }
@@ -549,7 +549,7 @@ class GameScene extends Phaser.Scene {
           if (me.chair) me.chair.driftHeld = !!(input.held && input.held.b);   /* B (hold): drift */
           if (input.pressed.halfCW) me.spinQueued = 0.5; if (input.pressed.halfCCW) me.spinQueued = -0.5;
           /* (v13.4: the triggers no longer spin the cart) */
-          if (m.mini && (input.pressed.x || input.pressed.spinCW || (MD && MD.holdFire && input.held && (input.held.x || input.held.spinCW)))) m.useBy(me); else if (input.pressed.x) m.togglePress(me.side);
+          if (m.mini && (input.pressed.spinCW || (MD && MD.holdFire && input.held && input.held.spinCW))) m.useBy(me); else if (!m.mini && input.pressed.x) m.togglePress(me.side);   /* (v14: minigame items and fire on RT only) */
           if (input.pressed.y) m.switchChair(me);
         }
         if (input.pressed.speedUp && me.speedLevel < Settings.speedCap) { me.speedLevel++; Sound.play('blip'); }
@@ -804,12 +804,12 @@ class GameScene extends Phaser.Scene {
     for (const p of this.setup.players) {
       if (p.invOpen) continue;                                                       // (their inventory screen has their buttons)
       const MD = m.mini && modeOf(m);
-      if (MD && MD.jumpOnA) brPadInput(this, m, p, p.src, Math.min(delta / 1000, 0.05));      // Battle Royale has its own buttons (modes_br2.js)
+      if (MD && MD.jumpOnA) brPadInput(this, m, p, p.src, Math.min(delta / 1000, 0.05));      // Volt Royale has its own buttons (modes_br2.js)
       else {
         if (p.chair) p.chair.driftHeld = !!(p.src.held && p.src.held.b);               // B (hold, while turning): drift
         if (p.src.pressed.halfCW) p.spinQueued = 0.5; if (p.src.pressed.halfCCW) p.spinQueued = -0.5;
         /* (v13.4: the triggers no longer spin the cart) */
-        if (m.mini && (p.src.pressed.x || p.src.pressed.spinCW || (MD && MD.holdFire && p.src.held && (p.src.held.x || p.src.held.spinCW)))) m.useBy(p); else if (p.src.pressed.x) m.togglePress(p.side);   // X: use / fire (some games: hold to keep firing)
+        if (m.mini && (p.src.pressed.spinCW || (MD && MD.holdFire && p.src.held && p.src.held.spinCW))) m.useBy(p); else if (!m.mini && p.src.pressed.x) m.togglePress(p.side);   // X: use / fire (some games: hold to keep firing)
         if (p.src.pressed.y) m.switchChair(p);
       }
       if (p.src.pressed.speedUp && p.speedLevel < Settings.speedCap) { p.speedLevel++; Sound.play('blip'); }   // RB

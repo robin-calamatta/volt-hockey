@@ -54,7 +54,7 @@
     count: s => { s.osc({ f: 880, vol: 0.14, d: 0.18 }); s.osc({ f: 1760, vol: 0.04, d: 0.1 }); },
     /* a referee's pea whistle: two close pitches warbling, with breath */
     whistle: s => { const d = 0.42; s.osc({ f: 1750, vol: 0.06, a: 0.03, d, vib: 22, vibF: 11, wet: 0.25 }); s.osc({ f: 875, vol: 0.025, a: 0.03, d }); s.nz({ f: 1800, q: 2, vol: 0.025, a: 0.03, d }); },   // (softer and lower: the old one sounded like a smoke alarm chirping)
-    /* Battle Royale starts with a deep "go" horn and a whoosh, not a referee's whistle */
+    /* Volt Royale starts with a deep "go" horn and a whoosh, not a referee's whistle */
     br_go: s => { s.osc({ wave: 'sawtooth', f: 98, vol: 0.05, a: 0.08, d: 0.9, wet: 0.5 }); s.osc({ wave: 'sawtooth', f: 147, vol: 0.04, a: 0.08, d: 0.9, wet: 0.5 }); s.nz({ type: 'lowpass', f: 400, f2: 2400, vol: 0.12, a: 0.25, d: 0.7, pink: true, wet: 0.4 }); },
     /* the goal horn: a big brassy chord with a slow swell and the arena's echo */
     goal: s => { for (const [f, v] of [[110, 0.14], [138.6, 0.1], [165, 0.1], [220, 0.06]]) { const c = s.ctx, t = c.currentTime, o = c.createOscillator(), fl = c.createBiquadFilter(), g = c.createGain(); o.type = 'sawtooth'; o.frequency.value = f; fl.type = 'lowpass'; fl.frequency.setValueAtTime(400, t); fl.frequency.linearRampToValueAtTime(1600, t + 0.25); fl.Q.value = 1.5; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.12); g.gain.setValueAtTime(v, t + 1.3); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.9); o.connect(fl); fl.connect(g); s.out(g, 0.45); o.start(t); o.stop(t + 2); } },

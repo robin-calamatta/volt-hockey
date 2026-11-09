@@ -3,6 +3,33 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14: skins, Volt Royale, Victory Royale, jumps everywhere, reconnect
+- **Skins replace hats, hair and colours.** The Locker now has three slots: **PLAYER SKIN**, **CART SKIN** and **EMOTE WHEEL**. Player and cart skins are picked separately.
+  - Player skins: Rookie and Hometown Hero (free), Lil Bro (a kid on your lap in a blue jersey with a white maple leaf), Biker, Rockstar, Software Engineer, Star Knight, Good Boy (a dog), Hockey Pro, Ace Pilot, Trucker (denim cutoff, VOLT FREIGHT hat), Astronaut, Lumberjack, DJ Volt and Captain Volt. Each pass skin also has a second colourway.
+  - Cart skins: Classic Plywood and Street Neon (free), Rocket Ship (fins, portholes, a jet flame that grows when you go), Mouse Mobile (ears, whiskers, a swaying tail), Big Rig (grille, headlights, smoking stacks), Chopper, Tour Rig, Dev Rig, Star Cruiser, Dog House (wagging tail), Ice Machine (spinning beacon), Biplane (spinning prop), Pickup, Moon Rover, Log Hauler and Volt Racer, each with a second colourway. The cart's shape and hitbox never change.
+  - In Volt Hockey your team's jersey goes over your skin's top and the cart keeps its team stripe; everything else on the skin stays.
+  - Every driver has a neck, ears and a nose now. The seatbelt is gone.
+- **Emotes only.** The emoji pop-ups are gone. There are 56 body emotes (arms and legs), 10 of them free. Old wheels with emojis on them get emotes in those slots.
+- **Season pass rebuilt:** a player skin, an emote, a cart skin, an emote... across the 100 tiers. Titles are gone everywhere.
+- **Battle Royale is now Volt Royale.** The winner screen says **VICTORY ROYALE**, and when the last team is left the game doesn't stop. Confetti and fireworks start, and the winners drive round for 12 seconds. They can't be hurt, their guns never run dry, and they can shoot and emote. Then the results.
+- **Volt Royale is 16+.** Only logged-in players who gave an age of 16 or more at sign-up can see or play it. Admins can also approve a player: on the admin page, tick "Allowed to play Volt Royale" (or "16 or over"). Logged-out players don't see it at all, and it's hidden from the public room list for them. A party or room that starts it sends them back out.
+- **Gun pickups never add ammo.** Driving onto a gun while holding one swaps them: you drop yours on the ground, even if it's the same gun.
+- **New Volt Royale maps, with jumps.** Kickers are ramps that launch you, and a kicker landing never hurts.
+  - Volt City: drivable skyscrapers, an elevated highway with a jump over the gap, a mall roof car park and a skate park.
+  - Snow Peak: a three-tier mountain with a ski lodge on top.
+  - Thrill Park: a raised coaster track, a funhouse maze, a bumper-car pen and a pond jump.
+  - Two giant maps: Wild Peaks, and **The Continent**, 432 × 330 m with twelve places to land.
+- **Race jumps and the rescue drone.** There are three new tracks: Lava Skyway, Stunt Park and Coastal Cliffs. Some edges have no wall. Drive off one and you fall in, then a drone flies down, grabs your cart and drops you back on the track where you fell, about 2.8 s later. Some of the old tracks have jumps now too.
+- **Minigame layouts:** Hot Potato, Sumo, Floor Is Lava, Multiball, Giant Ball, Imposter, Infection Night, Stunt Arena, Slalom and Delivery each have their own kickers, towers and bumpers. Golf, Bowling, King of the Hill, Capture the Flag and Paintball keep their own courses.
+- **Team minigames** (Paintball, Capture the Flag, Multiball, Giant Ball) open on the Volt Hockey team screen from the first visit. X opens their settings.
+- **Boost is bigger:** a front wheelie and flames when any boost kicks in, and a stronger shove.
+- **Minigame power-ups are RT only.** X and A no longer use them, and the help text and touch button say so.
+- **League select:** only LB / RB changes the league. D-pad ◀ ▶ picks the team.
+- **Party on the home screen:** press ▲ (or tap someone) to pick a party member and A to see their profile: name, level, games, wins, goals, cups and hours. The host can remove local players and party members from there.
+- **Reconnect:** if you lose the host mid-game, the Online menu shows **Back into your game** for 20 minutes, and it puts you back in your own cart. If the game ended while you were away, it says so.
+- **Crowd:** the crowd holds ARTHROGRYPOSIS letters and #ARTHROGRYPOSIS AWARENESS signs.
+- **Fixes:** quests and pass progress count again after "Play again", and progress merges with your account instead of being overwritten. Name changes stick when you're logged in. The nameplate is never blank on side select.
+
 ## v13.6: the online room, redone
 - **Teams first (host):** a new room opens on the same team cards as Play now and Practice. Each card has the logo and stats, ◀ ▶ picks the team, LB / RB picks the league (Premier League, National Teams, Cities), and ▲ ▼ sets the carts. X opens the room settings: public or private, lobby name, game, CPU skill, practice, carts and Close room. The match rules are one level in, under **Rules ▸**. A goes on to the side picker.
 - **Side picker (everyone):** three columns, like the local controller screen: your team's logo on each side and **everyone starts in the middle**.
@@ -10,13 +37,13 @@ Phaser loads from a CDN; download `phaser.min.js` and change the first script ta
   - Local guests move themselves on their own controllers, and B on a guest's controller removes them.
   - The host has Y for settings, LB to go back to the teams, and START to play.
   - Online everyone plays, so anyone still in the middle at START is moved to the side with room. The host gets a warning first and presses START again to go.
-- **Minigames and Battle Royale** with no sides show one list of who's in.
+- **Minigames and Volt Royale** with no sides show one list of who's in.
 - **After a game** the room comes back on the side picker.
 
 ## v13.5.6: pick your side again (everyone starts in the middle)
 - Volt Hockey matches, practice and the team minigames (Paintball and Capture the Flag in Teams mode, Multiball, Giant Ball...) open the side picker again after you choose the teams.
 - You and your local players are already on it, in the middle. Each player pushes ◀ ▶ to pick a side, and X locks them to one cart (or leaves them free to switch carts). START plays. Anyone still in the middle doesn't play. Other controllers can still join with A.
-- Seasons (you always play for your team), free-for-all minigames and Battle Royale go straight in.
+- Seasons (you always play for your team), free-for-all minigames and Volt Royale go straight in.
 
 ## v13.5.5: no more music 404s on Netlify
 - Netlify now writes `assets/music/playlist.json` itself on every deploy (the build command runs `tools/make-playlist.js`). Push your songs in `assets/music/menu/`, `game/` and `intro/`, and they're found.
@@ -26,7 +53,7 @@ Phaser loads from a CDN; download `phaser.min.js` and change the first script ta
 - The on-screen controller now shows only the buttons a game uses, each named for what it does there:
   - **Volt Hockey**: SPIN ↻ / ↺ on the two big buttons (they used to press the triggers, which no longer spin), PRESS, CART, DRIFT (hold), SPEED + / −, VIEW, EMOTE, A.
   - **Minigames**: SPIN, DRIFT, SPEED, VIEW, EMOTE, and the X button as the game's action: USE (an item), FIRE (Paintball) or ZAP (Imposter). Games with no action hide it.
-  - **Battle Royale**: FIRE, AIM, JUMP, GRAB, AWAY, DRIFT, MELEE, BAG, ◀ ITEM ▶, VIEW, and new **AIM UP / AIM DOWN** buttons (there was no way to tilt your gun on a phone). Battle Royale has its own starting spots so nothing sits on the hotbar.
+  - **Volt Royale**: FIRE, AIM, JUMP, GRAB, AWAY, DRIFT, MELEE, BAG, ◀ ITEM ▶, VIEW, and new **AIM UP / AIM DOWN** buttons (there was no way to tilt your gun on a phone). Volt Royale has its own starting spots so nothing sits on the hotbar.
 - A says READY on the ready screen. At the end of a game, A says AGAIN and B says LOBBY.
 - The left-hand buttons no longer overlap the stick or the 😀 button.
 - Buttons you've moved yourself stay where you put them.
@@ -43,19 +70,19 @@ Phaser loads from a CDN; download `phaser.min.js` and change the first script ta
 
 ## v13.5.1: music folders, a sizzling opening
 - `assets/music/menu/` plays in the menus and the lobby, `assets/music/game/` in the games, and `assets/music/intro/` behind the opening splash (one song picked at random, which keeps playing on the title screen). Each folder is shuffled on its own, carries on with its next song when you come back to it, and plays every song before any repeats.
-- Battle Royale has a **Music** option (Off by default).
+- Volt Royale has a **Music** option (Off by default).
 - `tools/make-playlist.js` writes all three lists.
 - The opening sparkler sizzles, crackles and pops as it burns the logo in, whooshes when the logo flares, then fizzles out. (Browsers only allow sound after a click or key press, so on a first visit with no click yet the opening can be silent.)
 
 ## v13.5: local players in the lobby, ready up, play again, jerseys, any-league seasons
 
-- **Local players**: a second controller presses START in the lobby (or ＋ PLAYER, then A on their controller) and they stand on the stage with you. They come along into everything: hockey (on your team), seasons, minigames, Battle Royale (your squad), and online rooms and party games (as your local guests). To leave, they hold B. The controller screen after picking a game is gone, which also fixes the empty nameplate there.
+- **Local players**: a second controller presses START in the lobby (or ＋ PLAYER, then A on their controller) and they stand on the stage with you. They come along into everything: hockey (on your team), seasons, minigames, Volt Royale (your squad), and online rooms and party games (as your local guests). To leave, they hold B. The controller screen after picking a game is gone, which also fixes the empty nameplate there.
 - **Ready up**: every game waits until every player has pressed A, online too. The host's START skips the wait.
-- **Play again**: at the end, A plays again straight away (minigames and Battle Royale get a new random map) and B goes back to the lobby. Online, the host's A takes the whole room into the next game.
-- **Time played** in Volt Hockey, minigames and Battle Royale is on the CAREER tab.
+- **Play again**: at the end, A plays again straight away (minigames and Volt Royale get a new random map) and B goes back to the lobby. Online, the host's A takes the whole room into the next game.
+- **Time played** in Volt Hockey, minigames and Volt Royale is on the CAREER tab.
 - **Seasons in any league**: LB / RB on the new-season screen picks the league (Premier League, National Teams or Cities). The season is that league's teams only. Old saves carry on as Premier League seasons. The season hub menu is a list again, so it no longer overlaps the info card.
 - **Jerseys**: in hockey every shirt has its team's crest on the chest, and national teams wear their flag.
-- **Battle Royale**:
+- **Volt Royale**:
   - The gun in your hands lifts up and glows in the hotbar, marked IN HAND.
   - The bag opens on the item you're holding.
   - Using up an item no longer swaps what's in your hands.
@@ -76,20 +103,20 @@ Phaser loads from a CDN; download `phaser.min.js` and change the first script ta
 - **Heals**: you can open the bag and move a med or shield you're using, and it keeps applying.
 - **Downed** lasts about 38 s. You can't heal while downed. Drive into a ready rez garage and you get yourself back up, with heartbeat and defibrillator sounds (reviving and rezzing teammates have them too).
 - **Maps**: four new places (Volt Arena, Castle Hill, The Airfield, The Factory), and two giant maps: Mega Island (nine places in one) and The Frontier (a long strip). Squads go up to 5 and matches up to 20 carts.
-- **No team colours in Battle Royale**: everyone wears their locker look. PLAY on Battle Royale drops you straight in with your party, with no team picking. X opens its options.
+- **No team colours in Volt Royale**: everyone wears their locker look. PLAY on Volt Royale drops you straight in with your party, with no team picking. X opens its options.
 - **Party in the lobby** (up to 5): your friends stand in a V behind you (you, then 2, then 2), each in their own look with their name over them. Y or the 😀 button opens emotes, and your party sees them.
 - **Aiming down sights** is smoother and slower to turn.
-- **Hockey and every mode**: the triggers no longer spin the cart 90°. B is drift everywhere. In the minigames the item is used with RT (or X), same as Battle Royale.
-- **The "dying smoke alarm" chirp is gone**: it was the match-start whistle. It's softer now, Battle Royale has its own start sound, and far-off shots and storm sounds are quieter by distance.
+- **Hockey and every mode**: the triggers no longer spin the cart 90°. B is drift everywhere. In the minigames the item is used with RT (or X), same as Volt Royale.
+- **The "dying smoke alarm" chirp is gone**: it was the match-start whistle. It's softer now, Volt Royale has its own start sound, and far-off shots and storm sounds are quieter by distance.
 
-## v13.3.1: fix for Battle Royale freezing the browser
+## v13.3.1: fix for Volt Royale freezing the browser
 
 - v13.3 gave every chest its own small light for the opening glow. A big map has 150+ chests, and the 3D engine lights every pixel with every light, so the graphics card choked and the browser froze while the match loaded. The glow is now a sprite, so the scene is back to its 3 normal lights.
 
-## v13.3: Battle Royale interaction, melee, doors, new items, headshots, squad stats, realistic sound
+## v13.3: Volt Royale interaction, melee, doors, new items, headshots, squad stats, realistic sound
 
-- **Fixed the crash at the end of a Battle Royale** (`S is not defined` in progress.js).
-- **Buttons in Battle Royale**:
+- **Fixed the crash at the end of a Volt Royale** (`S is not defined` in progress.js).
+- **Buttons in Volt Royale**:
   - **X** picks up the gun or item in front of you (a prompt says what), opens or shuts doors, and swaps when your bag is full. **Hold X** to open a chest or ammo crate, or to revive. With nothing to grab, X reloads.
   - **B** (hold while turning) drifts, with no jump needed.
   - **Melee bash**: R3 (click the right stick), the B key on keyboard 1, the middle mouse button, or touch MELEE. It does 20 damage, knocks the target back and breaks doors.
@@ -137,9 +164,9 @@ Phaser loads from a CDN; download `phaser.min.js` and change the first script ta
   - In first and third person the screen edges glow in the drift colour with speed streaks, and in first person the view leans into the drift.
 - **Minigame menus**: the demo plays full screen behind the menu. The menu boxes are see-through, and the goal and rules sit in a see-through panel at the bottom right. The game list no longer breaks into a grid.
 
-## v13: Battle Royale squads, revives and the storm, drifting, hair, bigger maps
+## v13: Volt Royale squads, revives and the storm, drifting, hair, bigger maps
 
-**Battle Royale**
+**Volt Royale**
 - Squads: you stay with your party. Online, a party bigger than the squad size cannot join or host. Locally, ◀ ▶ on the player-select screen sets each player's squad. There are no team colours: everyone wears their own look.
 - Controller: A jump, X reload, RT shoot, LT aim, or heal a teammate when you hold a heal item next to them. LB/RB switch items, Y holsters (drive faster) and Y again takes out the last item. D-pad up opens the bag.
 - Last stand: at 0 HP you are downed (slow, bleeding) while a teammate still stands. Hold X near a downed teammate to revive. When the whole player is out, they drop a rez card: a teammate carries it into a rez garage (two openings, glows green) and waits inside. The garage then goes red while it cools down.
@@ -151,10 +178,10 @@ Phaser loads from a CDN; download `phaser.min.js` and change the first script ta
 - Maps are much bigger (5 enlarged plus Island, Metro, Wilds and Sprawl); "random" picks one each match.
 
 **Everyone**
-- Drifting in every game: hold A while turning at speed (in Battle Royale, hold A after a jump). A drift keeps its speed. The drift bar charges three levels, and letting go gives a speed kick and a boost. Minigame items moved to X.
+- Drifting in every game: hold A while turning at speed (in Volt Royale, hold A after a jump). A drift keeps its speed. The drift bar charges three levels, and letting go gives a speed kick and a boost. Minigame items moved to X.
 - Capture the Flag (Fortress, Canyon) and King of the Hill (Ruins, Colosseum) have big maps with walls and moving parts; "Classic" keeps the old court. CPUs path round walls and back off when stuck.
 - Hair styles (11) and hair colour are separate locker slots, plus titles, new hats, outfits, faces and decals.
-- Actions (thumbs up, cheer, wave and more) are in the pass and the emoji wheel; the arms move when you use them. Your own emoji shows in front of your face; in Battle Royale others only see it nearby.
+- Actions (thumbs up, cheer, wave and more) are in the pass and the emoji wheel; the arms move when you use them. Your own emoji shows in front of your face; in Volt Royale others only see it nearby.
 - Arms and legs are visible in first person, holding the item or weapon.
 - Season 1 now has 100 tiers. You earn XP from playing, kills, goals, wins and top-3 finishes (less than quests). There are new quests for revives, heals, rez and drifting.
 - Layered gun sounds for each gun, reloads and explosions.
@@ -165,10 +192,10 @@ Phaser loads from a CDN; download `phaser.min.js` and change the first script ta
 ## v12: the lobby, your character, Season 1 "The Beginning", quests and the emoji wheel
 
 - **New main screen (lobby):** your character sits on a lit stage, with tabs along the top. Switch tabs with LB / RB (keyboard Q / E) or click them. The right stick turns your character.
-  - **PLAY:** shows the mode you picked, today's quests and a big PLAY button. Press ▼ (or click the mode card) to pick a mode: Volt Hockey, Battle Royale, Minigames, Season, Practice Arena or Online.
+  - **PLAY:** shows the mode you picked, today's quests and a big PLAY button. Press ▼ (or click the mode card) to pick a mode: Volt Hockey, Volt Royale, Minigames, Season, Practice Arena or Online.
   - **LOCKER:** outfit (Rookie Tee, Team Jersey, Cozy Hoodie) and its colour, hat and hat colour, face, hair, skin tone, cart decal, and your emoji wheel. Hover an item to try it on. Locked items show the pass tier that unlocks them.
   - **PASS:** Season 1, "The Beginning". A free pass with 20 tiers and one small reward each (hats, faces, outfits, cart decals, emojis). Browse the rewards to try them on.
-  - **QUESTS:** 3 daily quests (reset at midnight) and 6 weekly quests (reset on Monday), picked from a larger pool. Examples: play a minigame to the end, play or win a Battle Royale, win a match of Volt Hockey, spend time in the Practice Arena, get a penalty, play a full season, open chests, score goals, drive 10 km.
+  - **QUESTS:** 3 daily quests (reset at midnight) and 6 weekly quests (reset on Monday), picked from a larger pool. Examples: play a minigame to the end, play or win a Volt Royale, win a match of Volt Hockey, spend time in the Practice Arena, get a penalty, play a full season, open chests, score goals, drive 10 km.
   - **CAREER:** your stats, the leaderboard, and changing your name.
   - **Start / Esc** opens the menu: Settings, Controls, your name, the leaderboard.
 - **XP and levels:** matches give 80 XP (150 for a win) and quests give 300–3,000. Every 1,000 XP is a level, and each level unlocks the next pass tier.
@@ -178,7 +205,7 @@ Phaser loads from a CDN; download `phaser.min.js` and change the first script ta
 
 ## v11.4: a more realistic outdoors, LT to aim
 
-- **Battle Royale looks more real:**
+- **Volt Royale looks more real:**
   - A painted sky with clouds and a sun glow, and haze that thickens with distance.
   - A horizon on every map: rolling hills and far mountains, a city skyline (Downtown, Port), the sea (Port), red mesas and boulders (Canyon), and woods all round (Suburbs, Jungle).
   - Leafy trees with bark, and building fronts with real windows on every storey. Warehouses and containers have corrugated metal.
@@ -186,29 +213,29 @@ Phaser loads from a CDN; download `phaser.min.js` and change the first script ta
 - The race maps use the new sky too.
 - **LT (hold) to aim:** zooms in (most with the sniper, which also shows a scope), tightens your shots, and slows your cart while held. Keyboards: Q or `,`.
 
-## v11.2: Battle Royale bag, jumping, aiming up and down
+## v11.2: Volt Royale bag, jumping, aiming up and down
 
 - **B opens your bag** (inventory screen): pictures of all 5 slots with ammo and gun stats. ◀ ▶ choose, A picks a slot up and A again swaps or moves it, Y holds that item, X drops it on the ground, B closes. You can't pick something up again for 2.5 s after dropping it. Works for online guests too (the host applies it).
-- **Jump with X** (Battle Royale only; A still fires). You can jump or simply **drive off any roof, floor or ledge** and drop to whatever is below. A long fall costs a little health. You bump your head on a floor above you. CPU carts keep to their railings.
+- **Jump with X** (Volt Royale only; A still fires). You can jump or simply **drive off any roof, floor or ledge** and drop to whatever is below. A long fall costs a little health. You bump your head on a floor above you. CPU carts keep to their railings.
 - **Aim up and down**: right stick, or I / K (keyboard 1) and Page Up / Page Down (keyboard 2). The tilt stays where you put it and eases back to level after a moment. Aim assist also tilts onto carts above or below you. Bullets now fly in 3D: floors and ceilings stop them, so you can shoot up at someone on a roof.
-- First-person view in Battle Royale sits higher so the crosshair is near the middle of the screen, and it tilts with your gun.
+- First-person view in Volt Royale sits higher so the crosshair is near the middle of the screen, and it tilts with your gun.
 - See-through openings: the floor above a ramp now has a real hole, so you can see where you're going.
 - New HUD: crosshair, hit marker, red flash when you're hit, low-health pulse, kill feed, "spectating" label when you're out, and the storm's current and next circle on the minimap. Health and shield are bottom-left under the speed meter; the inventory bar is bottom-right.
 - Surfaces use real textures (asphalt, concrete, grass and so on) instead of flat colours.
-- **Controller in Battle Royale:** RT fires (hold it for automatic guns), LT does nothing, and LB / RB step back and forward through your items. There are no spin buttons in this game. On keyboards: E fires, Z / R step through items (keyboard 2: `.` fires, `[` / `]` step).
+- **Controller in Volt Royale:** RT fires (hold it for automatic guns), LT does nothing, and LB / RB step back and forward through your items. There are no spin buttons in this game. On keyboards: E fires, Z / R step through items (keyboard 2: `.` fires, `[` / `]` step).
 - **Watching when you're out:** you follow a living teammate. If your team is gone, you can watch anyone still in. LB / RB (or left / right) switch between them.
-- Settings: **Invert right stick Y axis** (on/off) applies to looking around in every game and to aiming in Battle Royale.
+- Settings: **Invert right stick Y axis** (on/off) applies to looking around in every game and to aiming in Volt Royale.
 
-## v11.1: Battle Royale loot and HUD, players-only games, a more realistic look
-- **Battle Royale**: you start with nothing. Search CHESTS (a gun with its ammo, often an item too) and AMMO CRATES; medkits, shield
+## v11.1: Volt Royale loot and HUD, players-only games, a more realistic look
+- **Volt Royale**: you start with nothing. Search CHESTS (a gun with its ammo, often an item too) and AMMO CRATES; medkits, shield
   potions and other items lie out in the open. A new inventory bar shows a picture of every gun and item you carry (the one in your hands
-  is highlighted), with health and shield bars. No top-down (classic 2D) view in Battle Royale.
+  is highlighted), with health and shield bars. No top-down (classic 2D) view in Volt Royale.
 - **CPU carts: On / Off** on every minigame's setup page. Off: only the people who join get a cart (on this screen or online).
 - **A more realistic look** for every game (`src/look.js`): lighting and reflections from a generated sky outdoors or the arena's lights
   indoors, fine surface grain on every material, softer fill light, and real ground textures (asphalt, concrete, grass, dirt).
 
-## v11: Battle Royale
-**Battle Royale** (Minigames > Battles and sneaky): solo, duos (teams of 2) or trios (teams of 3), 6 to 12 carts.
+## v11: Volt Royale
+**Volt Royale** (Minigames > Battles and sneaky): solo, duos (teams of 2) or trios (teams of 3), 6 to 12 carts.
 - Everyone starts with a pistol. Loot lies around the maps (with a light beam above it): PISTOL, SMG, SHOTGUN, RIFLE, SNIPER, ROCKETS,
   MEDKIT (+50 health), SHIELD POTION (+50 shield), BOOST (3 s of speed) and SHIELD WALL (a wall in front of you that stops bullets and carts),
   plus ammo crates. The high ground has the better loot.
@@ -394,7 +421,7 @@ Keyboard 1: WASD, E / Q spin, V / C speed up / down, F switch, Space select, Ent
 Settings menu (also in the pause menu): volumes, cart turning speed, game clock speed, starting cart speed, ball bounce, ball grip, stick length, collisions on/off, penalties on/off, difficulty.
 
 ## Your own music
-Drop mp3/ogg/wav/m4a/flac files into `assets/music/menu/` (the menus and the lobby), `assets/music/game/` (every game) and `assets/music/intro/` (the opening splash). Each folder shuffles on its own and carries on where it left off, so every song plays before any repeats. Battle Royale only plays game music if its **Music** option is On; it's Off by default. (The older `match/` folder still counts as game music. Songs loose in `assets/music/` play in both.)
+Drop mp3/ogg/wav/m4a/flac files into `assets/music/menu/` (the menus and the lobby), `assets/music/game/` (every game) and `assets/music/intro/` (the opening splash). Each folder shuffles on its own and carries on where it left off, so every song plays before any repeats. Volt Royale only plays game music if its **Music** option is On; it's Off by default. (The older `match/` folder still counts as game music. Songs loose in `assets/music/` play in both.)
 - **Local dev server** (`npx serve`, `python3 -m http.server`): the game reads the folders itself. Nothing to do.
 - **Public hosting**: hosts hide folder listings, so the game reads `assets/music/playlist.json`. **Netlify** builds it by itself on every deploy (netlify.toml runs `node tools/make-playlist.js`), so you only push your songs. On other hosts (GitHub Pages, Wix...) run `node tools/make-playlist.js` before uploading.
   It writes `assets/music/playlist.json`, which the game reads. Re-run it whenever you add or remove songs.

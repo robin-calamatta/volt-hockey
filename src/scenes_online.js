@@ -6,7 +6,9 @@ class OnlineMenuScene extends ListMenuScene {
   init(data) { this.message = (data && data.message) || ''; this.autoJoin = (data && data.autoJoin) || ''; }   // autoJoin: an invite or your party leader's room
   create() {
     const ok = PeerTransport.available(), blocked = () => this.note.setText(netErrorText({ type: 'unsupported' }));
+    const rj = typeof Rejoin !== 'undefined' && Rejoin.get();
     this.buildMenu('ONLINE', [
+      ...(rj && ok ? [{ label: () => `▶ Back into your game (room ${rj.code})`, hint: 'Your connection dropped: rejoin the game that is still going, in your own cart', select: () => joinRoomByCode(this, rj.code, t => this.note && this.note.active && this.note.setText(t), () => {}, rj.token) }] : []),
       { label: () => 'Create room', select: () => (ok ? this.scene.start('Room', { role: 'host' }) : blocked()) },
       { label: () => 'Create a minigame room', hint: 'Balloon Bash, Race or Manhunt online (or switch any room with its Game row)', select: () => this.scene.start('Minigames') },
       { label: () => 'Browse public rooms', select: () => (ok ? this.scene.start('Browse') : blocked()) },
@@ -30,13 +32,13 @@ function tapButton(scene, x, y, w, label, fn) {
 }
 
 // Connect to a room by code from any screen. onNote shows progress / errors; onFail runs when the attempt did not work.
-function joinRoomByCode(scene, code, onNote, onFail) {
-  onNote('Connecting...'); Sound.play('select');
+function joinRoomByCode(scene, code, onNote, onFail, rejoin) {
+  onNote(rejoin ? 'Getting you back into the game...' : 'Connecting...'); Sound.play('select');
   const session = new ClientSession(new PeerTransport());
-  session.join(code).then(() => {
+  session.join(code, rejoin).then(() => {
     if (!scene.scene.isActive()) return session.leave();          // backed out while connecting
     scene.scene.start('Room', { role: 'client', session });
-  }).catch(e => { onFail(); if (scene.scene.isActive()) onNote(netErrorText(e)); });
+  }).catch(e => { if (rejoin && e && e.type === 'started') { Rejoin.forget(); e = { type: 'rejoin-over' }; } onFail(); if (scene.scene.isActive()) onNote(netErrorText(e)); });
 }
 
 /* The public room list: lobby name, host, players, teams and CPU skill. Up/down chooses, A joins, Y refreshes, LT joins by code, B goes back. It refreshes itself every few seconds. */
@@ -66,7 +68,7 @@ class BrowseScene extends Phaser.Scene {
     if (this.loading) return; this.loading = true; this.lastLoad = this.time.now;
     listPublicRooms().then(res => {
       this.loading = false; if (!this.scene.isActive()) return;
-      this.rooms = res.rooms.slice().sort((a, b) => (a.playing - b.playing) || (b.players - a.players));
+      this.rooms = res.rooms.filter(r => r.kind !== 'br' || brAllowed()).sort((a, b) => (a.playing - b.playing) || (b.players - a.players));
       this.cursor = clamp(this.cursor, 0, Math.max(0, this.rooms.length - 1));
       this.status = res.error ? netErrorText({ type: res.error }) : (this.rooms.length ? '' : 'No public rooms right now. Go back and create one!');
     });

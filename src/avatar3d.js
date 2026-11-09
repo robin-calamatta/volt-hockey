@@ -41,7 +41,7 @@ const Avatar = {
     const shirt = opts.shirt || look.shirt, hatCol = look.hatCol || '#e74c3c', put = (geo, mt, self = true) => { const me = new THREE.Mesh(geo, mt); me.castShadow = true; me.userData.self = self; G.add(me); return me; };
     for (const ch of group.children) { const part = ch.userData && ch.userData.part; if (!part) continue;
       if (part === 'selfTeam') ch.material = this.mat(shirt, 0.6); else if (part === 'selfHair') ch.material = this.mat(look.hair || '#3b2a1e', 0.9); else if (part === 'selfSkin') ch.material = this.mat(look.skin || '#e8b48a', 0.7); }
-    const face = new THREE.Mesh(new THREE.SphereGeometry(0.1005, 20, 12, Math.PI - 0.55, 1.1, Math.PI / 2 - 0.42, 0.8), new THREE.MeshStandardMaterial({ map: this.faceTex(look.face || 'smile'), alphaTest: 0.3, roughness: 0.7 }));
+    const face = new THREE.Mesh(new THREE.SphereGeometry(0.1006, 24, 14, Math.PI - 0.74, 1.48, Math.PI / 2 - 0.5, 1.08)   /* (v13.6.1: a bigger face) */, new THREE.MeshStandardMaterial({ map: this.faceTex(look.face || 'smile'), alphaTest: 0.3, roughness: 0.7 }));
     face.scale.set(0.955, 1.105, 0.905); face.position.set(hx, hy, 0); face.userData.self = true; G.add(face);
     const H = look.hat, hm = this.mat(hatCol, 0.75), at = (g, x, y, z = 0) => g.translate(hx + x, hy + y, z);
     if (H === 'cap') { put(at(new THREE.SphereGeometry(0.106, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1.02, 0.97, 1.02), -0.005, 0.02), hm); put(at(new THREE.CylinderGeometry(0.075, 0.075, 0.01, 18).scale(1.25, 1, 1.1).rotateZ(-0.12), 0.1, 0.04), hm); put(at(new THREE.SphereGeometry(0.012, 8, 6), -0.005, 0.105), hm); }

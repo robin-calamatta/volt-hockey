@@ -4,7 +4,7 @@
    - Then everyone is on the side picker: three columns, your team's logo on each side, everyone starting in the middle.
      ◀ ▶ moves you (and each local guest moves themselves on their own controller), X locks you to one cart, ▲ ▼ changes your name.
      The host's START plays. Online everyone plays, so anyone still in the middle at START is put on the side with room.
-   - Free-for-all minigames and Battle Royale have no sides: one list of who's in. */
+   - Free-for-all minigames and Volt Royale have no sides: one list of who's in. */
 const teamsMatter = cfg => !!cfg && (!cfg.mini || cfg.mini.mode === 'teams');
 
 { const P = RoomScene.prototype, ini = P.init;
@@ -42,6 +42,7 @@ const teamsMatter = cfg => !!cfg && (!cfg.mini || cfg.mini.mode === 'teams');
     this.view = this.viewWanted || (host && this.fresh && !this.preset && teamsMatter(S.cfg) ? 'teams' : 'sides');
     this.rulesSet = new TSSettings(this, this.ruleItems());
     this.wire();
+    if (this.role === 'client' && S.pendingStart) { const msg = S.pendingStart; S.pendingStart = null; return this.beginClient(msg); }   /* (rejoining a game that's going: straight back in) */
     if (this.view === 'teams') {                                          /* the host: the two teams, like Play now */
       const sizeOf = side => ({ get: () => S.cfg.sizes[side], set: d => { const sizes = [...S.cfg.sizes]; sizes[side] = clamp(sizes[side] + d, 1, CONFIG.match.chairsPerTeam); S.setConfig({ sizes }); } });
       TeamSelect.build(this, {
@@ -58,7 +59,7 @@ const teamsMatter = cfg => !!cfg && (!cfg.mini || cfg.mini.mode === 'teams');
     this.add.text(128, 44, 'ONLINE ROOM', { ...STYLE.title, fontSize: '50px' }).setOrigin(0, 0.5); this.add.rectangle(128, 76, 120, 4, THEME.gold, 0.95).setOrigin(0, 0.5);
     this.codeText = this.add.text(V.width - 40, 44, '', { ...STYLE.title, fontSize: '40px', color: '#ffe27a' }).setOrigin(1, 0.5);
     this.subText = this.add.text(128, 98, '', { fontFamily: FONT, fontSize: '19px', color: '#9fb2bf' }).setOrigin(0, 0.5);
-    this.panelG = this.add.graphics(); this.cardG = this.add.graphics().setDepth(5); this.lab = []; this.panelT = [];
+    this.panelG = this.add.graphics(); this.cardG = this.add.graphics().setDepth(5); this.lab = []; this.panelT = []; this.logos = null; this.pos = null;   /* (fresh every visit) */
     this.colX = [230, V.width / 2, V.width - 230];
     const go = col => { const me = this.meRow(); if (me) this.moveTo(me, col); };
     [0, 1, 2].forEach(c => this.add.zone(this.colX[c], 380, c === 1 ? 372 : 400, 520).setInteractive({ useHandCursor: true }).on('pointerdown', () => { Sound.resume(); go(c); }));   // tap a column to go there

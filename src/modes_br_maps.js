@@ -1,4 +1,4 @@
-/* Battle Royale maps (v13.4): new places to land, and two giant maps.
+/* Volt Royale maps (v13.4): new places to land, and two giant maps.
    - Volt Arena: a stadium. A concourse under the stands, ramps up to the stands, a field with cover and a stage in the middle.
    - Castle Hill: a castle on a cliff-sided hill. Ramps up the hill, curtain walls, corner towers to climb, a keep with a roof deck.
    - The Airfield: two big hangars, a control tower you can drive up, parked planes, fuel tanks.

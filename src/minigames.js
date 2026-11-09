@@ -4,7 +4,7 @@
                    No balloons left: you are out and watch from the sin bin. Free for all, or teams.
      Race          a barrier island turns the rink into an oval. Count the laps; first across the line wins (the rest get a little time to finish).
      Manhunt       one cart is IT. Whoever IT touches becomes IT too. IT wins when everybody is caught; anyone still free when the clock runs out wins.
-   Power-ups (? boxes) give one item, used with A (or X): BOOST (a few seconds faster), ZAP (a shot: pops a balloon, or spins a cart out) and
+   Power-ups (? boxes) give one item, used with RT: BOOST (a few seconds faster), ZAP (a shot: pops a balloon, or spins a cart out) and
    OIL (dropped behind you: whoever drives over it has their steering reversed for a few seconds, then the slick is gone).
    Online: the host runs everything; miniSnap() / miniApply() carry the extra state in each snapshot (see net.js). */
 const MINI = {
@@ -280,7 +280,7 @@ class MiniMatch extends Match {
   }
   useItem(c) {
     const I = MINI.item, it = c.item; if (!it || c.out || this.state !== 'play') return; c.item = '';
-    if (it === 'boost') { c.boostLeft = I.boostSeconds; this.sfx('screech'); }
+    if (it === 'boost') { c.boostLeft = I.boostSeconds; this.sfx('screech'); const k = 2.2; c.vx += Math.cos(c.heading) * k; c.vy += Math.sin(c.heading) * k; }   /* (v14: the boost kicks off with a shove) */
     else if (it === 'zap') { const f = c.toWorld(0.8, 0), hx = Math.cos(c.heading), hy = Math.sin(c.heading); this.zaps.push({ id: ++this.idN, x: f.x, y: f.y, vx: hx * I.zapSpeed + c.vx * 0.5, vy: hy * I.zapSpeed + c.vy * 0.5, life: I.zapLife, from: c }); this.sfx('whistle'); }
     else if (it === 'wave') {                                           // SHOCKWAVE: throws every cart near you away (and dazes them a moment)
       for (const o of this.chairs) { if (o === c || o.out) continue; const dx = o.x - c.x, dy = o.y - c.y, d = Math.hypot(dx, dy); if (d < 3.6 && d > 0) { const k = 3 + 6 * (1 - d / 3.6); o.vx += dx / d * k; o.vy += dy / d * k; o.stunLeft = Math.max(o.stunLeft, 0.5); } }

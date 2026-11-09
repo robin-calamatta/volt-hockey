@@ -1,4 +1,4 @@
-/* Drawing for Battle Royale (modes_br.js): the outdoor world with its levels (3D and classic 2D), loot, bullets, shield walls, the storm,
+/* Drawing for Volt Royale (modes_br.js): the outdoor world with its levels (3D and classic 2D), loot, bullets, shield walls, the storm,
    carts riding up ramps, and cameras that rise with your cart. */
 const BR_COLS = { wall: 0xb8b2a6, bldg: 0xc9c1b1, mall: 0xe0dbd0, warehouse: 0x8a8f96, house: 0xd8c3a5, hut: 0x8b6a45, column: 0x9aa0a6, trunk: 0x6b4a2b, cliff: 0xa8643a, crate: 0x9a6b3a, container: 0xc0392b, rock: 0x8a8f94, log: 0x6b4a2b };
 const BR_FLOORS = { garage: 0x8e949b, roof: 0x6f757c, canopy: 0x4f8a3a, wood: 0x8b5a2b, rock: 0xb8774a, stone: 0xa89f8f, bridge: 0x5f6a75, mall: 0xd9d4c7, container: 0x2f6f8f, concrete: 0x8e949b, metal: 0x6f7f8f };
@@ -109,7 +109,7 @@ Object.assign(View3D.prototype, {
       c.position.set(st.bx, 16 + z, st.by + 13); c.lookAt(st.bx, z, st.by - 1); c.fov = 50; c.updateProjectionMatrix(); c.updateMatrixWorld(); return c;
     }
     const ch = vp.chair, z = ch && ch.gs && ch.gs.z; if (z && vp.mode !== 'broadcast') { c.position.y += z; c.updateMatrixWorld(); }   // your camera rides up the ramps with you
-    if (m.kind === 'br' && ch && !vp.spect && (vp.mode === 'first' || vp.mode === 'third')) {        // Battle Royale: the view tilts with your gun
+    if (m.kind === 'br' && ch && !vp.spect && (vp.mode === 'first' || vp.mode === 'third')) {        // Volt Royale: the view tilts with your gun
       const st = this.camFor(vp.key), it = ch.gs.inv && ch.gs.inv[ch.gs.sel], zt = brAds(ch) ? (it && it.k === 'sniper' ? 0.38 : it && it.k === 'rifle' ? 0.62 : 0.75) : 1; st.zoom = (st.zoom || 1) + (zt - (st.zoom || 1)) * (1 - Math.exp(-14 * dt));   // LT: zoom in
       if (Math.abs(st.zoom - 1) > 0.002) { c.fov *= st.zoom; c.updateProjectionMatrix(); }
       const pt = (vp.mode === 'first' ? 0.3 + brPitch(ch) : brPitch(ch) * 0.6); if (pt) { const d = new THREE.Vector3(); c.getWorldDirection(d); const yaw = Math.atan2(d.z, d.x), p0 = Math.asin(Math.max(-1, Math.min(1, d.y))), np = Math.max(-1.2, Math.min(1.2, p0 + pt)); c.lookAt(c.position.x + Math.cos(yaw) * Math.cos(np), c.position.y + Math.sin(np), c.position.z + Math.sin(yaw) * Math.cos(np)); c.updateMatrixWorld(); }
@@ -153,7 +153,7 @@ Object.assign(View3D.prototype, {
   };
 }
 
-/* ----- the Battle Royale hotbar: five slots with a picture of each gun or item, its ammo, and health and shield bars ----- */
+/* ----- the Volt Royale hotbar: five slots with a picture of each gun or item, its ammo, and health and shield bars ----- */
 function brDrawIcon(c, k) {
   const W = 128, H = 72, metal = '#2b2f35', dark = '#15181c', acc = '#' + ((BR_GUNS[k] || BR_ITEMS[k] || { col: 0x2e7d32 }).col).toString(16).padStart(6, '0');
   c.clearRect(0, 0, W, H); c.lineJoin = 'round';
@@ -248,7 +248,7 @@ Object.assign(GameScene.prototype, {
     if (m && m.kind === 'br' && m.state === 'play' && src && src.bagTap && (src.bagTap = false, true) && !this.scene.isActive('BRInv') && !this.scene.isActive('Pause')) { const chair = this.brMyChair(); if (chair && !chair.out) this.openInventory({ chair, src, id: chair.player.id, get invOpen() { return chair.player.invOpen; }, set invOpen(v) { chair.player.invOpen = v; } }); }
     return onl.call(this, delta);
   };
-  P.viewports3d = function (LP) {                                           // eliminated in Battle Royale: watch a team-mate (or whoever got you, or anyone still in)
+  P.viewports3d = function (LP) {                                           // eliminated in Volt Royale: watch a team-mate (or whoever got you, or anyone still in)
     const list = vps.call(this, LP), m = this.match; if (m.kind !== 'br') return list;
     for (const vp of list) if (vp.look) vp.look = { x: vp.look.x, y: 0 };                    // (the right stick's up / down tilts your gun instead)
     for (const vp of list) {                                                  // (your team-mates if any are left, otherwise anyone still in; LB / RB switch between them)
@@ -270,7 +270,7 @@ Object.assign(GameScene.prototype, {
   };
 }
 
-/* The inventory screen (B in Battle Royale): your five slots, big. Move along them, A picks one up and puts it down in another slot
+/* The inventory screen (B in Volt Royale): your five slots, big. Move along them, A picks one up and puts it down in another slot
    (swapping), Y holds it, X drops it on the ground, B closes. Mouse / touch: click a slot, then the buttons. */
 class BRInvScene extends Phaser.Scene {
   constructor() { super('BRInv'); }

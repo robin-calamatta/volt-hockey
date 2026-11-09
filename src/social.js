@@ -108,7 +108,9 @@ const Party = {
   on(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); },
   emit() { for (const fn of this.listeners) { try { fn(); } catch (e) { console.error(e); } } if (typeof Voice !== 'undefined') Voice.refresh(); if (typeof Chat !== 'undefined') Chat.refresh(); },
   get active() { return !!this.role; },
-  meInfo() { return { name: Account.name || Settings.myName() || 'Player', acct: Account.name || '', adult: Account.adult, vid: typeof Voice !== 'undefined' ? Voice.myId() : '', look: typeof Progress !== 'undefined' ? Progress.look() : null }; },
+  meInfo() { return { name: Account.name || Settings.myName() || 'Player', acct: Account.name || '', adult: Account.adult, vid: typeof Voice !== 'undefined' ? Voice.myId() : '', look: typeof Progress !== 'undefined' ? Progress.look() : null, st: this.myStats() }; },
+  myStats() { try { const C = Settings.career || {}, T = C.time || {}; return { lvl: Progress.level(), tier: Progress.tier(), games: C.games || 0, wins: C.wins || 0, goals: C.goals || 0, cups: C.cups || 0, volt: Math.round(T.volt || 0), mini: Math.round(T.mini || 0), br: Math.round(T.br || 0) }; } catch (e) { return null; } },   // (shown when a party member is picked on the lobby stage: no email, nothing private)
+  cleanStats(o) { if (!o || typeof o !== 'object') return null; const n = v => Math.max(0, Math.min(1e9, Math.floor(+v || 0))); return { lvl: n(o.lvl), tier: n(o.tier), games: n(o.games), wins: n(o.wins), goals: n(o.goals), cups: n(o.cups), volt: n(o.volt), mini: n(o.mini), br: n(o.br) }; },
   create() {
     if (this.role) return Promise.resolve(this.id);
     if (!Account.loggedIn) { Toasts.show('Log in to start a party.', [], 4000); return Promise.reject(new Error('login')); }
@@ -129,12 +131,12 @@ const Party = {
     if (!msg || typeof msg !== 'object') return;
     if (msg.t === 'hello') {
       if (this.members.length >= this.max) { conn.send({ t: 'end', reason: 'full' }); setTimeout(() => conn.close(), 300); return; }
-      this.conns.set(key, conn); this.members.push({ key, leader: false, name: cleanText(msg.name, 20) || 'Player', acct: cleanText(msg.acct, 20), adult: !!msg.adult, vid: cleanText(msg.vid, 80), look: typeof Avatar !== 'undefined' && msg.look ? Avatar.cleanLook(msg.look) : null });
+      this.conns.set(key, conn); this.members.push({ key, leader: false, name: cleanText(msg.name, 20) || 'Player', acct: cleanText(msg.acct, 20), adult: !!msg.adult, vid: cleanText(msg.vid, 80), look: typeof Avatar !== 'undefined' && msg.look ? Avatar.cleanLook(msg.look) : null , st: this.cleanStats(msg.st)});
       this.sendMembers(); Toasts.show(`<b>${esc(msg.name)}</b> joined your party.`, [], 3500);
       if (Online.current && Online.current.role === 'host' && Online.current.code) conn.send({ t: 'room', code: Online.current.code });   // you are already in a room: come along
     } else if (msg.t === 'vid') { const m = this.members.find(x => x.key === key); if (m) { m.vid = cleanText(msg.vid, 80); this.sendMembers(); } }
     else if (msg.t === 'chat') { const m = this.members.find(x => x.key === key); if (m) this.relayChat(m, msg); }
-    else if (msg.t === 'look') { const m = this.members.find(x => x.key === key); if (m && typeof Avatar !== 'undefined') { m.look = Avatar.cleanLook(msg.look || {}); this.sendMembers(); } }
+    else if (msg.t === 'look') { const m = this.members.find(x => x.key === key); if (m && typeof Avatar !== 'undefined') { m.look = Avatar.cleanLook(msg.look || {}); if (msg.st) m.st = this.cleanStats(msg.st); this.sendMembers(); } }
     else if (msg.t === 'emo') { const id = cleanText(msg.id, 16); this.gotEmote(key, id); for (const [k, c] of this.conns) if (k !== key) c.send({ t: 'emo', key, id }); }
     else if (msg.t === 'bye') conn.close();
   },
@@ -198,7 +200,7 @@ const Party = {
   reset() { this.role = null; this.id = ''; this.peer = null; this.link = null; this.conns = new Map(); this.members = []; this.myKey = ''; this.emit(); },
   others() { return this.members.filter(m => m.key !== this.myKey); },
   /* the lobby: your look and your emotes, for the others in your party */
-  updateLook() { const look = Progress.look(); if (this.role === 'leader') { const me = this.members.find(m => m.key === 'L'); if (me) { me.look = look; this.sendMembers(); } } else if (this.link) this.link.send({ t: 'look', look }); },
+  updateLook() { const look = Progress.look(), st = this.myStats(); if (this.role === 'leader') { const me = this.members.find(m => m.key === 'L'); if (me) { me.look = look; me.st = st; this.sendMembers(); } } else if (this.link) this.link.send({ t: 'look', look, st }); },
   sendEmote(id) { if (this.role === 'leader') for (const c of this.conns.values()) c.send({ t: 'emo', key: 'L', id }); else if (this.link) this.link.send({ t: 'emo', id }); },
   gotEmote(key, id) { for (const fn of this.emoFns) { try { fn(key, id); } catch (e) { console.error(e); } } }
 };

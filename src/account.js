@@ -44,6 +44,7 @@ const Account = {
       catch (e) { this.lastError = e.message; }
     }
     this.ready = true; this.emit();
+    try { addEventListener('pagehide', () => this.flush()); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') this.flush(); }); } catch (e) { /* no page events */ }
     this.loadIce();
     if (this.loggedIn && typeof Social !== 'undefined') Social.start();
   },
@@ -70,21 +71,39 @@ const Account = {
   applyServer(prefs, progress) {
     this.applying = true;
     try {
-      if (prefs && typeof prefs === 'object') { for (const [k, v] of Object.entries(prefs)) if (!this.deviceKeys.includes(k) && typeof v !== 'function') Settings[k] = v; Settings.migrate(prefs); Settings.fixCam(); Settings.save(); Sound.applyVolumes && Sound.applyVolumes(); }
+      const localProfile = Settings.profile && typeof Settings.profile === 'object' ? JSON.parse(JSON.stringify(Settings.profile)) : null, localCareer = Settings.career ? JSON.parse(JSON.stringify(Settings.career)) : null;
+      if (prefs && typeof prefs === 'object') { for (const [k, v] of Object.entries(prefs)) if (!this.deviceKeys.includes(k) && typeof v !== 'function') Settings[k] = v; Settings.profile = this.mergeProfile(localProfile, prefs.profile); Settings.migrate(prefs); Settings.fixCam(); Settings.save(); Sound.applyVolumes && Sound.applyVolumes(); }
       if (progress && typeof progress === 'object') {
-        if (progress.career) { Settings.career = progress.career; Settings.save(); }
+        if (progress.career || localCareer) { Settings.career = this.mergeCareer(localCareer, progress.career); Settings.save(); }
         try { if (progress.season) localStorage.setItem(Season.key, JSON.stringify(progress.season)); else localStorage.removeItem(Season.key); } catch (e) { /* storage blocked */ }
         try { localStorage.setItem(Season.historyKey, JSON.stringify(Array.isArray(progress.history) ? progress.history : [])); } catch (e) { /* storage blocked */ }
         this.lastProgress = JSON.stringify(this.progressNow());
       }
     } finally { this.applying = false; }
   },
+  /* v13.6.1: the account's copy never wipes out progress made on this device. The profile (XP, the season pass, quests, your look) keeps whichever copy
+     has more XP, and today's / this week's quests keep the best count from either; career totals keep the higher of each number. (Before, a copy on
+     the server that was behind - say the last save hadn't reached it before the page closed - replaced this device's progress on the next visit.) */
+  mergeProfile(a, b) {
+    if (!a || typeof a !== 'object') return b || {}; if (!b || typeof b !== 'object') return a;
+    const ax = +a.xp || 0, bx = +b.xp || 0, base = JSON.parse(JSON.stringify(ax > bx ? a : b)), other = ax > bx ? b : a; base.xp = Math.max(ax, bx); base.done = Math.max(+a.done || 0, +b.done || 0);
+    const qa = a.q || {}, qb = b.q || {}, q = base.q = base.q || {}, best = (x, y) => { const o = { ...(x || {}) }; for (const [k, v] of Object.entries(y || {})) o[k] = Math.max(o[k] || 0, v || 0); return o; };
+    if (qa.day && qa.day === qb.day) q.d = best(qa.d, qb.d); if (qa.week && qa.week === qb.week) { q.w = best(qa.w, qb.w); q.kinds = [...new Set([...(qa.kinds || []), ...(qb.kinds || [])])]; }
+    if (!base.look && other.look) base.look = other.look; return base;
+  },
+  mergeCareer(a, b) {
+    if (!a) return b || null; if (!b) return a; const o = JSON.parse(JSON.stringify(b));
+    for (const [k, v] of Object.entries(a)) { if (typeof v === 'number') o[k] = Math.max(v, +o[k] || 0); else if (v && typeof v === 'object' && !Array.isArray(v)) { o[k] = o[k] && typeof o[k] === 'object' ? { ...o[k] } : {}; for (const [k2, v2] of Object.entries(v)) if (typeof v2 === 'number') o[k][k2] = Math.max(v2, +o[k][k2] || 0); else if (!(k2 in o[k])) o[k][k2] = v2; } else if (!(k in o)) o[k] = v; }
+    return o;
+  },
   prefsNow() { const out = {}; for (const [k, v] of Object.entries(Settings)) if (typeof v !== 'function' && !this.deviceKeys.includes(k)) out[k] = v; return out; },
   progressNow() { return { career: Settings.career || null, season: Season.load(), history: Season.history() }; },
-  changed() { if (!this.loggedIn || this.applying) return; clearTimeout(this.pushTimer); this.pushTimer = setTimeout(() => { this.pushPrefs(); this.pushProgress(); }, 1500); },   // called by Settings.save and Season.save
-  async pushPrefs() { if (!this.loggedIn) return; try { await this.req('PUT', '/prefs', { prefs: this.prefsNow() }); } catch (e) { this.lastError = e.message; } },
-  async pushProgress(force) {
-    if (!this.loggedIn) return; const p = this.progressNow(), json = JSON.stringify(p); if (!force && json === this.lastProgress) return;
+  changed() { if (!this.loggedIn || this.applying || this.pushTimer) return; this.pushTimer = setTimeout(() => { this.pushTimer = null; this.pushPrefs(); this.pushProgress(); }, 1500); },   // (at most one push every 1.5 s: before, saving often kept putting the push off, so it might never happen)
+  flush() { if (!this.loggedIn) return; clearTimeout(this.pushTimer); this.pushTimer = null; this.pushPrefs(true); this.pushProgress(false, true); },   // leaving the page: send now   // called by Settings.save and Season.save
+  async pushPrefs(keep) { if (!this.loggedIn) return; if (keep) return this.beacon('/prefs', { prefs: this.prefsNow() }); try { await this.req('PUT', '/prefs', { prefs: this.prefsNow() }); } catch (e) { this.lastError = e.message; } },
+  beacon(path, body) { try { fetch(this.base() + '/api' + path, { method: 'PUT', keepalive: true, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + this.token }, body: JSON.stringify(body) }); } catch (e) { /* closing anyway */ } },
+  async pushProgress(force, keep) {
+    if (!this.loggedIn) return; const p = this.progressNow(), json = JSON.stringify(p); if (!force && json === this.lastProgress) return; if (keep) { this.lastProgress = json; return this.beacon('/progress', p); }
     try { await this.req('PUT', '/progress', p); this.lastProgress = json; } catch (e) { this.lastError = e.message; }
   },
   /* A TURN relay the site owner set up (ICE_SERVERS in Netlify): lets voice and parties connect on strict networks. */

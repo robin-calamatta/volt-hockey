@@ -111,7 +111,7 @@ const TeamSelect = {
     if (typeof PadNav !== 'undefined' && PadNav.stack.some(x => x.modal)) return;
     if (sc.tsSet.open) sc.tsSet.update(e);
     else {
-      const C = T.cfg.cards[T.focus], lb = e.halfCCW || e.speedDown || e.spinCCW, rb = e.halfCW || e.speedUp || e.spinCW;
+      const C = T.cfg.cards[T.focus], lb = e.halfCCW || e.spinCCW, rb = e.halfCW || e.spinCW;   /* (LB / RB only: the D-pad's ◀ ▶ is also "cart speed", which used to change the league too) */
       if ((e.up || e.down) && C.carts) { T.row = T.row ? 0 : 1; Sound.play('blip'); }
       if (e.left || e.right) { const d = e.left ? -1 : 1; if (T.row === 1 && C.carts) C.carts.set(d); else this.cycle(C, d); Sound.play('blip'); }
       if ((lb || rb) && !C.leagueLock) { this.league(C, rb ? 1 : -1); T.row = 0; Sound.play('blip'); }
@@ -171,7 +171,7 @@ const TeamSelect = {
 /* Controller select: a card for every controller; push it under a team (or leave it in the middle to sit out) */
 { const P = LobbyScene.prototype, cr = P.create, up = P.update;
   P.create = function () {
-    if (this.br) return cr.call(this);                                  // (Battle Royale squads keep their own screen)
+    if (this.br) return cr.call(this);                                  // (Volt Royale squads keep their own screen)
     this.players = []; this.ready = 0; this.cards = new Map(); const V = CONFIG.view, T = this.teams;
     menuBackdrop(this);
     this.add.text(128, 44, 'CONTROLLERS', { ...STYLE.title, fontSize: '50px' }).setOrigin(0, 0.5); this.add.rectangle(128, 76, 120, 4, THEME.gold, 0.95).setOrigin(0, 0.5);
@@ -184,7 +184,7 @@ const TeamSelect = {
     this.add.text(V.width / 2, 150, 'NOT PLAYING', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#9fb2bf' }).setOrigin(0.5);
     this.countT = [0, 1].map(s => this.add.text(this.colX[s * 2], 618, '', { fontFamily: FONT, fontSize: '17px', color: '#cfd8de' }).setOrigin(0.5));
     this.idle = this.add.text(V.width / 2, 330, '', { fontFamily: FONT, fontSize: '19px', color: '#cfd8de', align: 'center', wordWrap: { width: 300 } }).setOrigin(0.5);
-    this.cardG = this.add.graphics().setDepth(5);
+    this.cardG = this.add.graphics().setDepth(5); this.lab = [];   /* (fresh labels every visit: the old ones were destroyed with the last visit, which left the nameplates blank) */
     const kick = () => { const ps = this.players.filter(p => p.side !== null); Controls.owner = null; this.scene.start('Game', { players: ps, sizes: this.sizes, practice: this.practice, season: this.season, mini: this.mini }); };
     this.kick = kick;
     TS_UI.legend(this, V.height - 26, [['A', 'Join'], ['◀ ▶', 'Team'], ['X', 'Lock to one cart'], ['▲ ▼', 'Name'], ['Y', 'Type name'], ['START', 'Play', () => { Sound.play('select'); kick(); }], ['B', 'Leave / back', () => { if (this.players.length) this.players = []; else this.scene.start(this.season ? 'SeasonHub' : 'Setup', { practice: this.practice }); }]]);

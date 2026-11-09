@@ -27,7 +27,7 @@ Object.assign(GameScene.prototype, {
     this.sharedFlat = Settings.camMode === '2d'; this.shownFlat = null;
     if (this.v3) this.v3.applyQuality();
   },
-  modeOf(p) { const m = (p && p.camMode) || Settings.camMode || 'first'; return !Settings.camAllowed(m) || (m === '2d' && this.match && this.match.kind === 'br') ? 'first' : m; },   // (no top-down view in Battle Royale)   // third person and broadcast only when turned on
+  modeOf(p) { const m = (p && p.camMode) || Settings.camMode || 'first'; return !Settings.camAllowed(m) || (m === '2d' && this.match && this.match.kind === 'br') ? 'first' : m; },   // (no top-down view in Volt Royale)   // third person and broadcast only when turned on
   /* Who is playing on this screen, and which device each of them is using right now. */
   localControls() {
     const o = this.online;
@@ -135,7 +135,7 @@ Object.assign(GameScene.prototype, {
       }
       // speed meter for your own cart (the ring on the floor is out of sight in first person)
       if (vp.p && vp.chair && vp.mode !== 'broadcast') {
-        const n = CONFIG.speedLevels.length, lv = vp.p.speedLevel || 0, x0 = R.x + 18, y0 = R.y + R.h - 22 - (this.match && this.match.kind === 'br' && !this.flat ? 44 : 0);   // (Battle Royale: health and shield sit under it)
+        const n = CONFIG.speedLevels.length, lv = vp.p.speedLevel || 0, x0 = R.x + 18, y0 = R.y + R.h - 22 - (this.match && this.match.kind === 'br' && !this.flat ? 44 : 0);   // (Volt Royale: health and shield sit under it)
         const D = vp.chair.dr, F = CONFIG.drift, drifting = D && !vp.chair.out && (D.on || D.boost > 0), now = this.time.now;
         if (!drifting) {
           g.fillStyle(0x0d151b, 0.6).fillRoundedRect(x0 - 8, y0 - 28, n * 16 + 84, 40, 8);
@@ -177,7 +177,7 @@ Object.assign(GameScene.prototype, {
     for (const n of m.nets) { const [x, y] = P(Math.min(n.backX, n.mouthX), n.y1); g.fillStyle(0xd8392b, 1).fillRect(x, y, CONFIG.net.depth * s, (n.y2 - n.y1) * s); }
     }
     const mine = new Set((this.vps || []).map(v => v.chair).filter(Boolean));
-    const brTeams = m.kind === 'br' ? new Set([...mine].map(c => c.gs && c.gs.team)) : null;   // (Battle Royale: only you and your team-mates, never enemies)
+    const brTeams = m.kind === 'br' ? new Set([...mine].map(c => c.gs && c.gs.team)) : null;   // (Volt Royale: only you and your team-mates, never enemies)
     for (const c of m.chairs) {
       if (c.benched) continue; if (brTeams && (c.out || !brTeams.has(c.gs && c.gs.team))) continue; const [x, y] = P(c.x, c.y), col = TEAMS[m.teams[c.side]].color, hx = Math.cos(c.heading), hy = Math.sin(c.heading);
       if (mine.has(c)) g.fillStyle(0xffffff, 0.16).slice(x, y, 26, c.heading - 0.6, c.heading + 0.6).fillPath();     // where you are looking

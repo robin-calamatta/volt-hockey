@@ -12,7 +12,7 @@ const SFX = {
   bump:     s => s.noise({ dur: 0.08, vol: 0.25, from: 400, to: 200 }),
   foul:     s => s.tone({ wave: 'sawtooth', from: 180, to: 90, dur: 0.35, vol: 0.3 }),
   screech:  s => s.noise({ dur: 0.18, vol: 0.07, from: 3400, to: 2200, q: 6 }),   // light, brief tyre squeal for the spin move
-  /* gunshots (Battle Royale): a crack, a body, a low thump and an outdoor echo, different for every gun */
+  /* gunshots (Volt Royale): a crack, a body, a low thump and an outdoor echo, different for every gun */
   gun_pistol:  s => s.shot({ vol: 0.42, crack: 0.025, body: 0.12, bodyF: 1300, low: 0.12, lowF: 170, tail: 0.35 }),
   gun_smg:     s => s.shot({ vol: 0.3, crack: 0.018, body: 0.07, bodyF: 1600, low: 0.07, lowF: 190, tail: 0.2 }),
   gun_shotgun: s => s.shot({ vol: 0.62, crack: 0.03, body: 0.32, bodyF: 650, low: 0.3, lowF: 90, tail: 0.7 }),

@@ -86,8 +86,12 @@ const kf = (keys, p) => { if (p <= keys[0][0]) return keys[0].slice(1); for (let
     /* v13.5: the boost out of a drift: flames out of the back wheels and a short trail of fire on the ground */
     if (!this.flameTex) { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d'), gr = x.createRadialGradient(32, 32, 1, 32, 32, 30); gr.addColorStop(0, 'rgba(255,255,220,1)'); gr.addColorStop(0.3, 'rgba(255,200,60,0.9)'); gr.addColorStop(0.65, 'rgba(255,90,20,0.5)'); gr.addColorStop(1, 'rgba(255,40,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); this.flameTex = new THREE.CanvasTexture(cv); this.flames = []; }
     const flame = () => this.flames.find(o => !o.visible) || (this.flames.length < 220 ? (() => { const o = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.flameTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); this.scene.add(o); this.flames.push(o); return o; })() : null);
-    for (const c of this.carts || []) { const D = c.ch.dr; if (!D || !(D.boost > 0) || c.ch.out) { c.flameAcc = 0; continue; }
-      const hot = D.lvl >= 3 ? 0xd89bff : D.lvl >= 2 ? 0xffb347 : 0x9fe8ff;   /* (the colour of the drift level) */
+    for (const c of this.carts || []) { const ch = c.ch, D = ch.dr || {}, on = !ch.out && (D.boost > 0 || ch.boostLeft > 0 || (ch.gs && ch.gs.boost > 0));
+      /* v14: every boost (a drift's or an item's) kicks off with a front wheelie */
+      if (on && !c.boostWas) c.wheelie = 1; c.boostWas = on; if (c.wheelie > 0) { c.wheelie = Math.max(0, c.wheelie - dt * 1.35); const w = Math.sin(Math.min(1, (1 - c.wheelie) * 1.6) * Math.PI) * (1 - (1 - c.wheelie) * 0.4), a = 0.32 * w; c.wA = a; c.group.position.y += Math.sin(a) * 0.36; } else c.wA = 0;
+      { const cur = c.group.rotation.z, base = c.wSet !== undefined && cur === c.wSet ? c.wBase : cur; c.wBase = base; c.group.rotation.z = c.wSet = base + (c.wA || 0); }   /* (tilt on top of whatever the mode set: a ramp in Volt Royale) */
+      if (!on) { c.flameAcc = 0; continue; }
+      const hot = D.boost > 0 ? (D.lvl >= 3 ? 0xd89bff : D.lvl >= 2 ? 0xffb347 : 0x9fe8ff) : 0xffb347;   /* (the colour of the drift level) */
       if ((c.flameAcc = (c.flameAcc || 0) + dt) > 0.025) { c.flameAcc = 0;
         for (const sd of [1, -1]) { const w = new THREE.Vector3(CONFIG.view3d.cart.seatX - 0.42, 0.14, sd * 0.32); c.group.localToWorld(w);
           const f1 = flame(); if (f1) { f1.position.copy(w); f1.visible = true; f1.userData = { t: 0, life: 0.22, s0: 0.38, vy: 0.9, trail: false }; f1.material.color.setHex(0xffffff); }
@@ -107,7 +111,7 @@ const kf = (keys, p) => { if (p <= keys[0][0]) return keys[0].slice(1); for (let
     if (this.m.kind === 'br' && !vp.spect && ch.gs) { const k = brKick(ch, this.m); if (k > 0.001) { c.rotateX(0.045 * k); changed = true; } }
     if (vp.mode === 'first') { const D = ch.dr, want = D && D.on ? D.dir : 0; st.lean = (st.lean || 0) + (want - (st.lean || 0)) * (1 - Math.exp(-8 * dt));
       if (Math.abs(st.lean) > 0.002) { c.rotateZ(-st.lean * 0.075); c.fov += Math.abs(st.lean) * 5; c.updateProjectionMatrix(); changed = true; } }
-    { const D = ch.dr, want = D && D.boost > 0 ? 1 : 0; st.bst = (st.bst || 0) + (want - (st.bst || 0)) * (1 - Math.exp(-(want ? 14 : 4) * dt));   /* the boost: the view punches wider */
+    { const D = ch.dr, want = (D && D.boost > 0) || ch.boostLeft > 0 || (ch.gs && ch.gs.boost > 0) ? 1 : 0; st.bst = (st.bst || 0) + (want - (st.bst || 0)) * (1 - Math.exp(-(want ? 14 : 4) * dt));   /* the boost: the view punches wider */
       if (st.bst > 0.01) { c.fov += st.bst * (vp.mode === 'first' ? 14 : 9); c.updateProjectionMatrix(); changed = true; } }
     if (changed) c.updateMatrixWorld(); return c;
   };

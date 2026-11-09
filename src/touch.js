@@ -20,13 +20,13 @@ const TOUCH = {
     speedDown:{ kind: 'button', x: 0.165, y: 0.25, size: 54,  button: 'speedDown',label: '−', sub: 'SPEED', name: 'Cart speed down (LB)' },
     camera:   { kind: 'button', x: 0.93, y: 0.235, size: 50, button: 'camera',   label: '◉', sub: 'VIEW',  name: 'Camera view (1st / 3rd person, broadcast, 2D)' },
     start:    { kind: 'button', x: 0.50, y: 0.92, size: 50,  button: 'start',    label: 'II', sub: '',     name: 'Pause' },
-    quick:    { kind: 'button', x: 0.165, y: 0.40, size: 54,  button: 'quick',    label: '😀', sub: 'EMOTE', name: 'Emotes (hold for the wheel); Battle Royale: tap for your bag' },
-    aimUp:    { kind: 'button', x: 0.68, y: 0.30, size: 52,  button: 'aimUp',    label: '▲', sub: 'AIM UP', name: 'Battle Royale: tilt your gun up' },
-    aimDown:  { kind: 'button', x: 0.68, y: 0.44, size: 52,  button: 'aimDown',  label: '▼', sub: 'AIM DOWN', name: 'Battle Royale: tilt your gun down' }
+    quick:    { kind: 'button', x: 0.165, y: 0.40, size: 54,  button: 'quick',    label: '🙌', sub: 'EMOTE', name: 'Emotes (hold for the wheel); Volt Royale: tap for your bag' },
+    aimUp:    { kind: 'button', x: 0.68, y: 0.30, size: 52,  button: 'aimUp',    label: '▲', sub: 'AIM UP', name: 'Volt Royale: tilt your gun up' },
+    aimDown:  { kind: 'button', x: 0.68, y: 0.44, size: 52,  button: 'aimDown',  label: '▼', sub: 'AIM DOWN', name: 'Volt Royale: tilt your gun down' }
   }
 };
 
-/* Battle Royale has more buttons and a hotbar along the bottom right: its own starting spots for them */
+/* Volt Royale has more buttons and a hotbar along the bottom right: its own starting spots for them */
 TOUCH.profilePos = { br: { spinCW: { x: 0.92, y: 0.52 }, spinCCW: { x: 0.79, y: 0.66 }, a: { x: 0.93, y: 0.75 }, b: { x: 0.66, y: 0.76 }, x: { x: 0.81, y: 0.42 }, y: { x: 0.93, y: 0.32 },
   halfCCW: { x: 0.70, y: 0.21 }, halfCW: { x: 0.80, y: 0.21 }, camera: { x: 0.60, y: 0.21 }, aimUp: { x: 0.68, y: 0.36 }, aimDown: { x: 0.68, y: 0.50 }, speedUp: { x: 0.555, y: 0.79 }, quick: { x: 0.07, y: 0.40 } } };
 
@@ -143,21 +143,21 @@ const TouchPad = {
   /* v13.5.4: every game gets the buttons it uses, named for what they do there, and no others.
      hockey: SPIN on the two big buttons (LB / RB), PRESS (X), CART (Y), DRIFT (hold B), SPEED + / −
      minigames: SPIN, DRIFT, SPEED, and X named for the game's action (USE an item, FIRE, ZAP) when it has one
-     Battle Royale: FIRE, AIM, JUMP, GRAB (X), AWAY (Y), DRIFT, MELEE, the bag, ITEM ◀ ▶, and AIM UP / DOWN */
+     Volt Royale: FIRE, AIM, JUMP, GRAB (X), AWAY (Y), DRIFT, MELEE, the bag, ITEM ◀ ▶, and AIM UP / DOWN */
   profile(g) {
     const m = g && g.match; if (!m) return null; const k = m.mini ? m.mini.kind : 'hockey', common = ['stick', 'a', 'b', 'start', 'camera', 'quick'];
     if (k === 'br') return { key: 'br', show: [...common, 'spinCW', 'spinCCW', 'halfCW', 'halfCCW', 'x', 'y', 'speedUp', 'aimUp', 'aimDown'], press: {}, labels: typeof BR_TOUCH !== 'undefined' ? BR_TOUCH : {} };
     const spin = { spinCW: 'halfCW', spinCCW: 'halfCCW' }, spinL = { spinCW: ['↻', 'SPIN'], spinCCW: ['↺', 'SPIN'], b: ['💨', 'DRIFT'], a: ['A', 'OK'] };
     if (k === 'hockey') return { key: 'hockey', show: [...common, 'spinCW', 'spinCCW', 'x', 'y', 'speedUp', 'speedDown'], press: spin, labels: { ...spinL, x: ['X', 'PRESS'], y: ['⇄', 'CART'] } };
     const lines = ((GAME_INFO[k] || {}).controls || []).join(' '), act = /Zap/.test(lines) ? ['⚡', 'ZAP'] : /Fire:/.test(lines) ? ['🎯', 'FIRE'] : lines.includes(CTRL.item) ? ['★', 'USE'] : null;
-    return { key: 'mini:' + k, show: [...common, 'spinCW', 'spinCCW', 'speedUp', 'speedDown', ...(act ? ['x'] : [])], press: spin, labels: { ...spinL, ...(act ? { x: act } : {}) } };
+    return { key: 'mini:' + k, show: [...common, 'spinCW', 'spinCCW', 'speedUp', 'speedDown', ...(act ? ['x'] : [])], press: { ...spin, x: 'spinCW' }, labels: { ...spinL, ...(act ? { x: act } : {}) } };   // (the touch USE / FIRE / ZAP button presses RT)
   },
   applyProfile(g) {
     const P = this.profile(g); if (!P) return; const m = g.match, wait = m.state === 'over' || !!m.readyText; if (wait) P.labels = { ...P.labels, a: ['A', m.state === 'over' ? 'AGAIN' : 'READY'], ...(m.state === 'over' ? { b: ['B', 'LOBBY'] } : {}) };   /* (the result and ready screens) */
     if (P.key !== this.profKey) { this.profKey = P.key; this.press = P.press; this.posProfile = P.key === 'br' ? 'br' : null; this.place(); for (const id of Object.keys(TOUCH.controls)) this.els[id].style.display = P.show.includes(id) ? 'flex' : 'none'; this.clear(); }
     this.relabel(P.labels);
   },
-  relabel(map) {                                                               // a game can rename the buttons (Battle Royale: FIRE, AIM, JUMP...); null puts them back
+  relabel(map) {                                                               // a game can rename the buttons (Volt Royale: FIRE, AIM, JUMP...); null puts them back
     const key = map ? JSON.stringify(map) : ''; if (key === this.lblKey || !this.built) return; this.lblKey = key;
     for (const id of Object.keys(TOUCH.controls)) { const d = TOUCH.controls[id], el = this.els[id]; if (!el || d.kind === 'stick') continue; const r = (map && map[id]) || [d.label, d.sub], l = el.querySelector('.l'), s = el.querySelector('.s'); if (l) l.textContent = r[0]; if (s) s.textContent = r[1] || ''; }
   }

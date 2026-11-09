@@ -1,13 +1,14 @@
 /* v13.5: ready up, and play again.
    - Every real game (not the demos) waits on a READY UP screen until every player has pressed A (online too). The host's START skips the wait.
-   - At the end: A plays again straight away (a minigame or Battle Royale gets a new random map), B goes back to the lobby.
+   - At the end: A plays again straight away (a minigame or Volt Royale gets a new random map), B goes back to the lobby.
      Online the host does the same for the room: A plays again with everyone, B goes back to the room. */
 function randomMapFor(mini) {
   if (!mini) return mini; const op = (GAME_INFO[mini.kind] && GAME_INFO[mini.kind].opts || []).find(o => o.key === 'map'); if (!op || !op.values || op.values.length < 2) return mini;
   const vals = op.values.filter(v => v !== mini.map && v !== 'random'); return vals.length ? { ...mini, map: vals[Math.floor(Math.random() * vals.length)] } : mini;
 }
 
-{ const P = GameScene.prototype, up = P.update;
+{ const P = GameScene.prototype, up = P.update, ini = P.init;
+  P.init = function (...a) { const d = a[0] || {}; for (const p of [...(d.players || []), ...((d.online && d.online.players) || [])]) if (p) delete p._rdy; this.prog = null; this.rdy = undefined; this.timeAcc = 0; this.rdyT = null; return ini ? ini.apply(this, a) : undefined; };   /* (a fresh game: "Play again" restarts this same scene, and the last game's quest and XP records - already marked as over - stopped the next game counting) */
   P.update = function (time, delta) {
     const m = this.match, o = this.online;
     if (m && !this.demo && !(o && o.role === 'client')) {

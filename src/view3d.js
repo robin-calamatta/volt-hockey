@@ -311,18 +311,15 @@ class View3D {
     // the white plastic stick: a mount under the nose, the flat "c" blade and the stem, down at ball height
     const cupY = 0.045, crossX = cup.frontX - cup.recess - 0.02, tipX = cup.frontX - cup.recess + Settings.stickLength;
     P.plastic.push(B(0.06, 0.08, 0.06, 0.39, 0.08, 0), G3.ribbon(CUP_POINTS.map(p => [p.x, cupY, p.y]), 0.07, 0.03), B(0.035, 0.06, 0.3, crossX, cupY, 0), B(tipX - crossX, 0.055, cup.stickColliderRadius * 2, (crossX + tipX) / 2, cupY, 0));
-    // the driver: legs out along the chair to the footrest, arms on the pods, harness straps, head and hair
+    // the driver: legs out along the chair to the footrest, arms on the pods, head and hair (v14: no seatbelt)
     const tx = sx - 0.07;                                                                                                  // torso
     for (const sd of [-1, 1]) {
       P.pants.push(L([tx + 0.02, 0.53, sd * 0.1], [sx + 0.36, 0.56, sd * 0.1], 0.07), L([sx + 0.38, 0.55, sd * 0.1], [0.23, 0.22, sd * 0.1], 0.055));   // (your legs show in first person, down in front of you)
       P.shoes.push(B(0.17, 0.07, 0.09, 0.27, 0.215, sd * 0.1));
       const shd = [tx, 0.96, sd * 0.18], el = [tx + 0.15, 0.74, sd * 0.24], hand = sd > 0 ? [px + 0.1, 0.71, 0.25] : [px + 0.05, 0.67, -0.25];
       if (typeof Rig === 'undefined') { P.selfTeam.push(L(shd, el, 0.055, 0.05)); P.selfSkin.push(L(el, hand, 0.04, 0.035), G3.sphere(0.042, ...hand)); }   // (the arms are separate and move: rig3d.js)
-      P.selfBlack.push(B(0.012, 0.3, 0.045, tx + 0.128, 0.83, sd * 0.07, 0, 0, -0.1));                             // harness straps
     }
-    P.selfBlack.push(B(0.015, 0.045, 0.2, tx + 0.13, 0.75, 0), B(0.015, 0.05, 0.05, tx + 0.135, 0.75, 0));
     P.selfTeam.push(new THREE.CapsuleGeometry(0.15, 0.22, 4, 10).scale(0.85, 1, 1.2).translate(tx, 0.79, 0));
-    P.selfWhite.push(B(0.06, 0.04, 0.4, tx, 0.98, 0));
     const hx = tx + 0.02, hy = 1.15;                                                                                       // head centre
     P.selfSkin.push(L([tx + 0.01, 0.97, 0], [hx - 0.005, 1.07, 0], 0.045), G3.sphere(0.1, hx, hy, 0, 0.95, 1.1, 0.9), G3.sphere(0.022, hx - 0.01, hy, 0.09), G3.sphere(0.022, hx - 0.01, hy, -0.09));
     P.selfHair.push(typeof hairGeometry === 'function' ? hairGeometry('short').translate(hx, hy, 0) : G3.cap(0.106, 0, 0, 0, 0.98, 0.95, 0.94).rotateZ(0.45).translate(hx - 0.012, hy + 0.01, 0));      // short hair down to a hairline (no bald patch at the front)

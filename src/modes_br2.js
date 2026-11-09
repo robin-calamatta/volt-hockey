@@ -1,4 +1,4 @@
-/* Battle Royale, part 2 (v13): bigger maps (and new ones made of whole districts), Random map; ammo types you carry without a gun,
+/* Volt Royale, part 2 (v13): bigger maps (and new ones made of whole districts), Random map; ammo types you carry without a gun,
    magazines and reloading; heals that take time (bandages, first aid kits, cart armour, full body kits) and healing a team-mate with LT;
    putting your item away (Y) to drive faster; going down (last stand), being revived, rez cards and rez garages; storm stages with
    announcements. Loaded after modes_br.js: it replaces some of MODES.br's parts and wraps others. */
@@ -156,7 +156,7 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
         if (G.rl > 0) return; if (it.a <= 0) { this.reload(c, m); G.cd = 0.25; return; } const a0 = it.a, r = M0.use.call(this, c, m); if (it.a < a0) { G.shotT = m.gs.t; G.shotN = (G.shotN || 0) + 1; } return r; }   // (shotT: the recoil)
       const I = BR_ITEMS[it.k]; if (!I) return;
       if (I.heal) { if (!this.helps(c, I)) { if (c.player) this.say(m, c, I.hp && !I.sh ? (G.hp >= (I.cap || 100) ? (I.cap < 100 ? 'BANDAGES ONLY HEAL UP TO 75' : 'HEALTH IS FULL') : '') : I.shCap && G.sh >= I.shCap && G.sh < BR.maxShield ? `PLATES ONLY GO UP TO ${I.shCap}` : 'CART ARMOUR IS FULL'); G.cd = 0.5; return; } G.use = { k: it.k, s: G.sel, left: I.time, tot: I.time, tk: -1 }; m.sfx('blip'); return; }
-      if (it.k === 'boost') G.boost = 3; else if (it.k === 'wall') { const p = c.toWorld(1.6, 0); MG.add(m, { t: 'dwall', x: MG.r2(p.x), y: MG.r2(p.y), a: MG.r2(c.heading), lv: G.lv, z: G.z, hp: 150, until: m.gs.t + 25 }); }
+      if (it.k === 'boost') { G.boost = 3; c.vx += Math.cos(c.heading) * 2.2; c.vy += Math.sin(c.heading) * 2.2; } else if (it.k === 'wall') { const p = c.toWorld(1.6, 0); MG.add(m, { t: 'dwall', x: MG.r2(p.x), y: MG.r2(p.y), a: MG.r2(c.heading), lv: G.lv, z: G.z, hp: 150, until: m.gs.t + 25 }); }
       m.sfx('select'); G.cd = 0.8; this.spend(c, G.sel);
     },
     helps(o, I) { const G = o.gs; return (I.hp && G.hp < (I.cap || 100)) || (I.sh && G.sh < (I.shCap || BR.maxShield)); },
@@ -295,8 +295,8 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
 }
 
 /* ---------- controls ----------
-   Battle Royale: RT fire / use · LT aim (or heal a team-mate when you hold a heal) · A jump (hold: drift) · X reload · Y put away / take out
-   LB RB switch item · B (hold) revive, or swap with what you're sitting on · D-pad ▲ tap: bag, hold: emoji + action wheel.
+   Volt Royale: RT fire / use · LT aim (or heal a team-mate when you hold a heal) · A jump (hold: drift) · X reload · Y put away / take out
+   LB RB switch item · B (hold) revive, or swap with what you're sitting on · D-pad ▲ tap: bag, hold: emote wheel.
    Keyboard + mouse: left click fire, right click aim, mouse wheel switch item. */
 const Mouse = {
   left: 0, right: 0, wheel: 0, on: false,
@@ -311,7 +311,7 @@ const Mouse = {
   for(src, sc) { return src && (src.id === 'kb1' || (sc && sc.online && src === Controls.mine)) ? this : null; }
 };
 Mouse.init();
-/* a person on this device (or the host's own players): what their buttons do in Battle Royale */
+/* a person on this device (or the host's own players): what their buttons do in Volt Royale */
 function brPadInput(sc, m, p, src, dt) {
   const M = MODES.br, c = p.chair; if (!c || !src || p.invOpen) return; const H = src.held || {}, P = src.pressed || {}, ms = Mouse.for(src, sc);
   if (src.bagTap) { src.bagTap = false; if (!c.out && !c.gs.down && m.state === 'play') sc.openInventory(p); return; }

@@ -1,5 +1,5 @@
 Object.assign(BR_COLS, { seat: 0x2f5fa8, stone: 0x9a948a, hangar: 0xc8ced4, silo: 0xd8dde2 });   /* (v13.4: the new maps' walls) */
-/* Battle Royale drawing, part 3 (v13.3): chests and crates that sit on the ground and open (the loot flies out), loot from an
+/* Volt Royale drawing, part 3 (v13.3): chests and crates that sit on the ground and open (the loot flies out), loot from an
    eliminated cart flying out too, doors that swing open and break into splinters, bubbles, the riot shield, rez garages with a big
    rez symbol over them, your team-mates' rez cards with a beam and a marker on screen, damage numbers, and big storm warnings. */
 
@@ -171,7 +171,7 @@ Object.assign(BR_COLS, { seat: 0x2f5fa8, stone: 0x9a948a, hangar: 0xc8ced4, silo
   };
 }
 
-/* ---- the result screen in Battle Royale: only your squad, a card each ---- */
+/* ---- the result screen in Volt Royale: only your squad, a card each ---- */
 { const P = GameScene.prototype, show = P.showMiniResult;
   P.showMiniResult = function () {
     const m = this.match, R = m.result; if (this.result || m.kind !== 'br' || !R || !R.br) return show.call(this);

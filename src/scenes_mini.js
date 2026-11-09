@@ -7,7 +7,7 @@ const DEMO_WIN = { x: 0, y: 0, w: 1280, h: 720 };                     // v13.1: 
 const DEMO_INFO = { x: 484, w: 776 };                                 // the goal and rules: a see-through panel at the bottom right
 const HOWTO_WIN = { x: 596, y: 96, w: 664, h: 374 };                    // How to play: the video beside the rules panel (16:9)
 const MENU_SIDE = { x: 232, panelWidth: 430, size: 28, noBackdrop: true, noFooter: true, hintX: 232, hintY: 692, hintWidth: 410, hintSize: '17px', hintBg: '#0d151bb0', rows: true, translucent: true };
-const cartsFor = kind => (kind && MODES[kind] && modeOpts(kind).carts) || miniOpts().carts;   // a game can have its own number of carts (Battle Royale)
+const cartsFor = kind => (kind && MODES[kind] && modeOpts(kind).carts) || miniOpts().carts;   // a game can have its own number of carts (Volt Royale)
 function sideTitle(sc, name) {                                          // the page title, clear of the Log in button at the top left
   const t = sc.add.text(124, 40, name.toUpperCase(), { ...STYLE.title, fontSize: '40px' }).setOrigin(0, 0.5).setDepth(6);
   if (t.width > 330) t.setScale(330 / t.width); sc.add.graphics().setDepth(5).fillStyle(0x0d151b, 0.8).fillRoundedRect(114, 16, t.displayWidth + 22, 48, 10); return t;   // (on a dark plate: the demo plays behind)
@@ -205,7 +205,7 @@ Object.assign(GameScene.prototype, {
     if (m.kind === 'hunt' && c.side === 1) return 'IT';
     return '';
   },
-  itemLine(p) { const c = p && p.chair; if (!c || c.out) return ''; const it = c.item && MINI.items[c.item]; return it ? `${it.icon} ${it.label}  (A)` : ''; },
+  itemLine(p) { const c = p && p.chair; if (!c || c.out) return ''; const it = c.item && MINI.items[c.item]; return it ? `${it.icon} ${it.label}   RT to use` : ''; },
   drawMini2D(g) {                                                       // the classic 2D view: same things, flat (drawn in metres)
     const m = this.match, t = this.time.now / 1000;
     if (m.kind === 'race' && m.island) {

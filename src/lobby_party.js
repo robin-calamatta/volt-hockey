@@ -1,9 +1,9 @@
-/* v13.4: the lobby with your party, and Battle Royale straight from the lobby.
+/* v13.4: the lobby with your party, and Volt Royale straight from the lobby.
    - Your party (up to 5) stands on the stage with you, each in their own look, with their name over them.
    - Emotes in the lobby: Y (or the 😀 button) opens your wheel's emotes along the bottom; your party sees them too.
-   - PLAY on Battle Royale drops you straight in (with your party: everyone together in one squad). X opens its options. */
+   - PLAY on Volt Royale drops you straight in (with your party: everyone together in one squad). X opens its options. */
 
-/* ---- Battle Royale from the lobby: no team picking ---- */
+/* ---- Volt Royale from the lobby: no team picking ---- */
 function brQuickPlay(sc) {
   if (typeof memberWaits === 'function' && memberWaits()) return;
   const n = Party.active ? Party.members.length : 1, o = modeOpts('br'); if (n > (o.squad || 1)) modeSave('br', { squad: Math.min(5, n) });
@@ -14,7 +14,7 @@ function brQuickPlay(sc) {
 }
 { const M = LOBBY_MODES.find(x => x.id === 'br'); M.go = sc => brQuickPlay(sc); M.opts = sc => sc.scene.start('MiniSetup', { kind: 'br' }); M.sub = 'Drop in with your party: loot, beat the storm, be the last ones left'; }
 { const f = Mouse.for.bind(Mouse); Mouse.for = (src, sc) => f(src, sc) || (src && src.id === 'mine' ? Mouse : null); }   // (playing from the lobby: your mouse aims too)
-/* Battle Royale has no team colours: the "Colours" row leaves its setup screen */
+/* Volt Royale has no team colours: the "Colours" row leaves its setup screen */
 { const P = MiniSetupScene.prototype, cr = P.buildMenu; P.buildMenu = function (title, items, ...a) { if (this.kind === 'br') items = items.filter(it => !String(it.label()).startsWith('Colours')); return cr.call(this, title, items, ...a); }; }
 
 /* ---- the stage: your party beside you ---- */
@@ -46,7 +46,7 @@ function brQuickPlay(sc) {
     cr.call(this); const V = CONFIG.view; this.partyT = []; this.emoPick = null; this.myEmo = null;
     if (Party.active) Party.updateLook();
     const fn = (key, id) => { if (this.stage) this.stage.playFor(key, id); }; Party.emoFns.add(fn); this.events.once('shutdown', () => Party.emoFns.delete(fn));
-    this.emoBtn = this.add.text(36, V.height - 104, '😀  EMOTE (Y)', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#ffffff', backgroundColor: '#1b2a35d0', padding: { x: 10, y: 6 } }).setOrigin(0, 0.5).setDepth(8).setInteractive({ useHandCursor: true }).on('pointerdown', () => { Sound.resume(); this.toggleEmotes(); });
+    this.emoBtn = this.add.text(36, V.height - 104, '🙌  EMOTE (Y)', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#ffffff', backgroundColor: '#1b2a35d0', padding: { x: 10, y: 6 } }).setOrigin(0, 0.5).setDepth(8).setInteractive({ useHandCursor: true }).on('pointerdown', () => { Sound.resume(); this.toggleEmotes(); });
     this.partyG = this.add.graphics().setDepth(7);
   };
   P.toggleEmotes = function () { if (this.emoPick) { this.emoPick.forEach(o => o.destroy()); this.emoPick = null; return; } const V = CONFIG.view, W = Progress.P.wheel.slice(0, 8), objs = []; this.emoCur = 0;

@@ -1,4 +1,4 @@
-/* Battle Royale drawing, part 2 (v13): pickups float over a glow in their rarity's colour and look like what they are; rez garages;
+/* Volt Royale drawing, part 2 (v13): pickups float over a glow in their rarity's colour and look like what they are; rez garages;
    downed carts; no team colours (everyone wears their own look; team-mates get a soft ring and a name); the team panel (bottom left:
    you and your team-mates, faces, health and armour); prompts (reload, heal, revive, rez); the storm (a purple haze when you are in it,
    stage warnings); the bag screen with your ammo and the full map; spectating (first or third person, LB / RB to switch, Y to take
@@ -62,7 +62,7 @@
 const BR_TOUCH = { spinCW: ['🔫', 'FIRE'], spinCCW: ['🎯', 'AIM'], halfCW: ['▶', 'ITEM'], halfCCW: ['◀', 'ITEM'], a: ['⤒', 'JUMP'], x: ['✋', 'GRAB'], y: ['✊', 'AWAY'], b: ['💨', 'DRIFT'], speedUp: ['👊', 'MELEE'], quick: ['🎒', 'BAG'] };
 Object.assign(GameScene.prototype, {
   brFaceKey(c) {                                                           // a little round face for the team panel (skin, hair, hat colour)
-    const L = Avatar.lookFor(c, this) || LOOK0, key = 'brface-' + [L.skin, L.hair, L.hat, L.hatCol, L.face].join('-'); if (this.textures.exists(key)) return key;
+    const L = typeof Skins !== 'undefined' ? Skins.expand(Avatar.lookFor(c, this)) : (Avatar.lookFor(c, this) || LOOK0), key = 'brface-' + [L.skin, L.hair, L.hat, L.hatCol, L.face].join('-'); if (this.textures.exists(key)) return key;
     const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d');
     x.fillStyle = '#1b2a35'; x.beginPath(); x.arc(32, 32, 32, 0, 7); x.fill(); x.fillStyle = L.skin; x.beginPath(); x.arc(32, 36, 20, 0, 7); x.fill();
     x.fillStyle = L.hair; x.beginPath(); x.arc(32, 32, 21, Math.PI * 1.05, Math.PI * 1.95); x.fill();
@@ -98,7 +98,7 @@ Object.assign(GameScene.prototype, {
     else { const dn = M.reviveTarget(m, c), it = G.inv[G.sel], I = it && BR_ITEMS[it.k], gun = it && BR_GUNS[it.k], sw = G.swapL && (g.L || []).find(L => L[0] === G.swapL && Math.hypot(L[2] - c.x, L[3] - c.y) < R_CART() + 0.6);
       if (dn) txt = `HOLD X: revive ${MG.pname(dn) || m.name(dn)}`;
       else if (G.op > 0) txt = bar(G.op, 0xffd23f, (g.L || []).some(L => L[0] === G.opL && L[1] === 'ammo') ? 'OPENING THE AMMO CRATE' : 'OPENING THE CHEST');
-      else if (G.foc > 0) { const L = (g.L || []).find(x => x[0] === G.foc), k = L && L[1], full = G.inv.length >= BR.slots && !G.inv.some(it => it.k === k);
+      else if (G.foc > 0) { const L = (g.L || []).find(x => x[0] === G.foc), k = L && L[1], full = BR_GUNS[k] ? !!(!G.hol && G.inv[G.sel] && BR_GUNS[G.inv[G.sel].k]) || G.inv.length >= BR.slots : G.inv.length >= BR.slots && !G.inv.some(it => it.k === k);   /* (a gun swaps for the gun in your hands) */
         txt = !L ? '' : k === 'chest' ? 'HOLD X: open the chest' : k === 'ammo' ? 'HOLD X: open the ammo crate' : `X: ${full ? 'swap for' : 'pick up'} ${brName(k, L[12])}${BR_ITEMS[k] && L[5] > 1 ? ' x' + L[5] : ''}`; }
       else if (G.foc < 0) { const i = -1 - G.foc; txt = g.dr && g.dr[i] === 1 ? 'X: shut the door' : 'X: open the door    R3: bash it'; }
       else if (G.cards && G.cards.length) { const i = (M.map(m).rez || []).findIndex(q => c.x > q.x0 && c.x < q.x1 && c.y > q.y0 && c.y < q.y1); txt = i >= 0 && g.gar[i] > g.t ? `THIS REZ GARAGE IS RECHARGING: ${Math.ceil(g.gar[i] - g.t)} s` : `🎴 Take the rez card to a REZ GARAGE (green on the map)`; }
@@ -143,7 +143,7 @@ Object.assign(GameScene.prototype, {
     for (const L of m.gs.L || []) if (L[1] === 'card' && me && m.chairs[L[5]] && m.chairs[L[5]].gs.team === me.gs.team) g.fillStyle(0xffd23f, 1).fillRect(ox + L[2] * s - 2, oy + L[3] * s - 3, 4, 6);
   };
   const pc = View3D.prototype.placeCamera;
-  View3D.prototype.placeCamera = function (vp, dt) {                       // Battle Royale third person: further back and higher, looking ahead of the cart
+  View3D.prototype.placeCamera = function (vp, dt) {                       // Volt Royale third person: further back and higher, looking ahead of the cart
     const c = pc.call(this, vp, dt); if (!(this.m.kind === 'br' && vp.mode === 'third' && vp.chair)) return c;
     const ch = vp.chair, z = (ch.gs && ch.gs.z) || 0, st = this.camFor(vp.key), k = 1 - Math.exp(-6 * dt), h = ch.heading; st.th = st.th === undefined ? h : st.th + normalizeAngle(h - st.th) * k;
     const bx = ch.x - Math.cos(st.th) * 4.2, by = ch.y - Math.sin(st.th) * 4.2; c.position.set(bx, z + 2.5, by); c.lookAt(ch.x + Math.cos(st.th) * 6, z + 0.9, ch.y + Math.sin(st.th) * 6);

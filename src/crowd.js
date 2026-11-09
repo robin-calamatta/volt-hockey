@@ -11,10 +11,11 @@ const CAUSE_SIGNS = [
   { text: 'BRAIN INJURY\nAWARENESS', bg: 0x2e9e44, ink: '#ffffff' }, { text: 'AUTISM\nACCEPTANCE', bg: 0xf2c200, ink: '#14181c' }, { text: 'AMC\nSTRONG', bg: 0x1f6fd1, ink: '#ffffff' },
   { text: 'CP\nAWARENESS', bg: 0x2e9e44, ink: '#ffffff' }, { text: 'TBI\nSURVIVORS', bg: 0x2e9e44, ink: '#ffffff' }, { text: 'SPINA BIFIDA\nAWARENESS', bg: 0xf2c200, ink: '#14181c' },
   { text: 'DOWN SYNDROME\nAWARENESS', bg: 0x2b6fd1, ink: '#ffd23f' }, { text: 'SMA\nAWARENESS', bg: 0xf0e6d2, ink: '#14181c' }, { text: 'MUSCULAR\nDYSTROPHY', bg: 0x9ccc1f, ink: '#14181c' },
-  { text: 'DISABILITY\nPRIDE', bg: 0xb59ddb, ink: '#14181c' }, { text: 'NEURO-\nDIVERSITY', bg: 0xf2c200, ink: '#14181c' }
+  { text: 'DISABILITY\nPRIDE', bg: 0xb59ddb, ink: '#14181c' }, { text: 'NEURO-\nDIVERSITY', bg: 0xf2c200, ink: '#14181c' },
+  { text: '#ARTHROGRYPOSIS\nAWARENESS', bg: 0x1f6fd1, ink: '#ffffff' }, { text: '#ARTHROGRYPOSIS\nAWARENESS', bg: 0x1f6fd1, ink: '#ffffff' }, { text: '#ARTHROGRYPOSIS\nAWARENESS', bg: 0xffffff, ink: '#1f6fd1' }
 ];
 /* Words the shirtless fans paint across their chests, one letter each (a space is a fan with nothing painted). */
-const CAUSE_WORDS = [{ w: 'AMC', col: 0x1f6fd1 }, { w: 'AMC STRONG', col: 0x1f6fd1 }, { w: 'DEFEAT DMD', col: 0xd8262e }, { w: 'DUCHENNE', col: 0xd8262e }, { w: 'AUTISM', col: 0xc99a00 }, { w: 'TBI STRONG', col: 0x2e9e44 }, { w: 'CP PRIDE', col: 0x2e9e44 }];
+const CAUSE_WORDS = [{ w: 'ARTHROGRYPOSIS', col: 0x1f6fd1 }, { w: 'ARTHROGRYPOSIS', col: 0x1f6fd1 }, { w: 'AMC', col: 0x1f6fd1 }, { w: 'AMC STRONG', col: 0x1f6fd1 }, { w: 'DEFEAT DMD', col: 0xd8262e }, { w: 'DUCHENNE', col: 0xd8262e }, { w: 'AUTISM', col: 0xc99a00 }, { w: 'TBI STRONG', col: 0x2e9e44 }, { w: 'CP PRIDE', col: 0x2e9e44 }];
 const CROWD_SIGNS = ['#INCLUSIVE\nSPORTS', 'SPORTS\nFOR ALL', 'GO\n{T}', 'GO\n{T}', 'GO\n{T}', '{T}\nPOWER!', 'ROLL\nON!', 'EVERY BODY\nPLAYS', '#VOLT\nHOCKEY', 'LET\'S GO\n{T}', 'NO\nLIMITS', 'POWER\nUP!', '#INCLUSIVE\nSPORTS', 'SPORTS\nFOR ALL', 'WE BACK\n{T}'];
 const CROWD_SKIN = [0xf1c7a0, 0xe0a97d, 0xc68a5c, 0xa86b43, 0x7b4a2d, 0x5a3520, 0xf6d5b8];
 const CROWD_HAIR = [0x1a1410, 0x2d1d12, 0x4a2c17, 0x7a4a22, 0xb98a4a, 0xd9b870, 0xa8a8a8, 0x6b2a1a, 0xe8e8e8];
@@ -117,7 +118,7 @@ class Crowd {
   startWave() { const C = CONFIG.court; this.wave = { pos: 0, len: 2 * (C.width + 5), speed: this.rnd(6, 8) }; }
   stripGroup(s) {                                                // a run of fans in the front rows take their jerseys off: a letter of the team name painted on each
     if (this.strip) return; const cause = Math.random() < 0.5 ? CAUSE_WORDS[Math.floor(Math.random() * CAUSE_WORDS.length)] : null;   // half the time a cause instead of the team
-    const name = cause ? cause.w : TEAMS[this.sc.match.teams[s]].name.toUpperCase().replace(/[^A-Z]/g, ''), n = name.length, col = cause ? cause.col : this.teamCol[s]; if (n < 2 || n > 12) return;
+    const name = cause ? cause.w : TEAMS[this.sc.match.teams[s]].name.toUpperCase().replace(/[^A-Z]/g, ''), n = name.length, col = cause ? cause.col : this.teamCol[s]; if (n < 2 || n > 16) return;
     for (let tries = 0; tries < 12; tries++) {
       const stand = Math.floor(Math.random() * 2), row = Math.floor(Math.random() * 2), list = this.rows[stand][row], i0 = Math.floor(Math.random() * Math.max(1, list.length - n));
       const run = list.slice(i0, i0 + n); if (run.length < n || run.some(f => !f)) continue;

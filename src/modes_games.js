@@ -493,9 +493,9 @@ MODES.imposter = {
     }
     return MG.wander(c, m, 1);
   },
-  hud(m) { const ag = this.agents(m).length; return { a: 'IMPOSTER CARTS', b: `${ag} AGENTS LEFT`, mid: `Blend in.  ${m.mini.orbs} orbs wins.  A: zap`, left: MG.peopleLine(m, c => c.out ? 'UNMASKED' : `${c.gs.orbs}/${m.mini.orbs} orbs`) }; },
+  hud(m) { const ag = this.agents(m).length; return { a: 'IMPOSTER CARTS', b: `${ag} AGENTS LEFT`, mid: `Blend in.  ${m.mini.orbs} orbs wins.  RT: zap`, left: MG.peopleLine(m, c => c.out ? 'UNMASKED' : `${c.gs.orbs}/${m.mini.orbs} orbs`) }; },
   tag(c, m, vp) { return vp && vp.p && vp.p.chair === c ? 'YOU' : ''; },
-  itemLine(c, m) { return c.gs.agent ? (c.gs.cd > 0 ? `ZAP in ${Math.ceil(c.gs.cd)}s` : '⚡ ZAP ready (A)') + `   orbs ${c.gs.orbs}/${m.mini.orbs}` : ''; },
+  itemLine(c, m) { return c.gs.agent ? (c.gs.cd > 0 ? `ZAP in ${Math.ceil(c.gs.cd)}s` : '⚡ ZAP ready (RT)') + `   orbs ${c.gs.orbs}/${m.mini.orbs}` : ''; },
   color: () => 0x9fb2bf,
   startLine: () => 'Blend in. Find the orbs. Trust nobody.'
 };
@@ -861,7 +861,7 @@ MODES.paintball = {
     const lead = m.chairs.reduce((a, c) => c.gs.hits > a.gs.hits ? c : a, m.chairs[0]); return { a: 'PAINTBALL', b: `LEADER ${MG.up(m.name(lead))} ${lead.gs.hits}`, mid: `First to ${m.mini.target} tags`, left: MG.peopleLine(m, c => `${c.gs.hits}  🎯${c.gs.ammo}`) };
   },
   tag(c, m) { return c.gs.dead > 0 ? '' : c.player ? MG.pname(c) + (c.gs.shield ? ' 🛡' : '') : c.gs.shield ? '🛡' : ''; },
-  itemLine(c, m) { const G = c.gs; return G.dead > 0 ? `SPLATTED: back in ${Math.ceil(G.dead)}s` : `🎯 ${G.ammo}${G.ammo === 0 ? ' (find ammo!)' : ''}${G.shield ? '   🛡 SHIELD' : ''}${G.rapid > 0 ? `   ⚡ RAPID ${Math.ceil(G.rapid)}s` : ''}   A: fire`; },
+  itemLine(c, m) { const G = c.gs; return G.dead > 0 ? `SPLATTED: back in ${Math.ceil(G.dead)}s` : `🎯 ${G.ammo}  (RT)${G.ammo === 0 ? ' (find ammo!)' : ''}${G.shield ? '   🛡 SHIELD' : ''}${G.rapid > 0 ? `   ⚡ RAPID ${Math.ceil(G.rapid)}s` : ''}   A: fire`; },
   startLine: () => 'Paintball! Lock and load.'
 };
 
@@ -902,7 +902,7 @@ Object.assign(GAME_INFO, {
   imposter: { name: 'Imposter Carts', cat: 'sneaky', blurb: 'Every cart looks the same. Find the real players among the CPUs.', minutes: 3, noItems: true,
     goal: 'Collect the orbs while blending in, or unmask every other agent.',
     rules: ['All carts look alike. Most are harmless CPUs pottering about; a few are agents (every player is one).', 'Agents collect glowing orbs: sit on one for a second and a half (the ring fills up). Taking one makes you flash for a moment.', 'A: zap the cart in front of you. An agent is unmasked and out. A harmless cart: you are stunned and revealed.', 'First to collect enough orbs wins, or be the last agent left.'],
-    controls: [CTRL.drive, CTRL.drift, 'Zap (in front of you): X or RT  /  X or E  /  \\  /  touch ⚡ ZAP', CTRL.pause], opts: [minOpt([2, 3, 4], 3), { key: 'orbs', label: 'Orbs to win', values: [5, 7, 9], def: 7 }, { key: 'agents', label: 'Agents', values: [2, 3, 4], def: 3 }] },
+    controls: [CTRL.drive, CTRL.drift, 'Zap (in front of you): RT  /  E  /  .  /  touch ⚡ ZAP', CTRL.pause], opts: [minOpt([2, 3, 4], 3), { key: 'orbs', label: 'Orbs to win', values: [5, 7, 9], def: 7 }, { key: 'agents', label: 'Agents', values: [2, 3, 4], def: 3 }] },
   ctf: { name: 'Capture the Flag', cat: 'sneaky', blurb: 'Steal their flag and drive it home.', minutes: 4, teams: true,
     goal: 'Capture the other team\'s flag more times than they capture yours.',
     rules: ['Each team has a flag at its end.', 'Drive over the other team\'s flag to pick it up (you are a little slower carrying it).', 'Bring it to your own base: a capture.', 'Touch an enemy carrier to knock the flag loose. Touch your own dropped flag to send it home.', 'A dropped flag goes home by itself after 8 seconds.'],
@@ -923,7 +923,7 @@ Object.assign(GAME_INFO, {
     court: mini => (PB_MAPS[mini && mini.map] || PB_MAPS.bunker).size, label: cfg => `${(PB_MAPS[cfg.map] || PB_MAPS.bunker).name}, ${cfg.mode === 'teams' ? 'teams' : 'free for all'}`,
     goal: 'Tag the other team (or everyone) with paint more times than they tag you.',
     rules: ['Every cart has a paintball gun: A fires straight ahead.', 'One hit and you are splatted: back at your spawn in a few seconds (with a moment of protection).', 'Paint is limited (24 at most). Ammo crates 🎯 appear around the map: drive over one for 8 more.', 'Power-ups: SHIELD 🛡 blocks the next shot, RAPID FIRE ⚡ for 8 seconds.', 'Walls, crates and moving gates stop paint. Use the bunker and the maze for cover.', 'First to the target, or the most when time runs out.'],
-    controls: [CTRL.drive, CTRL.drift, 'Fire: X or RT  /  X or E  /  \\  /  touch 🎯 FIRE', CTRL.spin, CTRL.pause],
+    controls: [CTRL.drive, CTRL.drift, 'Fire: RT  /  E  /  .  /  touch 🎯 FIRE', CTRL.spin, CTRL.pause],
     opts: [{ key: 'map', label: 'Map', values: ['bunker', 'maze', 'warehouse'], names: ['Bunker Hill', 'The Maze', 'The Warehouse'], def: 'bunker', hint: () => (PB_MAPS[modeOpts('paintball').map] || PB_MAPS.bunker).blurb },
       { key: 'mode', label: 'Mode', values: ['teams', 'ffa'], names: ['Teams', 'Free for all'], def: 'teams' }, minOpt([3, 4, 6], 4), { key: 'target', label: 'Tags to win', values: [10, 20, 30], def: 20 }] },
   delivery: { name: 'Delivery Rush', cat: 'racing', blurb: 'Grab parcels at the depot and deliver them to the right house.', minutes: 3,

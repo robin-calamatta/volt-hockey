@@ -1,5 +1,5 @@
 /* A more realistic outdoors (v11.4): a painted sky with clouds and a sun glow, haze that thickens with distance, hills / mountains /
-   a skyline / mesas on the horizon, leafy trees with bark, building fronts with windows, and corrugated metal. Used by Battle Royale
+   a skyline / mesas on the horizon, leafy trees with bark, building fronts with windows, and corrugated metal. Used by Volt Royale
    (modes_br_draw.js) and the sky of the race maps (scenes_mini.js). */
 const LookWorld = {
   cache: {},
@@ -106,7 +106,7 @@ const LookWorld = {
     for (let i = 0; i < 70; i++) { c.fillStyle = `rgba(230,215,255,${0.05 + r() * 0.12})`; c.fillRect(r() * W, H * 0.3 + r() * H * 0.7, 1 + r() * 3, H); }
     const t = new THREE.CanvasTexture(cv); t.wrapS = THREE.RepeatWrapping; t.repeat.set(8, 1); t.encoding = THREE.sRGBEncoding; return (this.cache.storm = t);
   },
-  /* the big picture round a Battle Royale map */
+  /* the big picture round a Volt Royale map */
   dressBR(v3, group, mapKey, T, W, D) {
     const hi = Settings.gfx !== 'Low', many = Settings.gfx === 'High' || !Settings.gfx, cx = W / 2, cy = D / 2, Rm = Math.max(W, D) / 2, r = Look.rnd(W * 13 + D);
     const sky = this.sky(T.sky, mapKey.length); v3.scene.background = sky; v3.scene.fog = new THREE.FogExp2(this.haze(T.sky), 0.0058);

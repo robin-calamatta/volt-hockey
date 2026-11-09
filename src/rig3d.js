@@ -1,5 +1,5 @@
 /* The driver, properly (v13): hairstyles, arms that move (driving, holding a gun or an item, healing, reviving, being downed, actions
-   like a wave or a cheer), what they hold, and the new hats, faces, outfits and decals. Also the 3D models of every Battle Royale pickup
+   like a wave or a cheer), what they hold, and the new hats, faces, outfits and decals. Also the 3D models of every Volt Royale pickup
    (Items3D), used both in your hands and floating over the ground with a glow.
    Cart-local coordinates: x forward, y up, z to the driver's right. */
 
@@ -32,7 +32,7 @@ function hairGeometry(style, hat) {                                     // the h
   return G3.merge(parts.map(g => (g.index ? g.toNonIndexed() : g)));
 }
 
-/* ---------- Battle Royale pickups as 3D models (also what you hold) ---------- */
+/* ---------- Volt Royale pickups as 3D models (also what you hold) ---------- */
 const RARITY = { common: 0xb8c4cc, uncommon: 0x4cd964, rare: 0x3d9bff, epic: 0xb35cff, legendary: 0xffb31a };
 const Items3D = {
   cache: {},
@@ -138,7 +138,7 @@ const Rig = {
     for (const S of R.sides) {
       const sd = S.sd, sh = new THREE.Vector3(tx, 0.96, sd * 0.18), T = new THREE.Vector3(...(sd > 0 ? P.R : P.L)), pole = new THREE.Vector3(...(sd > 0 ? P.pr || [tx - 0.15, 0.45, 0.62] : P.pl || [tx - 0.15, 0.45, -0.62]));
       const { elbow, hand } = this.solve(sh, T, 0.27, 0.3, pole); this.bone(S.up, sh, elbow); this.bone(S.fo, elbow, hand); S.ha.position.copy(hand); S.hand.copy(hand);
-      S.up.material = shirt || S.up.material; S.fo.material = long || S.fo.material; S.ha.material = skin || S.ha.material; S.th.material = S.ha.material;
+      S.up.material = (group.userData.bare ? skin : shirt) || S.up.material; S.fo.material = long || S.fo.material; S.ha.material = skin || S.ha.material; S.th.material = S.ha.material;
       S.th.visible = sd > 0 && !!P.thumb && vis; if (S.th.visible) { S.th.position.set(hand.x, hand.y + 0.045, hand.z); S.th.rotation.set(0, 0, 0); }
       S.up.visible = S.fo.visible = S.ha.visible = vis;
     }
@@ -207,7 +207,7 @@ const Rig = {
   };
 }
 
-/* a random look for a CPU driver (Battle Royale: everyone wears their own things, no team colours) */
+/* a random look for a CPU driver (Volt Royale: everyone wears their own things, no team colours) */
 Avatar.randomLook = function (seed) {
   const r = Look.rnd(seed * 7919 + 13), pick = a => a[Math.floor(r() * a.length)];
   return { outfit: pick(COS.outfits).id, shirt: pick(COS.colors), hat: pick(COS.hats).id, hatCol: pick(COS.colors), face: pick(COS.faces).id, hair: pick(COS.hair), hairStyle: pick(COS.hairStyles).id, skin: pick(COS.skin), decal: pick(COS.decals).id };

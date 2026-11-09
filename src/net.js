@@ -64,7 +64,7 @@ function sanitizeRoom(r) {                                       // whatever arr
   const code = cleanCode(r.code); if (code.length !== CONFIG.online.codeLength) return null;
   const num = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(+v) || 0));
   return { code, name: cleanText(r.name, DIR().nameMax) || 'Volt room', host: cleanText(r.host, 20) || 'Player 1', players: num(r.players, 0, CONFIG.online.maxPlayers), max: num(r.max, 1, CONFIG.online.maxPlayers),
-    left: cleanText(r.left, 16), right: cleanText(r.right, 16), skill: cleanText(r.skill, 12), practice: !!r.practice, playing: !!r.playing, v: num(r.v, 0, 99) };
+    left: cleanText(r.left, 16), right: cleanText(r.right, 16), skill: cleanText(r.skill, 12), practice: !!r.practice, playing: !!r.playing, kind: cleanText(r.kind || '', 16), v: num(r.v, 0, 99) };
 }
 
 class DirectoryPublisher {
@@ -141,11 +141,11 @@ function watchIce(conn, onFail, n = 0) {
 function netErrorText(e) {
   const t = (e && (e.type || e.reason)) || 'unknown';
   return ({
-    'peer-unavailable': 'Room not found. Check the code.', timeout: 'Could not reach the room (timed out). Check the code. If it is right, a router or firewall may be blocking the connection between the two computers.',
+    'rejoin-over': 'That game has finished, so there is nothing to rejoin.', 'peer-unavailable': 'Room not found. Check the code.', timeout: 'Could not reach the room (timed out). Check the code. If it is right, a router or firewall may be blocking the connection between the two computers.',
     ice: 'Found the room, but the two computers could not connect to each other directly (a router or firewall is blocking it). The game needs a relay server for this network (DEPLOY.md, "TURN relay").',
     network: 'Could not reach the matchmaking server. Check your internet connection.', 'server-error': 'The matchmaking server had a problem. Try again in a moment.',
     'socket-error': 'Lost the matchmaking server. Try again.', 'socket-closed': 'Lost the matchmaking server. Try again.', 'unavailable-id': 'Could not create a room. Try again.',
-    'browser-incompatible': 'This browser does not support online play.', full: 'That room is full.', 'party-too-big': 'Your party is bigger than this Battle Royale room\'s squads. Ask the host for bigger squads (duos or trios), or make your party smaller.', started: 'That match has already started. Ask the host to return to the lobby.',
+    'browser-incompatible': 'This browser does not support online play.', full: 'That room is full.', 'party-too-big': 'Your party is bigger than this Volt Royale room\'s squads. Ask the host for bigger squads (duos or trios), or make your party smaller.', started: 'That match has already started. Ask the host to return to the lobby.',
     version: 'Different game versions. Everyone should reload the page.', unsupported: 'Online play is unavailable (the PeerJS library did not load).',
     host_left: 'The host left the room.', party_done: 'Your party leader finished that game. They will bring you into the next one.', lost: 'Lost connection to the host.', kicked: 'You were removed from the room.'
   })[t] || 'Connection problem (' + t + ').';
@@ -167,7 +167,7 @@ class HostSession {
   publicInfo() {                                                  // what the room list shows (null while private)
     if (this.visibility !== 'public' || !this.code || this.closed) return null;
     return { code: this.code, name: this.lobbyName, host: this.roster[0].name, players: this.roster.length, max: Math.min(CONFIG.online.maxPlayers, this.cfg.sizes[0] + this.cfg.sizes[1]),
-      left: TEAMS[this.cfg.teamA].name, right: TEAMS[this.cfg.teamB].name, skill: this.cfg.difficulty, practice: this.cfg.practice, playing: this.state !== 'lobby', v: PROTOCOL };
+      left: TEAMS[this.cfg.teamA].name, right: TEAMS[this.cfg.teamB].name, skill: this.cfg.difficulty, practice: this.cfg.practice, playing: this.state !== 'lobby', kind: this.cfg.mini ? this.cfg.mini.kind : 'hockey', v: PROTOCOL };
   }
   setVisibility(v) {
     this.visibility = v === 'public' ? 'public' : 'private';
@@ -225,13 +225,23 @@ class HostSession {
     if (!entry.id) {                                              // the first message must be hello
       if (msg.t !== 'hello') return;
       if (msg.v !== PROTOCOL) return this.reject(entry, 'version');
-      if (this.state !== 'lobby') return this.reject(entry, 'started');
+      if (this.state !== 'lobby') {                                   /* v14: back into a game that's still going, in the same cart */
+        const G = msg.rejoin && this.ghosts && this.ghosts.get(String(msg.rejoin));
+        if (!G || this.state !== 'playing' || !this.match) return this.reject(entry, 'started');
+        this.ghosts.delete(String(msg.rejoin)); clearTimeout(entry.hello); entry.id = G.id; entry.token = String(msg.rejoin); entry.players = G.players;
+        this.roster.push(...G.rows.filter(r => !this.roster.some(q => q.id === r.id)));
+        for (const p of G.players.values()) { const ch = G.chairs.get(p.id); if (ch && !ch.player) { ch.player = p; p.chair = ch; } if (!this.match.players.includes(p)) this.match.players.push(p); }
+        entry.conn.send({ t: 'welcome', id: entry.id, code: this.code, roster: this.roster, cfg: this.cfg, token: entry.token, rejoined: true }); if (this.startMsg) entry.conn.send(this.startMsg);
+        if (this.match && MG && MG.notice) { try { MG.notice(this.match, `${(G.rows[0] || {}).name || 'A PLAYER'} IS BACK`.toUpperCase(), 1.6); } catch (e) { /* not a minigame */ } }
+        return this.sendRoster();
+      }
       const side = this.openSide();
       if (this.roster.length >= CONFIG.online.maxPlayers || side === undefined) return this.reject(entry, 'full');
-      if (this.cfg.mini && this.cfg.mini.kind === 'br' && (+msg.psize || 1) > (this.cfg.mini.squad || 1)) return this.reject(entry, 'party-too-big');   // Battle Royale: your party plays as one squad
+      if (this.cfg.mini && this.cfg.mini.kind === 'br' && (+msg.psize || 1) > (this.cfg.mini.squad || 1)) return this.reject(entry, 'party-too-big');   // Volt Royale: your party plays as one squad
       entry.id = this.nextId++; clearTimeout(entry.hello);
       this.roster.push({ id: entry.id, name: this.uniqueName(Settings.cleanName(msg.name) || 'Player ' + (this.roster.length + 1)), side, mid: !this.cfg.season, look: Avatar.cleanLook(msg.look), party: cleanText(msg.party, 80), acct: cleanText(msg.acct, 20), adult: !!msg.adult, vid: cleanText(msg.vid, 80) });
-      entry.conn.send({ t: 'welcome', id: entry.id, code: this.code, roster: this.roster, cfg: this.cfg });
+      entry.token = Math.random().toString(36).slice(2) + Date.now().toString(36);   // (keep it: it lets you back into a game if your connection drops)
+      entry.conn.send({ t: 'welcome', id: entry.id, code: this.code, roster: this.roster, cfg: this.cfg, token: entry.token });
       return this.sendRoster();
     }
     switch (msg.t) {
@@ -278,6 +288,7 @@ class HostSession {
     if (!this.entries.delete(entry.conn)) return;
     clearTimeout(entry.hello); entry.conn.onClose = null; entry.conn.close();
     if (entry.id) {
+      if (this.state === 'playing' && this.match && entry.token && entry.players) { this.ghosts = this.ghosts || new Map(); this.ghosts.set(entry.token, { id: entry.id, rows: this.roster.filter(r => r.id === entry.id || r.own === entry.id), players: entry.players, chairs: new Map([...entry.players.values()].map(p => [p.id, p.chair])) }); }   // (kept so they can come back)
       this.roster = this.roster.filter(r => r.id !== entry.id && r.own !== entry.id);   // their guests go with them
       if (entry.players && this.match) for (const p of entry.players.values()) this.match.removePlayer(p);            // a CPU takes over their carts
       if (this.onPlayerLeft) this.onPlayerLeft(entry.id);
@@ -294,7 +305,7 @@ class HostSession {
     const se = this.cfg.season;                                    // a party season game: the season's length and each team's own skill
     this.match = makeMatch({ mini: this.cfg.mini || null, teamA: this.cfg.teamA, teamB: this.cfg.teamB, players, difficulty: this.cfg.difficulty, sizes: this.cfg.sizes, practice: this.cfg.practice, periodSeconds: se ? se.periodSeconds : undefined, diffBySide: se ? se.levels : undefined });
     this.match.sfxQueue = []; this.match.callQueue = []; this.state = 'playing'; this.snapAcc = 0; this.relist();
-    this.broadcast({ t: 'start', cfg: this.cfg, rules: Settings.rules(), players: players.map(p => ({ id: p.id, name: p.name, side: p.side, tag: p.tag, look: p.look || ((this.roster.find(r => r.id === p.id) || {}).host ? Progress.look() : null) })) });
+    this.ghosts = new Map(); this.broadcast(this.startMsg = { t: 'start', cfg: this.cfg, rules: Settings.rules(), players: players.map(p => ({ id: p.id, name: p.name, side: p.side, tag: p.tag, look: p.look || ((this.roster.find(r => r.id === p.id) || {}).host ? Progress.look() : null) })) });
     return this.match;
   }
   applyInput(entry, msg) {                                       // a player's stick and button events (plus those of their local guests, in msg.g)
@@ -345,7 +356,7 @@ class HostSession {
       b: [r3(b.x), r3(b.y), r3(b.vx), r3(b.vy)], lv: m.players.map(p => [p.id, p.speedLevel]), sf: m.sfxQueue.splice(0), cm: m.callQueue.splice(0), em: m.emoQ && m.emoQ.length ? m.emoQ.splice(0) : undefined, mg: m.mini ? m.miniSnap() : undefined };
   }
   sendSnapshots() { const snap = this.snapshot(); for (const e of this.entries.values()) if (e.id) e.conn.send({ ...snap, a: e.seq }); }
-  backToLobby() { this.state = 'lobby'; this.match = null; for (const e of this.entries.values()) e.players = null; this.broadcast({ t: 'lobby' }); this.sendRoster(); }
+  backToLobby() { this.state = 'lobby'; this.match = null; this.ghosts = new Map(); this.startMsg = null; for (const e of this.entries.values()) e.players = null; this.broadcast({ t: 'lobby' }); this.sendRoster(); }
   close(reason = 'host_left') {
     if (this.closed) return; this.closed = true; Online.clear(this);
     if (this.directory) this.directory.stop();
@@ -361,16 +372,16 @@ class ClientSession {
     this.guestSrc = new Map(); this.pendingGuests = new Map(); this.gk = 0;          // local guests: devices by player id (pending until the host confirms with a roster)
     this.onRoster = null; this.onStart = null; this.onSnapshot = null; this.onLobby = null; this.onClosed = null;
   }
-  async join(code) {
+  async join(code, rejoin) {
     this.code = code; this.conn = await this.transport.join(code);
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { this.leave(); reject({ type: 'timeout' }); }, CONFIG.online.helloTimeoutMs);
       this.conn.onMessage = msg => {
-        if (msg.t === 'welcome') { clearTimeout(timer); this.myId = msg.id; this.roster = msg.roster; this.cfg = msg.cfg; this.lastHeard = performance.now(); this.conn.onMessage = m => this.receive(m); this.startPing(); resolve(); }
+        if (msg.t === 'welcome') { clearTimeout(timer); this.myId = msg.id; this.roster = msg.roster; this.cfg = msg.cfg; this.token = msg.token || null; this.rejoined = !!msg.rejoined; Rejoin.remember(code, this.token); this.lastHeard = performance.now(); this.conn.onMessage = m => this.receive(m); this.startPing(); resolve(); }
         else if (msg.t === 'reject') { clearTimeout(timer); this.leave(); reject({ type: msg.reason }); }
       };
       this.conn.onClose = () => { clearTimeout(timer); reject({ type: 'peer-unavailable' }); };
-      this.conn.send({ t: 'hello', v: PROTOCOL, name: Settings.myName(), ...accountTag() });
+      this.conn.send({ t: 'hello', v: PROTOCOL, name: Settings.myName(), ...accountTag(), ...(rejoin ? { rejoin } : {}) });
     }).then(() => { this.conn.onClose = () => this.finish('lost'); Online.set(this); });
   }
   startPing() { this.pinger = setInterval(() => this.conn && this.conn.send({ t: 'ping', n: performance.now() }), CONFIG.online.pingEverySeconds * 1000); }
@@ -379,7 +390,7 @@ class ClientSession {
     this.lastHeard = performance.now();
     switch (msg.t) {
       case 'roster': this.roster = msg.roster; this.cfg = msg.cfg; this.matchGuests(); if (this.onRoster) this.onRoster(); Voice.refresh(); break;
-      case 'start': this.state = 'playing'; if (this.onStart) this.onStart(msg); break;
+      case 'start': this.state = 'playing'; if (this.onStart) this.onStart(msg); else this.pendingStart = msg; break;   // (a rejoin's start can arrive before the room screen is up)
       case 'snap': if (this.onSnapshot) this.onSnapshot(msg); break;
       case 'rules': Settings.applyRules(msg.rules || {}); break;
       case 'lobby': this.state = 'lobby'; if (this.onLobby) this.onLobby(); break;
@@ -405,6 +416,13 @@ class ClientSession {
   finish(reason) { if (this.closed) return; this.closed = true; Online.clear(this); clearInterval(this.pinger); if (this.conn) { this.conn.onClose = null; this.conn.close(); } if (this.onClosed) this.onClosed(reason); }
   leave() { if (this.conn && !this.closed) this.conn.send({ t: 'bye' }); this.closed = true; Online.clear(this); clearInterval(this.pinger); if (this.conn) { this.conn.onClose = null; setTimeout(() => this.conn.close(), 150); } }
 }
+
+/* v14: what you need to get back into a game: the room code and your rejoin token (kept for 20 minutes, also across a page reload) */
+const Rejoin = {
+  remember(code, token) { if (!code || !token) return; this.cur = { code, token, at: Date.now() }; try { localStorage.setItem('volt-rejoin', JSON.stringify(this.cur)); } catch (e) { /* private mode */ } },
+  get() { let r = this.cur; if (!r) { try { r = JSON.parse(localStorage.getItem('volt-rejoin') || 'null'); } catch (e) { r = null; } } return r && Date.now() - r.at < 20 * 60 * 1000 ? r : null; },
+  forget() { this.cur = null; try { localStorage.removeItem('volt-rejoin'); } catch (e) { /* private mode */ } }
+};
 
 /* ===== ClientSim: what a joining player sees =====
    - Everything except your own cart is drawn slightly in the past (CONFIG.online.interpDelayMs), blended between host snapshots.
@@ -443,16 +461,16 @@ class ClientSim {
     const C = CONFIG.online; dt = Math.min(dt, 0.05); this.clock += dt;
     for (const L of this.locals) {
       const found = inputs.find(x => x.id === L.id), input = found ? found.input : { ax: 0, ay: 0, pressed: {} }, p = input.pressed || {}; let spin = 0;
-      const MD = this.m.mini && modeOf(this.m), BRP = MD && MD.jumpOnA, SP = BRP;   // Battle Royale: its own buttons (modes_br2.js)
-      const dh = input.held && input.held.b && !(L.me && L.me.invOpen) ? 1 : 0;   /* (Battle Royale drifts on B) */ if (dh !== (L.drSent || 0)) { L.pending.push('dr:' + dh); L.drSent = dh; } if (L.me && L.me.chair) L.me.chair.driftHeld = !!dh;   // A (hold): drift
+      const MD = this.m.mini && modeOf(this.m), BRP = MD && MD.jumpOnA, SP = BRP;   // Volt Royale: its own buttons (modes_br2.js)
+      const dh = input.held && input.held.b && !(L.me && L.me.invOpen) ? 1 : 0;   /* (Volt Royale drifts on B) */ if (dh !== (L.drSent || 0)) { L.pending.push('dr:' + dh); L.drSent = dh; } if (L.me && L.me.chair) L.me.chair.driftHeld = !!dh;   // A (hold): drift
       if (SP && L.me) { const ads = !L.me.invOpen && input.held && input.held.spinCCW ? 1 : 0; if (ads !== (L.me.brAds || 0)) L.pending.push('ads:' + ads); L.me.brAds = ads; }   // LT: aim (zoom, slower)
       if (SP) { if (!(L.me && L.me.invOpen) && (p.halfCW || p.halfCCW)) L.pending.push(p.halfCCW ? 'cyc:-1' : 'cyc:1'); }
       else { if (p.halfCW) { L.pending.push('hcw'); spin = 0.5; } if (p.halfCCW) { L.pending.push('hccw'); spin = -0.5; }
       /* (v13.4: the triggers no longer spin the cart) */ }
-      const MJ = this.m.mini && modeOf(this.m) && modeOf(this.m).jump;         // Battle Royale: X jumps; your gun's tilt goes to the host when it changes
+      const MJ = this.m.mini && modeOf(this.m) && modeOf(this.m).jump;         // Volt Royale: X jumps; your gun's tilt goes to the host when it changes
       if (MJ && L.me && !L.me.invOpen) { brAimInput(L.me, input, dt); const ap = MG.r2(L.me.brAp || 0); if (Math.abs(ap - (L.sentAp || 0)) > 0.015 || (ap !== L.sentAp && this.clock - (L.apAt || 0) > 0.3)) { L.pending.push('ap:' + ap); L.sentAp = ap; L.apAt = this.clock; } }
       if (BRP) brPadEvents(L, input, dt, this.clock);
-      else if (this.m.mini && !(L.me && L.me.invOpen)) { const M = modeOf(this.m), hold = M && M.holdFire && input.held && (input.held.x || input.held.spinCW) && this.clock - (L.holdAt || 0) > 0.08; if (p.x || p.spinCW || hold) { L.pending.push('use'); L.holdAt = this.clock; } } else if (p.x) L.pending.push('x');
+      else if (this.m.mini && !(L.me && L.me.invOpen)) { const M = modeOf(this.m), hold = M && M.holdFire && input.held && input.held.spinCW && this.clock - (L.holdAt || 0) > 0.08; if (p.spinCW || hold) { L.pending.push('use'); L.holdAt = this.clock; } } else if (p.x) L.pending.push('x');
       if (spin) { Sound.play('screech'); L.spins.push({ t: this.clock, dir: Math.sign(spin), amt: Math.abs(spin) }); if (L.spins.length > 8) L.spins.shift(); }
       if (p.speedUp && L.me.speedLevel < Settings.speedCap) { L.me.speedLevel++; L.pending.push('up'); }
       if (p.speedDown && L.me.speedLevel > 1) { L.me.speedLevel--; L.pending.push('down'); }

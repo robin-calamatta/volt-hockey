@@ -32,7 +32,7 @@ const CONFIG = {
   // The "c" shaped cup on the front of the cart. Its middle is recessed, its arms reach forward.
   cup:     { frontX: 0.5, halfWidth: 0.3, recess: 0.08, points: 7, colliderRadius: 0.05,
              stickColliderRadius: 0.03, stickColliders: 5 },   // the stem of the "t"; its length is the Stick length setting
-  drift: { grip: 0.28, turn: 1.0, drag: 0.12, yaw: 0.9, minSpeed: 0.35, levels: [0.8, 1.6, 2.6], boost: [0, 0.8, 1.3, 1.9], boostMul: 1.55, colors: [0xffffff, 0x3dd6ff, 0xff9f1c, 0xc44dff] },   // drifting (chair.js): slide, charge levels (s), boost (s) per level
+  drift: { grip: 0.28, turn: 1.0, drag: 0.12, yaw: 0.9, minSpeed: 0.35, levels: [0.8, 1.6, 2.6], boost: [0, 0.9, 1.4, 2.0], boostMul: 1.7, colors: [0xffffff, 0x3dd6ff, 0xff9f1c, 0xc44dff] },   // drifting (chair.js): slide, charge levels (s), boost (s) per level
   spin:    { degrees: 90, seconds: 0.14, cooldown: 0.55 }, // slap-shot spin (RT clockwise, LT counter-clockwise)
 
   foul:    { noticeSeconds: 3, minClosingSpeed: 2.8, binSeconds: 8, facingDot: 0.6, hitDot: 0.8, bumpSoundSpeed: 1.5 },

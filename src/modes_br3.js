@@ -1,4 +1,4 @@
-/* BATTLE ROYALE, part 3 (v13.3): how you interact with the world.
+/* VOLT ROYALE, part 3 (v13.3): how you interact with the world.
    - X is the interact button: tap it next to a gun or item to pick it up (ammo and rez cards are still picked up by driving over them),
      HOLD it at a chest or an ammo crate to open it (the loot spills out), tap it at a door to open or shut it, hold it next to a downed
      team-mate to revive them. With nothing to interact with, X reloads.
@@ -76,6 +76,12 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
       if (c.player && needsPress(k) && c.grant !== L[0] && !(BR_ITEMS[k] && c.gs.inv.some(it => it.k === k && it.a < BR_ITEMS[k].stack))) return false;   // (driving over it only tops up a stack you already have)
       c.grant = 0;
       if (k === 'chest' || k === 'ammo') { this.openBox(m, c, L); return false; }
+      if (c.player && BR_GUNS[k] && !c.gs.down) {                          /* v14: a gun never turns into ammo. Holding a gun: you swap it (it drops where you are), even for the same gun. */
+        const G = c.gs, held = !G.hol && G.inv[G.sel];
+        if (held && BR_GUNS[held.k]) { this.swapFar(m, c, L); return false; }
+        if (G.inv.length < BR.slots) { G.inv.push({ k, a: L[5], t: L[12] || 0 }); brSlots(G); m.sfx('pickup'); this.say(m, c, brName(k, L[12] || 0)); if (G.hol) G.last = G.inv.length - 1; return true; }
+        if (held) { this.swapFar(m, c, L); return false; }
+      }
       const r = P2.take.call(this, m, c, L); brSlots(c.gs); return r;
     },
     openBox(m, c, L) {                                                    // a chest or a crate opens where it stands; the loot spills out
@@ -272,7 +278,7 @@ function brPadEvents(L, input, dt, clock) {
 /* the middle mouse button: melee */
 if (typeof window !== 'undefined') window.addEventListener('mousedown', e => { if (e.button === 1 && e.target && e.target.tagName === 'CANVAS') { Mouse.mid = true; e.preventDefault(); } });
 
-/* ---- the end of a game: your squad's stats, like the big battle royales (eliminations, knocks, assists, damage, revives, rezzes, time alive) ---- */
+/* ---- the end of a game: your squad's stats, like the big Volt Royales (eliminations, knocks, assists, damage, revives, rezzes, time alive) ---- */
 { const BRm = MODES.br, P3 = { ...BRm };
   Object.assign(BRm, {
     hurt(m, c, dmg, by, storm, o) {

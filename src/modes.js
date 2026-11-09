@@ -14,7 +14,7 @@ const MODES = {};
 const CTRL = {                                                         // control lines used by the How to play pages
   drive: 'Drive: left stick  /  WASD  /  arrows  /  touch stick',
   spin: 'Spin (a half turn that whacks things): LB / RB  /  R Z  /  ] [  /  SPIN buttons',
-  item: 'Use a power-up / fire: RT (or X)  /  E (or X)  /  . (or \\)  /  touch ★ USE',
+  item: 'Use a power-up / fire: RT  /  E  /  .  /  touch ★ USE',
   drift: 'Drift: hold B while turning (Backspace  /  Right Ctrl  /  touch 💨 DRIFT): let go when the bar is purple for the biggest boost',
   speed: 'Cart speed: D-pad ◀ ▶  /  C V  /  ; \'  /  touch SPEED + −',
   pause: 'Pause: Start  /  Esc  /  II'

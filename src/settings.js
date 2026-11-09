@@ -55,8 +55,8 @@ const Settings = {
     for (const s of sides) { k.goals += match.score[s]; k.shots += (match.shots || [0, 0])[s]; if (match.score[s] > match.score[1 - s]) k.wins++; }
     this.save();
   },
-  myName() { return typeof Account !== 'undefined' && Account.loggedIn ? Account.name : this.cleanName(this.playerName); },   // logged in: you play under your username
-  setMyName(n) { this.playerName = this.cleanName(n); this.save(); },
+  myName() { const on = typeof Account !== 'undefined' && Account.loggedIn; return (on && this.cleanName(this.displayName)) || (on ? Account.name : '') || this.cleanName(this.playerName); },   // logged in: your username, unless you've picked another name to play under (v13.6.1)
+  setMyName(n) { const c = this.cleanName(n); if (!c) return; if (typeof Account !== 'undefined' && Account.loggedIn) this.displayName = c === Account.name ? '' : c; else this.playerName = c; this.save(); },
   toggle(key) { this[key] = !this[key]; this.save(); },
   // key is 'teamA' or 'teamB'; skips the team the other side already uses.
   cycleTeam(key, dir) {

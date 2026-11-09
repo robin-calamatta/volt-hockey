@@ -1,6 +1,6 @@
 /* YOUR MUSIC. Drop audio files (mp3, ogg, wav, m4a, flac...) into two folders:
      assets/music/menu/   the menus and the lobby play these, shuffled
-     assets/music/game/   the games play these, shuffled (Battle Royale only if its "Music" option is On: it's Off by default)
+     assets/music/game/   the games play these, shuffled (Volt Royale only if its "Music" option is On: it's Off by default)
      assets/music/intro/  the opening splash (the sparkler burning in the logo) plays one of these, picked at random
    (Older setups still work: assets/music/match/ counts as game music, and songs loose in assets/music/ play in both.)
    The game finds songs three ways and combines them:

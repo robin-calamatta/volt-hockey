@@ -5,7 +5,7 @@
 const LOBBY_TABS = ['PLAY', 'LOCKER', 'PASS', 'QUESTS', 'CAREER'];
 const LOBBY_MODES = [
   { id: 'hockey', name: 'VOLT HOCKEY', sub: 'A match against the CPU or friends', icon: '🏒', col: 0x2f6fed, go: sc => sc.scene.start('Setup', { practice: false }) },
-  { id: 'br', name: 'BATTLE ROYALE', sub: 'Loot, beat the storm, be the last one left', icon: '⚡', col: 0x8e44ff, go: sc => sc.scene.start('MiniSetup', { kind: 'br' }) },
+  { id: 'br', name: 'VOLT ROYALE', sub: 'Loot, beat the storm, be the last one left', icon: '⚡', col: 0x8e44ff, go: sc => sc.scene.start('MiniSetup', { kind: 'br' }) },
   { id: 'mini', name: 'MINIGAMES', sub: 'Races, paintball, golf, sumo and more', icon: '🎉', col: 0xff7a1c, go: sc => sc.scene.start('Minigames') },
   { id: 'season', name: 'SEASON', sub: 'A full season, the playoffs and the World Cup', icon: '🏆', col: 0x1f9d55, go: sc => sc.scene.start('SeasonMenu') },
   { id: 'practice', name: 'PRACTICE ARENA', sub: 'Any team sizes, no clock', icon: '🎯', col: 0x139c8a, go: sc => sc.scene.start('Setup', { practice: true }) },
@@ -14,7 +14,7 @@ const LOBBY_MODES = [
 const LOCKER_SLOTS = [
   { key: 'outfit', name: 'OUTFIT', list: () => COS.outfits }, { key: 'shirt', name: 'OUTFIT COLOUR', colors: () => COS.colors }, { key: 'hat', name: 'HAT', list: () => COS.hats },
   { key: 'hatCol', name: 'HAT COLOUR', colors: () => COS.colors }, { key: 'face', name: 'FACE', list: () => COS.faces }, { key: 'hairStyle', name: 'HAIRSTYLE', list: () => COS.hairStyles }, { key: 'hair', name: 'HAIR COLOUR', colors: () => COS.hair },
-  { key: 'skin', name: 'SKIN TONE', colors: () => COS.skin }, { key: 'decal', name: 'CART DECAL', list: () => COS.decals }, { key: 'title', name: 'TITLE', list: () => COS.titles }, { key: 'wheel', name: 'EMOJI + ACTION WHEEL', wheel: true }
+  { key: 'skin', name: 'SKIN TONE', colors: () => COS.skin }, { key: 'decal', name: 'CART DECAL', list: () => COS.decals }, { key: 'wheel', name: 'EMOJI + ACTION WHEEL', wheel: true }
 ];
 
 class LobbyHomeScene extends Phaser.Scene {
@@ -75,7 +75,7 @@ class LobbyHomeScene extends Phaser.Scene {
       if (s.colors) { const g = this.add.graphics().setDepth(11); g.fillStyle(Phaser.Display.Color.HexStringToColor(look[s.key]).color, 1).fillCircle(290, y + 21, 12).lineStyle(2, 0xffffff, 0.8).strokeCircle(290, y + 21, 12); this.ui.push(g); }
       this.tap(40, y, 276, 42, () => { L.slot = i; L.col = 1; L.item = 0; L.pick = -1; this.preview = null; this.redraw(); }); });
     const s = S[L.slot], items = this.lockerItems(), cols = s.colors ? 5 : 3, tw = s.colors ? 70 : 118, th = s.colors ? 70 : 118, x0 = 860, y0 = 150;
-    this.box(844, 100, 410, 560); this.T(860, 108, s.wheel ? (L.pick >= 0 ? `PICK AN EMOJI OR ACTION FOR SLOT ${L.pick + 1}` : 'YOUR WHEEL: pick a slot') : s.name, 22, '#ffd23f');
+    this.box(844, 100, 410, 560); this.T(860, 108, s.wheel ? (L.pick >= 0 ? `PICK AN EMOTE FOR SLOT ${L.pick + 1}` : 'YOUR WHEEL: pick a slot') : s.name, 22, '#ffd23f');
     const vis = Math.floor((650 - y0) / (th + 10)), row0 = Math.max(0, Math.floor(L.item / cols) - vis + 1);   // (a long list scrolls with the cursor)
     if (row0 > 0) this.T(1240, 112, '▲ more', 14, '#9fb2bf', { ox: 1 }); if (Math.ceil(items.length / cols) > row0 + vis) this.T(1240, 640, '▼ more', 14, '#9fb2bf', { ox: 1 });
     items.forEach((it, i) => { const cx = x0 + (i % cols) * (tw + 10), cy = y0 + (Math.floor(i / cols) - row0) * (th + 10), on = L.col === 1 && i === L.item, eq = it.equipped, own = it.own;
@@ -107,9 +107,8 @@ class LobbyHomeScene extends Phaser.Scene {
       this.box(x, y, 152, 196, got ? 0x2a1f6b : 0x141820, 0.95, on ? 0x5fd6ff : tier === t ? 0xffd23f : 0x2d5068, 10); this.T(x + 10, y + 8, String(tier), 22, got ? '#ffd23f' : '#7d8a96');
       if (rw) { this.T(x + 76, y + 84, rw.icon, 56, '#ffffff', { ox: 0.5, oy: 0.5, depth: 12 }).setFontFamily('sans-serif').setAlpha(got ? 1 : 0.55); this.T(x + 76, y + 132, rw.name, 17, '#ffffff', { ox: 0.5, align: 'center', wrap: 140, depth: 12 }); this.T(x + 76, y + 170, got ? '✓ UNLOCKED' : '🔒 LOCKED', 15, got ? '#7dff6a' : '#9fb2bf', { ox: 0.5, depth: 12 }); }
       this.tap(x, y, 152, 196, () => { this.passCur = tier - 1; this.passHover(); }); }
-    const rw = PASS[cur + 1]; if (rw) this.T(V.width / 2, 412, `Tier ${cur + 1}: ${rw.name} (${{ outfit: 'outfit', hat: 'hat', face: 'face', decal: 'cart decal', emoji: 'emoji', action: 'action', title: 'title', hairStyle: 'hairstyle' }[rw.slot]})  ${cur + 1 <= t ? '— unlocked, wear it from the Locker' : '— reach level ' + (cur + 1) + ' to unlock'}`, 18, '#ffffff', { ox: 0.5 });
+    const rw = PASS[cur + 1]; if (rw) this.T(V.width / 2, 412, `Tier ${cur + 1}: ${rw.name} (${{ ps: 'player skin', cs: 'cart skin', outfit: 'outfit', hat: 'hat', face: 'face', decal: 'cart decal', emoji: 'emoji', action: 'emote', title: 'title', hairStyle: 'hairstyle' }[rw.slot]})  ${cur + 1 <= t ? '— unlocked, wear it from the Locker' : '— reach level ' + (cur + 1) + ' to unlock'}`, 18, '#ffffff', { ox: 0.5 });
     if (rw && rw.slot === 'emoji') this.T(1040, 250, rw.icon, 90, '#ffffff', { ox: 0.5, oy: 0.5 }).setFontFamily('sans-serif');
-    if (rw && rw.slot === 'title') this.T(1040, 250, '“' + rw.name + '”', 34, '#ffd23f', { ox: 0.5, oy: 0.5 }).setBackgroundColor('#1b2a45').setPadding(14, 8);
   }
   passHover() { const rw = PASS[this.passCur + 1]; this.preview = rw && !['emoji', 'action', 'title'].includes(rw.slot) ? { [rw.slot]: rw.id } : null; if (rw && rw.slot === 'action' && this.stage.ok) this.stage.play(rw.id); this.redraw(); }
   drawQuests() {
@@ -121,8 +120,8 @@ class LobbyHomeScene extends Phaser.Scene {
   }
   drawCareer() {
     const k = Object.assign({ games: 0, wins: 0, goals: 0, shots: 0 }, Settings.career), x = 820, w = 430; this.box(x, 100, w, 470);
-    this.T(x + 20, 112, (Settings.myName() || 'Player').toUpperCase(), 38, '#ffffff'); { const ti = COS.titles.find(t => t.id === Progress.look().title); if (ti) this.T(x + w - 20, 124, '“' + ti.name + '”', 18, '#ffd23f', { ox: 1 }); } this.T(x + 20, 162, `Level ${Progress.level()}   •   ${Progress.P.xp.toLocaleString()} XP`, 22, '#5fd6ff');
-    [['Volt Hockey matches', k.games], ['Wins', k.wins], ['Goals', k.goals], ['Shots', k.shots], ['Quests completed', Progress.P.done], ['Season pass tier', `${Progress.tier()} / ${SEASON1.tiers}`], ...(() => { const T = (Settings.career && Settings.career.time) || {}, h = s => { s = s || 0; return s < 3600 ? `${Math.floor(s / 60)} min` : `${(s / 3600).toFixed(1)} h`; }; return [['Time in Volt Hockey', h(T.volt)], ['Time in minigames', h(T.mini)], ['Time in Battle Royale', h(T.br)]]; })()].forEach(([a, b], i) => { this.T(x + 20, 206 + i * 38, a, 21, '#c9d6df', { bold: false }); this.T(x + w - 20, 206 + i * 38, String(b), 21, '#ffffff', { ox: 1 }); });   /* (v13.5: hours played) */
+    this.T(x + 20, 112, (Settings.myName() || 'Player').toUpperCase(), 38, '#ffffff'); this.T(x + 20, 162, `Level ${Progress.level()}   •   ${Progress.P.xp.toLocaleString()} XP`, 22, '#5fd6ff');
+    [['Volt Hockey matches', k.games], ['Wins', k.wins], ['Goals', k.goals], ['Shots', k.shots], ['Quests completed', Progress.P.done], ['Season pass tier', `${Progress.tier()} / ${SEASON1.tiers}`], ...(() => { const T = (Settings.career && Settings.career.time) || {}, h = s => { s = s || 0; return s < 3600 ? `${Math.floor(s / 60)} min` : `${(s / 3600).toFixed(1)} h`; }; return [['Time in Volt Hockey', h(T.volt)], ['Time in minigames', h(T.mini)], ['Time in Volt Royale', h(T.br)]]; })()].forEach(([a, b], i) => { this.T(x + 20, 206 + i * 38, a, 21, '#c9d6df', { bold: false }); this.T(x + w - 20, 206 + i * 38, String(b), 21, '#ffffff', { ox: 1 }); });   /* (v13.5: hours played) */
     this.box(x, 586, 205, 64, 0x1b2a35, 1); this.T(x + 102, 618, 'LEADERBOARD (A)', 20, '#ffffff', { ox: 0.5, oy: 0.5 }); this.tap(x, 586, 205, 64, () => this.scene.start('Leaderboard'));
     this.box(x + 225, 586, 205, 64, 0x1b2a35, 1); this.T(x + 327, 618, 'CHANGE NAME (Y)', 20, '#ffffff', { ox: 0.5, oy: 0.5 }); this.tap(x + 225, 586, 205, 64, () => this.askName());
   }

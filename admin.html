@@ -60,7 +60,7 @@ async function start() { $('#login').hidden = true; $('#app').hidden = false; tr
 async function search() {
   try {
     const r = await api('GET', '/admin/users', null, { q: $('#q').value.trim() });
-    $('#ulist').innerHTML = r.users.map(u => `<tr class="click" data-n="${esc(u.name)}"><td>${esc(u.name)} ${u.adult ? '' : '<span class="tag kid">under 18</span>'} ${u.banned ? '<span class="tag ban">suspended</span>' : ''}</td><td class="hide-sm">${esc(u.email)}</td><td>${u.games}</td><td>${u.wins}</td><td>${u.cups}</td><td class="hide-sm dim">${when(u.lastSeen)}</td></tr>`).join('') || '<tr><td colspan="6" class="dim">No players found.</td></tr>';
+    $('#ulist').innerHTML = r.users.map(u => `<tr class="click" data-n="${esc(u.name)}"><td>${esc(u.name)} ${u.adult ? '' : '<span class="tag kid">under 18</span>'} ${u.br ? '<span class="tag">BR</span>' : ''} ${u.banned ? '<span class="tag ban">suspended</span>' : ''}</td><td class="hide-sm">${esc(u.email)}</td><td>${u.games}</td><td>${u.wins}</td><td>${u.cups}</td><td class="hide-sm dim">${when(u.lastSeen)}</td></tr>`).join('') || '<tr><td colspan="6" class="dim">No players found.</td></tr>';
     $('#utotal').textContent = `${r.users.length} shown of ${r.total}`;
     document.querySelectorAll('#ulist tr[data-n]').forEach(tr => tr.onclick = () => detail(tr.dataset.n));
   } catch (e) { $('#ulist').innerHTML = `<tr><td colspan="6" class="err">${esc(e.message)}</td></tr>`; }
@@ -73,7 +73,7 @@ async function detail(name) {
   d.innerHTML = `<h3 style="margin-top:0">${esc(u.name)}</h3>
     <div class="row dim">Joined ${when(u.created)} · last seen ${when(u.lastSeen)} · ${u.adult ? '18 or over' : 'under 18'} ${u.banned ? '· <span class="err">suspended</span>' : ''}</div>
     <div class="row"><label>Email <input id="de" value="${esc(u.email || '')}" size="30"></label><button id="dsave-e">Save email</button></div>
-    <div class="row"><label><input type="checkbox" id="dadult" ${u.adult ? 'checked' : ''}> 18 or over</label><label><input type="checkbox" id="dban" ${u.banned ? 'checked' : ''}> Suspended (cannot log in)</label><button id="dsave-f">Save</button></div>
+    <div class="row"><label><input type="checkbox" id="dadult" ${u.adult ? 'checked' : ''}> 18 or over</label><label><input type="checkbox" id="dover16" ${u.over16 ? 'checked' : ''}> 16 or over</label><label title="Lets this player see and play Volt Royale even if they are under 16"><input type="checkbox" id="dbrok" ${u.brOk ? 'checked' : ''}> Allowed to play Volt Royale</label><label><input type="checkbox" id="dban" ${u.banned ? 'checked' : ''}> Suspended (cannot log in)</label><button id="dsave-f">Save</button></div>
     <div class="row">Career: ${['games', 'wins', 'goals', 'shots', 'cups'].map(k => `<label>${k} <input data-c="${k}" type="number" min="0" value="${c[k] || 0}" style="width:80px"></label>`).join(' ')}<button id="dsave-c">Save career</button></div>
     <div class="row"><input id="dpw" type="password" placeholder="New password for them"><button id="dsave-p">Set password</button><span class="dim">(logs them out everywhere)</span></div>
     <div class="row dim">Friends: ${friends}</div><div class="row dim">Blocked: ${esc((u.blocked || []).join(', ') || 'nobody')}</div>
@@ -81,7 +81,7 @@ async function detail(name) {
   const msg = (t, ok) => { $('#dmsg').innerHTML = `<span class="${ok ? 'okm' : 'err'}">${esc(t)}</span>`; };
   const save = async patch => { try { await api('POST', '/admin/user', { name: u.name, patch }); msg('Saved.', true); search(); } catch (e) { msg(e.message); } };
   $('#dsave-e').onclick = () => save({ email: $('#de').value.trim() });
-  $('#dsave-f').onclick = () => save({ adult: $('#dadult').checked, banned: $('#dban').checked });
+  $('#dsave-f').onclick = () => save({ adult: $('#dadult').checked, over16: $('#dover16').checked, brOk: $('#dbrok').checked, banned: $('#dban').checked });
   $('#dsave-c').onclick = () => save({ career: Object.fromEntries([...document.querySelectorAll('[data-c]')].map(i => [i.dataset.c, +i.value])) });
   $('#dsave-p').onclick = async () => { try { await api('POST', '/admin/user/password', { name: u.name, password: $('#dpw').value }); msg('Password set.', true); } catch (e) { msg(e.message); } };
   $('#ddel').onclick = async () => { if (!confirm(`Delete ${u.name} for good? Their progress, email and friendships go too.`)) return; try { await api('POST', '/admin/user/delete', { name: u.name }); d.hidden = true; search(); } catch (e) { msg(e.message); } };

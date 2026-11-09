@@ -1,4 +1,4 @@
-/* BATTLE ROYALE (v11). Big outdoor maps with buildings you drive into, parking garages, rooftops, a jungle tree with a spiral ramp, canyons.
+/* VOLT ROYALE (v11). Big outdoor maps with buildings you drive into, parking garages, rooftops, a jungle tree with a spiral ramp, canyons.
    The world has LEVELS (floors 2.2 m apart): every cart, wall, bullet and pick-up has one. Ramps carry carts between levels; on an upper
    level a cart stays on the floors (railings all round). Carts on different levels do not touch and cannot hit each other.
    Map pieces (all metres, lv = level):
@@ -413,7 +413,7 @@ MODES.br = {
   },
   hud(m) {
     const S = m.gs.st, live = MG.live(m), teams = new Set(live.map(c => c.gs.team)).size, sq = m.mini.squad || 1, t = Math.ceil(S.wait > 0 ? S.wait : Math.max(0, S.shrink));
-    return { clock: S.ph >= 6 ? 'FINAL' : `${S.wait > 0 ? '⏳' : '🌀'} ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, a: 'BATTLE ROYALE', b: sq > 1 ? `${teams} TEAMS LEFT` : `${live.length} LEFT`, mid: S.wait > 0 ? 'Storm closes in' : 'THE STORM IS MOVING', left: MG.peopleLine(m, c => c.out ? 'OUT' : `❤${Math.ceil(c.gs.hp)} 🛡${Math.ceil(c.gs.sh)} ✖${c.gs.kills}`) };
+    return { clock: S.ph >= 6 ? 'FINAL' : `${S.wait > 0 ? '⏳' : '🌀'} ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, a: 'VOLT ROYALE', b: sq > 1 ? `${teams} TEAMS LEFT` : `${live.length} LEFT`, mid: S.wait > 0 ? 'Storm closes in' : 'THE STORM IS MOVING', left: MG.peopleLine(m, c => c.out ? 'OUT' : `❤${Math.ceil(c.gs.hp)} 🛡${Math.ceil(c.gs.sh)} ✖${c.gs.kills}`) };
   },
   tag(c, m, vp) {                                                          // your team-mates' names (enemies show nothing: no tags through walls)
     const me = vp && vp.p && vp.p.chair; if (c.out) return '';
@@ -429,7 +429,7 @@ MODES.br = {
 };
 { const P = MiniMatch.prototype, sw = P.switchChair; P.switchChair = function (p) { const M = modeOf(this); if (p && p.invOpen) return; if (M && M.holster && p && p.chair) return M.holster(p.chair, this); if (M && M.cycle && p && p.chair) return M.cycle(p.chair, this); return sw.call(this, p); }; }
 
-GAME_INFO.br = { name: 'Battle Royale', cat: 'sneaky', noCarts: true, blurb: 'Loot guns and items, stay in the circle, be the last team standing. Five big maps with buildings, garages and ramps.', noItems: true, noClockOpt: true,
+GAME_INFO.br = { name: 'Volt Royale', cat: 'sneaky', noCarts: true, blurb: 'Loot guns and items, stay in the circle, be the last team standing. Five big maps with buildings, garages and ramps.', noItems: true, noClockOpt: true,
   court: mini => (BR_MAPS[mini && mini.map] || BR_MAPS.downtown).size, label: cfg => `${(BR_MAPS[cfg.map] || BR_MAPS.downtown).name}, ${['solo', 'duos', 'trios'][(cfg.squad || 1) - 1]}`,
   goal: 'Be the last cart (or team) left alive.',
   rules: ['You start with nothing. Drive into a CHEST to burst it open: a gun, ammo for it, often a heal. AMMO CRATES and ammo boxes give ammo: light (pistol, SMG), shells (shotgun), medium (rifle), heavy (sniper) and rockets. You can carry ammo without the gun. Guns have magazines: reload with X.',
@@ -441,6 +441,6 @@ GAME_INFO.br = { name: 'Battle Royale', cat: 'sneaky', noCarts: true, blurb: 'Lo
   controls: [CTRL.drive, 'Fire / use what you hold: RT  /  E or left click  /  .  /  touch FIRE  (hold for automatic guns; heals take a few seconds)', 'Aim (zoom, tighter shots, slower cart): hold LT  /  Q or right click  /  ,  /  touch AIM.  Holding a heal: LT uses it on a team-mate next to you',
     'Jump: A  /  Space  /  Right Shift  /  touch JUMP.  ', 'Pick up / open / doors (tap), open chests and revive (hold), or reload: X  /  X  /  \\  /  touch GRAB','Drift: hold B while turning  /  Backspace  /  Right Ctrl  /  touch DRIFT (no jump needed; let go for a boost)','Melee bash: R3 (click the right stick)  /  B or middle click  /  Numpad 0 or End  /  touch MELEE', 'Put your item away (drive faster) / take it out again: Y  /  F  /  /  /  touch AWAY',
     'Switch item: LB / RB  /  Z / R or the mouse wheel  /  [ / ]  /  touch ◀ ITEM ▶', 
-    'Bag (and the map): tap D-pad ▲  /  H  /  M  /  touch BAG.  Hold it for the emoji and action wheel', 'Aim up and down: right stick  /  I and K  /  Page Up and Page Down  /  touch AIM UP / AIM DOWN', 'When you are out: LB / RB switch whose view you watch, ▼ first / third person, Y takes over a CPU team-mate', CTRL.pause],
+    'Bag (and the map): tap D-pad ▲  /  H  /  M  /  touch BAG.  Hold it for the emote wheel', 'Aim up and down: right stick  /  I and K  /  Page Up and Page Down  /  touch AIM UP / AIM DOWN', 'When you are out: LB / RB switch whose view you watch, ▼ first / third person, Y takes over a CPU team-mate', CTRL.pause],
   opts: [{ key: 'map', label: 'Map', values: ['downtown', 'jungle', 'port', 'suburbs', 'canyon'], names: ['Downtown', 'The Jungle', 'The Port', 'The Suburbs', 'The Canyon'], def: 'downtown', hint: () => (BR_MAPS[modeOpts('br').map] || BR_MAPS.downtown).blurb },
     { key: 'squad', label: 'Teams', values: [1, 2, 3, 4, 5], names: ['Solo', 'Duos (teams of 2)', 'Trios (teams of 3)', 'Squads (teams of 4)', 'Fives (teams of 5)'], def: 1 }, { key: 'carts', label: 'Carts', values: [6, 8, 10, 12, 16, 20], def: 12, hint: 'Carts nobody drives are played by the CPU.' }, { key: 'music', label: 'Music', values: [0, 1], names: ['Off', 'On'], def: 0, hint: 'Game music while you play (your songs in assets/music/game/). Off by default.' }] };
