@@ -8,6 +8,7 @@ const KEYMAP = {
          b: ['ControlRight'], y: ['Slash'], start: ['Escape'], spinCW: ['Period'], spinCCW: ['Comma'], speedUp: ['Quote'], speedDown: ['Semicolon'], x: ['Backslash'], halfCW: ['BracketRight'], halfCCW: ['BracketLeft'], camera: ['KeyP'], talk: ['KeyL'], quick: ['KeyM'], social: [], aimUp: ['PageUp'], aimDown: ['PageDown'], melee: ['Numpad0', 'End'] }
 };
 const PAD_BUTTON = { a: 0, b: 1, y: 3, start: 9, spinCW: 7, spinCCW: 6, speedUp: 15, speedDown: 14, x: 2, halfCW: 5, halfCCW: 4, camera: 13, social: 8, talk: 10, quick: 12, up: 12, down: 13, left: 14, right: 15, melee: 11 };   // (melee: R3, Volt Royale)
+const padInMatch = () => { const g = typeof window !== 'undefined' && window.voltGame; if (!g || !g.scene.isActive('Game')) return false; for (const k of ['Pause', 'BRInv', 'BRMap', 'Settings', 'SettingsPage']) if (g.scene.isActive(k)) return false; return !(typeof FriendsBar !== 'undefined' && FriendsBar.open); };   // (in a match, not in a menu over it)
 const PAD = { deadzone: 0.2, menuThreshold: 0.55 };
 const MENU_REPEAT = { delayMs: 350, intervalMs: 110 };   // holding a direction in a menu repeats
 const DIRECTIONS = ['up', 'down', 'left', 'right'];
@@ -53,7 +54,8 @@ class Source {
   readPad() {
     const pad = navigator.getGamepads()[+this.id.slice(3)], held = {};
     if (!pad) { this.ax = this.ay = this.rx = this.ry = 0; return held; }
-    for (const b of BUTTONS) held[b] = [].concat(PAD_BUTTON[b]).some(i => pad.buttons[i] && pad.buttons[i].pressed);   // a button may have more than one pad button (camera: View or R3)
+    const tac = Settings.padTactical && padInMatch(), phys = i => tac ? (i === 1 ? 11 : i === 11 ? 1 : i) : i;   // v14.2.6: the Tactical layout swaps B and R3 in a match
+    for (const b of BUTTONS) held[b] = [].concat(PAD_BUTTON[b]).some(i => { const q = pad.buttons[phys(i)]; return q && q.pressed; });   // a button may have more than one pad button (camera: View or R3)
     let x = pad.axes[0], y = pad.axes[1];
     const m = Math.hypot(x, y);
     if (m < PAD.deadzone) { x = y = 0; } else { const k = (Math.min(1, m) - PAD.deadzone) / (1 - PAD.deadzone) / m; x *= k; y *= k; }

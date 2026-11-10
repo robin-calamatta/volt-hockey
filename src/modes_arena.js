@@ -73,25 +73,28 @@ for (const kind of ['ctf', 'hill']) {
 }
 /* drawing: the walls (like Paintball's) in 3D and 2D, and the moving parts */
 { const P = View3D.prototype, upd = P.updateMode;
-  P.updateMode = function (dt) {
-    const r = upd.call(this, dt), m = this.m, A = Arena.map(m); if (!A) return r;
-    if (!this.arenaG) {
-      const g = this.arenaG = new THREE.Group(), H = PB.wallH, cols = { wall: 0x8b939c, bags: 0xb59a6a, crate: 0x9a6b3a };
-      for (const b of Arena.walls(m)) { const h = b.kind === 'bags' ? 1.0 : b.kind === 'crate' ? 1.2 : H, box = new THREE.Mesh(new THREE.BoxGeometry(b.x1 - b.x0, h, b.y1 - b.y0), this.mat(cols[b.kind] || 0x8b939c, { rough: 0.85 })); box.position.set((b.x0 + b.x1) / 2, h / 2, (b.y0 + b.y1) / 2); box.castShadow = box.receiveShadow = true; g.add(box);
-        if (b.kind === 'wall') { const cap = new THREE.Mesh(new THREE.BoxGeometry(b.x1 - b.x0 + 0.04, 0.08, b.y1 - b.y0 + 0.04), this.mat(0x3dd6ff, { rough: 0.5 })); cap.position.set((b.x0 + b.x1) / 2, H + 0.04, (b.y0 + b.y1) / 2); g.add(cap); } }
-      this.arenaMv = A.moving.map(o => { if (o.type === 'spin') { const s = new THREE.Group(), post = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 1.3, 12), this.mat(0x333a40, { metal: 0.4 })); post.position.y = 0.65; const bar = new THREE.Mesh(new THREE.BoxGeometry(o.len * 2, 0.4, 0.5), this.mat(0xff7a1c, { rough: 0.5 })); bar.position.y = 0.7; s.add(post, bar); s.position.set(o.x, 0, o.y); g.add(s); return { o, mesh: s }; }
-        const box = new THREE.Mesh(new THREE.BoxGeometry(o.w, o.type === 'gate' ? H : 1.1, o.h), this.mat(o.type === 'gate' ? 0xf2c200 : 0xff7a1c, { rough: 0.5 })); box.castShadow = true; g.add(box); return { o, mesh: box }; });
-      this.scene.add(g);
+  P.updateMode = function (dt) { const r = upd.call(this, dt); Arena.draw3d(this); return r; };
+  Arena.draw3d = function (V) {   // (v14.2.6: on its own, so Manhunt, which has no mode of its own, draws its walls too)
+    const m = V.m, A = Arena.map(m), ak = m && m.mini ? m.mini.kind + ':' + m.mini.map : '';
+    if (V.arenaG && (V.arenaKey !== ak || V.arenaG.parent !== V.scene)) { if (V.arenaG.parent) V.arenaG.parent.remove(V.arenaG); V.arenaG = null; }   // (v14.2.10: another map, or a new scene: build again)
+    if (!A) return; V.arenaKey = ak;
+    if (!V.arenaG) {
+      const g = V.arenaG = new THREE.Group(), H = PB.wallH, cols = { wall: 0x8b939c, bags: 0xb59a6a, crate: 0x9a6b3a };
+      for (const b of Arena.walls(m)) { const h = b.kind === 'bags' ? 1.0 : b.kind === 'crate' ? 1.2 : H, box = new THREE.Mesh(new THREE.BoxGeometry(b.x1 - b.x0, h, b.y1 - b.y0), V.mat(cols[b.kind] || 0x8b939c, { rough: 0.85 })); box.position.set((b.x0 + b.x1) / 2, h / 2, (b.y0 + b.y1) / 2); box.castShadow = box.receiveShadow = true; g.add(box);
+        if (b.kind === 'wall') { const cap = new THREE.Mesh(new THREE.BoxGeometry(b.x1 - b.x0 + 0.04, 0.08, b.y1 - b.y0 + 0.04), V.mat(0x3dd6ff, { rough: 0.5 })); cap.position.set((b.x0 + b.x1) / 2, H + 0.04, (b.y0 + b.y1) / 2); g.add(cap); } }
+      V.arenaMv = A.moving.map(o => { if (o.type === 'spin') { const s = new THREE.Group(), post = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 1.3, 12), V.mat(0x333a40, { metal: 0.4 })); post.position.y = 0.65; const bar = new THREE.Mesh(new THREE.BoxGeometry(o.len * 2, 0.4, 0.5), V.mat(0xff7a1c, { rough: 0.5 })); bar.position.y = 0.7; s.add(post, bar); s.position.set(o.x, 0, o.y); g.add(s); return { o, mesh: s }; }
+        const box = new THREE.Mesh(new THREE.BoxGeometry(o.w, o.type === 'gate' ? H : 1.1, o.h), V.mat(o.type === 'gate' ? 0xf2c200 : 0xff7a1c, { rough: 0.5 })); box.castShadow = true; g.add(box); return { o, mesh: box }; });
+      V.scene.add(g);
     }
-    const mv = Arena.movers(m); let bi = 0; for (const X of this.arenaMv) { if (X.o.type === 'spin') X.mesh.rotation.y = -(m.simTime || 0) * X.o.speed; else { const b = mv.boxes[bi++]; if (b) X.mesh.position.set((b.x0 + b.x1) / 2, X.mesh.geometry.parameters.height / 2, (b.y0 + b.y1) / 2); } }
-    return r;
+    const mv = Arena.movers(m); let bi = 0; for (const X of V.arenaMv) { if (X.o.type === 'spin') X.mesh.rotation.y = -(m.simTime || 0) * X.o.speed; else { const b = mv.boxes[bi++]; if (b) X.mesh.position.set((b.x0 + b.x1) / 2, X.mesh.geometry.parameters.height / 2, (b.y0 + b.y1) / 2); } }
   };
 }
 { const P = GameScene.prototype, d2 = P.drawMode2D;
   P.drawMode2D = function (g, under) {
-    const r = d2.call(this, g, under), m = this.match; if (!Arena.map(m)) return r; const cols = { wall: 0x8b939c, bags: 0xb59a6a, crate: 0x9a6b3a };
+    const r = d2.call(this, g, under); Arena.draw2d(this.match, g, under); return r; };
+  Arena.draw2d = function (m, g, under) {
+    if (!Arena.map(m)) return; const cols = { wall: 0x8b939c, bags: 0xb59a6a, crate: 0x9a6b3a };
     if (under) for (const b of Arena.walls(m)) g.fillStyle(cols[b.kind] || 0x8b939c, 1).fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
     else { const mv = Arena.movers(m); for (const b of mv.boxes) g.fillStyle(0xf2c200, 1).fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); for (const p of mv.posts) g.fillStyle(0xff7a1c, 1).fillCircle(p.x, p.y, p.r); }
-    return r;
   };
 }

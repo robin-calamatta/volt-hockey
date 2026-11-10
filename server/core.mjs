@@ -53,6 +53,7 @@ export function createApi(store, opts = {}) {
   const saveUser = u => store.set(key(u.name), u);
   const online = u => !!u && now() - (u.lastSeen || 0) < LIMITS.onlineMs;
   const me = u => ({ name: u.name, adult: !!u.adult, br: canBR(u), created: u.created, email: u.email ? maskEmail(u.email) : '' });
+  const GAME_DEFAULTS = { brThird: true };
   const canBR = u => !!(u && (u.adult || u.over16 || u.brOk));   // Volt Royale: 16 or over, or let in by an admin (v14)
 
   async function auth(headers) {
@@ -311,7 +312,10 @@ export function createApi(store, opts = {}) {
     'GET /admin/keys': async (b, q) => ({ keys: (await store.list(str(q.prefix, 100))).sort().slice(0, 1000) }),
     'GET /admin/raw': async (b, q) => ({ key: q.key, value: await store.get(str(q.key, 300)) }),
     'PUT /admin/raw': async (b) => { const k = str(b.key, 300); if (!k) bad('No key.'); await store.set(k, b.value); return { ok: true }; },
-    'POST /admin/raw/delete': async (b) => { await store.del(str(b.key, 300)); return { ok: true }; }
+    'POST /admin/raw/delete': async (b) => { await store.del(str(b.key, 300)); return { ok: true }; },
+    /* v14.2.6: game-wide switches (the Game tab). brThird: third person allowed in Volt Royale */
+    'GET /admin/game': async () => ({ game: { ...GAME_DEFAULTS, ...((await store.get('cfg/game')) || {}) } }),
+    'POST /admin/game': async (b) => { const cur = { ...GAME_DEFAULTS, ...((await store.get('cfg/game')) || {}) }; for (const k of Object.keys(GAME_DEFAULTS)) if (typeof b[k] === 'boolean') cur[k] = b[k]; await store.set('cfg/game', cur); return { game: cur }; }
   };
 
   /* ---- routing ---- */
@@ -323,6 +327,7 @@ export function createApi(store, opts = {}) {
     'POST /reset/request': (b) => requestReset(b), 'POST /reset/confirm': (b) => confirmReset(b),
     'PUT /prefs': async (b, q, h) => putPrefs((await auth(h)).u, b), 'PUT /progress': async (b, q, h) => putProgress((await auth(h)).u, b),
     'GET /ice': async () => ({ iceServers: [...(iceServers() || []), ...(await turnCredentials())] }),
+    'GET /game': async () => ({ game: { ...GAME_DEFAULTS, ...((await store.get('cfg/game')) || {}) } }),   // (v14.2.6: game-wide switches the admin sets)
     'GET /leaderboard': () => leaderboard(), 'GET /profile': (b, q) => profile(q.name), 'GET /search': async (b, q, h) => search((await auth(h)).u, q),
     'POST /sync': async (b, q, h) => sync((await auth(h)).u, b),
     'POST /friends/request': async (b, q, h) => friendRequest((await auth(h)).u, b), 'POST /friends/accept': async (b, q, h) => acceptFriend((await auth(h)).u, b),

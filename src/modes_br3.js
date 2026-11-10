@@ -12,7 +12,11 @@
    - Heals stop as soon as they are no longer doing anything (that one is used up, not the stack). */
 
 Object.assign(BR_GUNS.sniper, { dmg: 105 });
-const BR_HEAD = { sniper: 2, pistol: 1.6, rifle: 1.6, smg: 1.4, shotgun: 1.4, rocket: 1 };
+/* v14.2.11: snipers hit a bit less hard, and each rarity more: a body shot does 52 / 60 / 69 / 78, a headshot 1.25 times that (the legendary's
+   headshot is 98, so it never takes a full-health cart out in one shot) */
+const BR_SNIPER_DMG = [52, 60, 69, 78.4];
+const brGunDmg = (k, t) => k === 'sniper' ? BR_SNIPER_DMG[t || 0] : Math.round(BR_GUNS[k].dmg * BR_TIER[t || 0].mul * 10) / 10;
+const BR_HEAD = { sniper: 1.25, pistol: 1.6, rifle: 1.6, smg: 1.4, shotgun: 1.4, rocket: 1 };
 Object.assign(BR_ITEMS, {
   riot: { name: 'RIOT SHIELD', icon: '🛡️', stack: 1, pick: 1, col: 0x9fb8c8, hold: 1, hp: 220, about: 'hold it: stops hits from the front until it breaks. RT: shield bash' },
   bubble: { name: 'BUBBLE', icon: '🫧', stack: 2, pick: 1, col: 0x7fd8ff, about: 'a dome you can drive through but bullets cannot (12 s)' }
@@ -41,6 +45,10 @@ function brDoors(M) {
   return M.doors;
 }
 /* doors that are open or broken are taken out of the world (moved to level -99): every wall check in the game then ignores them */
+function brDoorsNear(M, x, y) {   // (v14.2.6: doors in an 8 m grid)
+  if (!M._dg || M._dgN !== (M.doors || []).length) { M._dg = new Map(); M._dgN = (M.doors || []).length; for (const d of M.doors || []) for (let i = Math.floor((d.cx - 3) / 8); i <= Math.floor((d.cx + 3) / 8); i++) for (let j = Math.floor((d.cy - 3) / 8); j <= Math.floor((d.cy + 3) / 8); j++) { const k = i * 4096 + j; let b = M._dg.get(k); if (!b) M._dg.set(k, b = []); b.push(d); } }
+  return M._dg.get(Math.floor(x / 8) * 4096 + Math.floor(y / 8)) || [];
+}
 function brDoorSync(m) { const M = MODES.br.map(m), g = m.gs; if (!M.doors || !g.dr) return; for (const d of M.doors) d.lv = g.dr[d.door] === 0 ? 0 : -99; }
 
 /* the bag keeps its slots: every item knows its slot (it.s), the list stays in slot order */
@@ -169,7 +177,7 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
     num(m, c, by, sh, hp, head, blocked) { MG.add(m, { t: 'dn', x: MG.r2(c.x), y: MG.r2(c.y), z: MG.r2(c.gs.z || 0), s: Math.round(sh), h: Math.round(hp), hd: head, bl: blocked ? Math.round(blocked) : 0, by: by.k, life: 1.0 }); },
     /* bullets: as before, plus doors, bubbles and headshots */
     bullet(m, o, h) {
-      const M = this.map(m), n = 4, g = m.gs; let hit = false, lv = 0; const top = Math.max(0, ...M.floors.map(f => f.lv)), bubs = MG.all(m, 'bub');
+      const M = this.map(m), n = 4, g = m.gs; let hit = false, lv = 0; const top = brTop(M), bubs = MG.all(m, 'bub');
       for (let s = 0; s < n && !hit; s++) {
         const hz0 = o.z + 0.55, px = o.x, py = o.y; o.x += o.vx * h / n; o.y += o.vy * h / n; o.z += (o.vz || 0) * h / n; const hz = o.z + 0.55; lv = Math.max(0, Math.floor(hz / BR.H));
         if (o.x < 0 || o.y < 0 || o.x > m.width || o.y > m.height || hz < 0.02 || hz > (top + 2) * BR.H) { hit = true; break; }
@@ -177,9 +185,9 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
         if (hit) break;
         for (const b of bubs) if (b.lv === lv && (Math.hypot(px - b.x, py - b.y) < b.r) !== (Math.hypot(o.x - b.x, o.y - b.y) < b.r)) { hit = true; b.hit = MG.r2(g.t); break; }   // a bubble: nothing gets in or out
         if (hit) break;
-        const w = M.walls.find(w => w.lv === lv && o.x > w.x0 && o.x < w.x1 && o.y > w.y0 && o.y < w.y1);
+        const w = brWallAt(M, lv, o.x, o.y);
         if (w) { if (w.door !== undefined) this.hitDoor(m, w.door, BR_GUNS[o.w].dmg * (o.w === 'rocket' ? 3 : 1)); hit = true; break; }
-        if (lv === 0 && M.trees.some(t => Math.hypot(o.x - t.x, o.y - t.y) < t.r)) { hit = true; break; }
+        if (lv === 0 && brTreesNear(M, o.x, o.y).some(t => Math.hypot(o.x - t.x, o.y - t.y) < t.r)) { hit = true; break; }
         for (const dw of MG.all(m, 'dwall')) if (dw.lv === lv && this.wallPosts(dw).some(p => Math.hypot(o.x - p.x, o.y - p.y) < 0.5)) { dw.hp -= BR_GUNS[o.w].dmg * (o.w === 'rocket' ? 3 : 1); hit = true; break; }
         if (hit) break;
         const sh = m.chairs[o.k];
@@ -199,14 +207,15 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
           else G.op = 0;
           c.intPress = false;                                              // (X is handled by xPress; holding it revives or opens)
         } else {                                                           // the CPU: opens doors in its way
-          if (G.lv === 0) for (const d of M.doors || []) if (g.dr[d.door] === 0 && Math.hypot(d.cx - c.x, d.cy - c.y) < 1.7) { g.dr[d.door] = 1; this.sfxNear(m, 'door_open', d.cx, d.cy); brDoorSync(m); }
+          if (G.lv === 0) for (const d of brDoorsNear(M, c.x, c.y)) if (g.dr[d.door] === 0 && Math.hypot(d.cx - c.x, d.cy - c.y) < 1.7) { g.dr[d.door] = 1; this.sfxNear(m, 'door_open', d.cx, d.cy); brDoorSync(m); }
         }
       }
       P2.step.call(this, m, h);
       for (const c of m.chairs) { const G = c.gs; if (c.out) continue; brSlots(G);
         if (G.use) { const U = G.use, I = BR_ITEMS[U.k], t = U.tk >= 0 ? m.chairs[U.tk] : c; if (I && t && !this.helps(t, I)) { this.spend(c, U.s); G.use = null; m.sfx('select'); } }   // full: stop, that one is used up
       }
-      for (const i in g.dr || []) if (g.dr[i] === 2 && g.t >= g.db[i]) { const d = M.doors[i]; if (!m.chairs.some(o => !o.out && o.gs.lv === 0 && o.x > d.x0 - R_CART() && o.x < d.x1 + R_CART() && o.y > d.y0 - R_CART() && o.y < d.y1 + R_CART())) { g.dr[i] = 0; g.dh[i] = BR_DOOR.hp; this.sfxNear(m, 'door_close', d.cx, d.cy); brDoorSync(m); } }
+      const DR = g.dr || []; for (let i = 0; i < DR.length; i++) if (DR[i] === 2 && g.t >= g.db[i]) {   // (v14.2.6: a plain loop, not for-in)
+        const d = M.doors[i]; if (!m.chairs.some(o => !o.out && o.gs.lv === 0 && o.x > d.x0 - R_CART() && o.x < d.x1 + R_CART() && o.y > d.y0 - R_CART() && o.y < d.y1 + R_CART())) { g.dr[i] = 0; g.dh[i] = BR_DOOR.hp; this.sfxNear(m, 'door_close', d.cx, d.cy); brDoorSync(m); } }
       for (const o of MG.all(m, 'bub')) if (g.t > o.until) MG.remove(m, o);
       for (const o of MG.all(m, 'dn').concat(MG.all(m, 'splint'), MG.all(m, 'hs'))) { o.life -= h; if (o.life <= 0) MG.remove(m, o); }
       if (g.L.some(L => L[1] === 'chestO' || L[1] === 'ammoO')) g.L = g.L.filter(L => !((L[1] === 'chestO' || L[1] === 'ammoO') && g.t - L[9] > 60));   // opened boxes go after a minute
@@ -352,7 +361,7 @@ Object.assign(BR, { bleed: 38 });                                     // the las
     reload(c, m) { if (c.gs.eq > 0 || c.gs.down) return; return P4.reload.call(this, c, m); },
     healMate(c, m) { if (c.gs.down || c.gs.eq > 0) return false; return P4.healMate.call(this, c, m); },
     bullet(m, o, h) {                                                     // a better tier hits harder
-      const G = BR_GUNS[o.w], d0 = G.dmg; G.dmg = Math.round(d0 * BR_TIER[o.tr || 0].mul * 10) / 10; try { return P4.bullet.call(this, m, o, h); } finally { G.dmg = d0; }
+      const G = BR_GUNS[o.w], d0 = G.dmg; G.dmg = brGunDmg(o.w, o.tr); try { return P4.bullet.call(this, m, o, h); } finally { G.dmg = d0; }
     },
     step(m, h) {
       const g = m.gs;

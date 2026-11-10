@@ -74,10 +74,10 @@ const LookWorld = {
     trunk.castShadow = crown.castShadow = shadows; crown.receiveShadow = shadows; g.add(trunk, crown); return g;
   },
   /* building fronts: a texture for one 3 m bay of one storey (BR.H tall): wall, a window with frame and sky reflection */
-  facade(kind) {
-    const key = 'fa' + kind; if (this.cache[key]) return this.cache[key];
-    const n = 256, cv = Look.canvas(n), c = cv.getContext('2d'), rc = Look.canvas(n), rq = rc.getContext('2d'), r = Look.rnd(kind.length * 101);
-    const wall = { bldg: '#b9b3a7', mall: '#d8d3c8', house: '#d4c2a6', metal: '#8e959c' }[kind] || '#b0aba0';
+  facade(kind0) {
+    const key = 'fa' + kind0; if (this.cache[key]) return this.cache[key]; const [kind, tint] = kind0.split('#');   // (v14.2.2: 'house#a0523d' = a house front in that colour)
+    const n = 256, cv = Look.canvas(n), c = cv.getContext('2d'), rc = Look.canvas(n), rq = rc.getContext('2d'), r = Look.rnd(kind0.length * 101);
+    const wall = tint ? '#' + tint : { bldg: '#b9b3a7', mall: '#d8d3c8', house: '#d4c2a6', metal: '#8e959c' }[kind] || '#b0aba0';
     c.fillStyle = wall; c.fillRect(0, 0, n, n); rq.fillStyle = '#e0e0e0'; rq.fillRect(0, 0, n, n);
     for (let i = 0; i < 1600; i++) { c.fillStyle = r() < 0.5 ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'; c.fillRect(r() * n, r() * n, 1 + r() * 2, 1 + r() * 2); }
     if (kind === 'metal') {                                                 // corrugated siding: ribs, and a little rust
@@ -109,7 +109,7 @@ const LookWorld = {
   /* the big picture round a Volt Royale map */
   dressBR(v3, group, mapKey, T, W, D) {
     const hi = Settings.gfx !== 'Low', many = Settings.gfx === 'High' || !Settings.gfx, cx = W / 2, cy = D / 2, Rm = Math.max(W, D) / 2, r = Look.rnd(W * 13 + D);
-    const sky = this.sky(T.sky, mapKey.length); v3.scene.background = sky; v3.scene.fog = new THREE.FogExp2(this.haze(T.sky), 0.0058);
+    const sky = this.sky(T.sky, mapKey.length); v3.scene.background = sky; v3.scene.fog = new THREE.FogExp2(this.haze(T.sky), 0.0074);   // (v14.2.2: a touch thicker, so the camera's 220 m limit is never seen)
     const at = (mesh) => { mesh.position.x += cx; mesh.position.z += cy; group.add(mesh); return mesh; };
     const land = { downtown: 0x6c7a6a, port: 0x6f7c84, suburbs: 0x5d7f48, jungle: 0x3f6a3a, canyon: 0xb36a40 }[mapKey] || 0x6a7a5a, far = { canyon: 0xc08a6a }[mapKey] || 0x8a9aa8;
     at(this.ring(Rm + 230, 70, 18, far, 11, false));                        // far mountains (mostly haze)

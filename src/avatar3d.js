@@ -124,8 +124,8 @@ class LobbyStage {
   render(dt, frame) {                                                    // frame: { x: where the character sits across the screen (0..1), zoom }
     if (!this.ok) return; const b = Render3D.sync(); if (!b) return; Render3D.show(true); const r = Render3D.r, w = Render3D.w, h = Render3D.h;
     this.spin += (this.spinV || 0.18) * dt; this.spinV *= Math.exp(-3 * dt); if (this.cart) this.cart.rotation.y = this.spin;
-    if (this.cart && typeof Rig !== 'undefined') { const now = performance.now() / 1000, A = this.act && ACTIONS[this.act.id], on = A && now - this.act.t < A.dur;   // the arms: an action now and then (or the one you are looking at in the Locker)
-      if (!on && now > (this.nextAct || 0)) { const acts = Progress.P.wheel.filter(id => ACTIONS[id]); if (acts.length) this.act = { id: acts[Math.floor(Math.random() * acts.length)], t: now }; this.nextAct = now + 9 + Math.random() * 6; }
+    if (this.cart && typeof Rig !== 'undefined') { const now = performance.now() / 1000, A = this.act && ACTIONS[this.act.id], on = A && now - this.act.t < A.dur;   // the arms: the action you just did (or the one you are looking at in the Locker)
+      /* (v14.2.11: no more random actions now and then: your character only emotes when you emote, or when you try one on in the Locker) */
       Rig.update(this.cart, on ? this.act.id : 'drive', on ? now - this.act.t : now, { sleeves: this.cart.userData.sleeves }); }
     const p = this.sparks.geometry.attributes.position; for (let i = 0; i < p.count; i++) { let y = p.getY(i) + dt * (0.15 + (i % 7) * 0.05); if (y > 8) y = 0; p.setY(i, y); } p.needsUpdate = true;
     this.ring.material.color.setHSL(0.53 + 0.06 * Math.sin(performance.now() / 900), 1, 0.65);

@@ -30,6 +30,25 @@ const BR_LOOT = [['pistol', 5], ['smg', 4], ['shotgun', 4], ['rifle', 3], ['snip
 const BR_TEAMCOL = [0x3dd6ff, 0xff4d6a, 0x7dff6a, 0xffd23f, 0xb28dff, 0xff9f1c, 0xffffff, 0xff7ad9, 0x39e0c0, 0xc9a26b, 0x8fa8ff, 0xd0ff4d];
 
 /* ----- map building ----- */
+/* v14.2.2: the walls in an 8 m grid, so collisions and line-of-sight only look at the walls nearby */
+function brWallGrid(M) { if (M._wg && M._wgN === M.walls.length) return M._wg; const cell = 8, map = new Map(); for (const w of M.walls) for (let i = Math.floor((w.x0 - 1) / cell); i <= Math.floor((w.x1 + 1) / cell); i++) for (let j = Math.floor((w.y0 - 1) / cell); j <= Math.floor((w.y1 + 1) / cell); j++) { const k = i * 4096 + j; if (!map.has(k)) map.set(k, []); map.get(k).push(w); } M._wgN = M.walls.length; return (M._wg = { cell, map }); }
+function brTreesNear(M, x, y) {   // (v14.2.6: trees in an 8 m grid)
+  if (!M._tg || M._tgN !== M.trees.length) { M._tg = new Map(); M._tgN = M.trees.length; for (const t of M.trees) for (let i = Math.floor((t.x - t.r - 1) / 8); i <= Math.floor((t.x + t.r + 1) / 8); i++) for (let j = Math.floor((t.y - t.r - 1) / 8); j <= Math.floor((t.y + t.r + 1) / 8); j++) { const k = i * 4096 + j; let b = M._tg.get(k); if (!b) M._tg.set(k, b = []); b.push(t); } }
+  return M._tg.get(Math.floor(x / 8) * 4096 + Math.floor(y / 8)) || [];
+}
+const BR_NB = new Float64Array([1, 0, 1, -1, 0, 1, 0, 1, 1, 0, -1, 1, 1, 1, 1.41, 1, -1, 1.41, -1, 1, 1.41, -1, -1, 1.41]);
+function brFloorsAt(M, x, y) {   // (v14.2.6: floors in an 8 m grid: "is there a floor here" no longer checks every floor on the map)
+  if (!M._fg || M._fgN !== M.floors.length) { M._fg = new Map(); M._fgN = M.floors.length; M._top = Math.max(0, ...M.floors.map(f => f.lv)); for (const f of M.floors) for (let i = Math.floor(f.x0 / 8); i <= Math.floor(f.x1 / 8); i++) for (let j = Math.floor(f.y0 / 8); j <= Math.floor(f.y1 / 8); j++) { const k = i * 4096 + j; let b = M._fg.get(k); if (!b) M._fg.set(k, b = []); b.push(f); } }
+  return M._fg.get(Math.floor(x / 8) * 4096 + Math.floor(y / 8)) || [];
+}
+const brTop = M => { brFloorsAt(M, 0, 0); return M._top; };
+function brWallAt(M, lv, x, y) { const b = brWallGrid(M).map.get(Math.floor(x / brWallGrid(M).cell) * 4096 + Math.floor(y / brWallGrid(M).cell)); if (b) for (const w of b) if (w.lv === lv && x > w.x0 && x < w.x1 && y > w.y0 && y < w.y1) return w; return null; }
+const BR_RAMP_CLEAR = 0.62;   // (v14.2.7: past this far up a ramp its deck is high enough to drive under)
+function brRampLow(q) {   // the low end of a ramp (foot to BR_RAMP_CLEAR of the way up): the solid part when you are on the ground beside or under it
+  if (q._low) return q._low; const k = BR_RAMP_CLEAR, Lx = q.x1 - q.x0, Ly = q.y1 - q.y0;
+  return (q._low = q.dir === 0 ? { x0: q.x0, y0: q.y0, x1: q.x0 + Lx * k, y1: q.y1 } : q.dir === 2 ? { x0: q.x1 - Lx * k, y0: q.y0, x1: q.x1, y1: q.y1 } : q.dir === 1 ? { x0: q.x0, y0: q.y0, x1: q.x1, y1: q.y0 + Ly * k } : { x0: q.x0, y0: q.y1 - Ly * k, x1: q.x1, y1: q.y1 });
+}
+function brWallsNear(M, x0, y0, x1, y1) { const GR = brWallGrid(M), out = new Set(); for (let i = Math.floor(x0 / GR.cell); i <= Math.floor(x1 / GR.cell); i++) for (let j = Math.floor(y0 / GR.cell); j <= Math.floor(y1 / GR.cell); j++) for (const w of GR.map.get(i * 4096 + j) || []) out.add(w); return [...out]; }
 function brBuild(name, size, theme, blurb, fn) {
   const M = { name, size, theme, blurb, walls: [], floors: [], ramps: [], trees: [], loot: [], deco: [] };
   const B = {
@@ -156,25 +175,25 @@ MODES.br = {
   /* where a cart may be: walls, ramps (solid except at their ends), floors (on an upper level), trees */
   ramp: (r, x, y) => r.dir === 0 ? (x - r.x0) / (r.x1 - r.x0) : r.dir === 1 ? (y - r.y0) / (r.y1 - r.y0) : r.dir === 2 ? (r.x1 - x) / (r.x1 - r.x0) : (r.y1 - y) / (r.y1 - r.y0),
   onFloor(M, lv, x, y, pad = 0.2) {                                       // inside the floors of this level (their union: seams between floors do not block; a ramp end counts as floor at the edge)
-    const inF = (px, py) => M.floors.some(f => f.lv === lv && px >= f.x0 && px <= f.x1 && py >= f.y0 && py <= f.y1), inR = (px, py) => M.ramps.some(q => (q.lv === lv || q.lv + 1 === lv) && px >= q.x0 && px <= q.x1 && py >= q.y0 && py <= q.y1);
+    const inF = (px, py) => brFloorsAt(M, px, py).some(f => f.lv === lv && px >= f.x0 && px <= f.x1 && py >= f.y0 && py <= f.y1), inR = (px, py) => M.ramps.some(q => (q.lv === lv || q.lv + 1 === lv) && px >= q.x0 && px <= q.x1 && py >= q.y0 && py <= q.y1);
     if (!inF(x, y)) return false; for (const [px, py] of [[x - pad, y], [x + pad, y], [x, y - pad], [x, y + pad]]) if (!inF(px, py) && !inR(px, py)) return false; return true;
   },
   jump(c, m) {                                                            // X: hop (off a roof, over a gap, to dodge)
     const G = c.gs; if (c.out || G.air || !m || m.state !== 'play') return;
     G.air = 1; G.vz = BR.jumpV; G.ramp = -1; m.sfx('bump');
   },
-  floorAt(M, lv, x, y) { return lv === 0 || M.floors.some(f => f.lv === lv && x >= f.x0 && x <= f.x1 && y >= f.y0 && y <= f.y1); },
+  floorAt(M, lv, x, y) { return lv === 0 || brFloorsAt(M, x, y).some(f => f.lv === lv && x >= f.x0 && x <= f.x1 && y >= f.y0 && y <= f.y1); },
   fly(m, c, h) {                                                          // in the air: gravity, walls at the height you are at, and land on whatever is below
     const M = this.map(m), G = c.gs, R = R_CART(), K = CONFIG.chair, z0 = G.z; let z = z0 + G.vz * h; G.vz -= BR.grav * h;
-    const top = Math.max(0, ...M.floors.map(f => f.lv));
+    const top = brTop(M);
     if (G.vz > 0) for (let k = 1; k <= top; k++) if (k * BR.H > z0 && z + BR.headroom > k * BR.H && this.floorAt(M, k, c.x, c.y)) { z = k * BR.H - BR.headroom; G.vz = 0; }   // bonk: the floor above
     const lvNow = Math.max(0, Math.floor((z + 0.3) / BR.H));
-    for (const w of M.walls) if (w.lv === lvNow) MG.rectPush(c, R, w, K.boardBounce);
-    if (lvNow === 0 && z < 3) for (const t of M.trees) { const dx = c.x - t.x, dy = c.y - t.y, d = Math.hypot(dx, dy), mn = R + t.r; if (d < mn && d > 0) { c.x = t.x + dx / d * mn; c.y = t.y + dy / d * mn; } }
+    for (const w of brWallsNear(M, c.x - 2, c.y - 2, c.x + 2, c.y + 2)) if (w.lv === lvNow) MG.rectPush(c, R, w, K.boardBounce);
+    if (lvNow === 0 && z < 3) for (const t of brTreesNear(M, c.x, c.y)) { const dx = c.x - t.x, dy = c.y - t.y, d = Math.hypot(dx, dy), mn = R + t.r; if (d < mn && d > 0) { c.x = t.x + dx / d * mn; c.y = t.y + dy / d * mn; } }
     for (const q of M.ramps) {                                            // a ramp: land on its deck, or bump its side if you are below the deck
       if (c.x < q.x0 || c.x > q.x1 || c.y < q.y0 || c.y > q.y1) continue; const t = this.ramp(q, c.x, c.y), sz = (q.lv + Math.max(0, Math.min(1, t))) * BR.H;
       if (z <= sz && z0 >= sz - 0.6 && G.vz <= 0) { this.land(m, c, sz); G.ramp = q.id; G.lv = t >= 1 ? q.lv + 1 : q.lv; return; }
-      if (z < sz - 0.6) MG.rectPush(c, R, q, K.boardBounce);
+      if (z < sz - 0.6 && z + BR.headroom > sz - 0.1) MG.rectPush(c, R, q, K.boardBounce);   // (v14.2.7: only if your head would hit the deck)
     }
     if (G.vz <= 0) for (let k = Math.min(top, Math.floor(z0 / BR.H + 0.01)); k >= 0; k--) if (z <= k * BR.H && z0 >= k * BR.H - 0.05 && this.floorAt(M, k, c.x, c.y)) { this.land(m, c, k * BR.H); G.lv = k; return; }
     if (c.x < R) c.x = R; if (c.y < R) c.y = R; if (c.x > m.width - R) c.x = m.width - R; if (c.y > m.height - R) c.y = m.height - R;
@@ -196,17 +215,18 @@ MODES.br = {
       G.z = MG.r2((r.lv + Math.max(0, Math.min(1, t))) * BR.H); return;
     }
     G.ramp = -1; G.z = G.lv * BR.H;
-    for (const w of M.walls) if (w.lv === G.lv) MG.rectPush(c, R, w, K.boardBounce);
+    { const GR = brWallGrid(M);   // (v14.2.2: walls in an 8 m grid: only the ones near you are checked)
+      const i = Math.floor(c.x / GR.cell), j = Math.floor(c.y / GR.cell), seen = new Set(); for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) for (const w of GR.map.get((i + di) * 4096 + j + dj) || []) if (w.lv === G.lv && !seen.has(w)) { seen.add(w); MG.rectPush(c, R, w, K.boardBounce); } }
     for (const q of M.ramps) {                                           // a ramp is solid from the sides; its foot (or its top, from above) is open
       if (q.lv !== G.lv && q.lv + 1 !== G.lv) continue;
       const t = this.ramp(q, c.x, c.y), lat = q.dir % 2 === 0 ? c.y > q.y0 + 0.1 && c.y < q.y1 - 0.1 : c.x > q.x0 + 0.1 && c.x < q.x1 - 0.1, L = q.dir % 2 === 0 ? q.x1 - q.x0 : q.y1 - q.y0, e = (R + 0.3) / L;
       if (lat && ((q.lv === G.lv && t > -e && t < 0.3) || (q.lv + 1 === G.lv && t > 0.7 && t < 1 + e))) continue;
-      MG.rectPush(c, R, q, K.boardBounce);
+      MG.rectPush(c, R, q.lv === G.lv ? brRampLow(q) : q, K.boardBounce);   // (v14.2.7: from below, only the low end is solid: you can drive under the high end of a ramp)
     }
     for (const o of MG.all(m, 'dwall')) if (o.lv === G.lv) for (const p of this.wallPosts(o)) { const dx = c.x - p.x, dy = c.y - p.y, d = Math.hypot(dx, dy), mn = R + 0.42; if (d < mn && d > 0) { c.x = p.x + dx / d * mn; c.y = p.y + dy / d * mn; } }
-    if (G.lv === 0) { for (const t of M.trees) { const dx = c.x - t.x, dy = c.y - t.y, d = Math.hypot(dx, dy), mn = R + t.r; if (d < mn && d > 0) { c.x = t.x + dx / d * mn; c.y = t.y + dy / d * mn; const vn = (c.vx * dx + c.vy * dy) / d; if (vn < 0) { c.vx -= 1.4 * vn * dx / d; c.vy -= 1.4 * vn * dy / d; } } } }
-    else if (c.player && !this.floorAt(M, G.lv, c.x, c.y) && !M.ramps.some(q => (q.lv === G.lv || q.lv + 1 === G.lv) && c.x >= q.x0 && c.x <= q.x1 && c.y >= q.y0 && c.y <= q.y1)) { G.air = 1; G.vz = 0; }   // people can drive off the edge (and drop)
-    else if (!c.player && !this.onFloor(M, G.lv, c.x, c.y)) {                // the CPU: railings at the edge of every floor (so it keeps to its route)
+    if (G.lv === 0) { for (const t of brTreesNear(M, c.x, c.y)) { const dx = c.x - t.x, dy = c.y - t.y, d = Math.hypot(dx, dy), mn = R + t.r; if (d < mn && d > 0) { c.x = t.x + dx / d * mn; c.y = t.y + dy / d * mn; const vn = (c.vx * dx + c.vy * dy) / d; if (vn < 0) { c.vx -= 1.4 * vn * dx / d; c.vy -= 1.4 * vn * dy / d; } } } }
+    else if ((c.player || G.letDrop > m.simTime) && !this.floorAt(M, G.lv, c.x, c.y) && !M.ramps.some(q => (q.lv === G.lv || q.lv + 1 === G.lv) && c.x >= q.x0 && c.x <= q.x1 && c.y >= q.y0 && c.y <= q.y1)) { G.air = 1; G.vz = 0; }   // people can drive off the edge (and drop)
+    else if (!c.player && !(G.letDrop > m.simTime) && !this.onFloor(M, G.lv, c.x, c.y)) {                // the CPU: railings at the edge of every floor (so it keeps to its route)
       if (this.onFloor(M, G.lv, c.x, c.py)) { c.y = c.py; c.vy = 0; } else if (this.onFloor(M, G.lv, c.px, c.y)) { c.x = c.px; c.vx = 0; } else { c.x = c.px; c.y = c.py; c.vx = c.vy = 0; }
     }
   },
@@ -214,14 +234,17 @@ MODES.br = {
   noCollide: (a, b) => Math.abs((a.gs.z || 0) - (b.gs.z || 0)) > 1,
   step(m, h) {
     const g = m.gs, M = this.map(m); g.t += h;
+    const LG = new Map(); for (const L of g.L) { const key = Math.floor(L[2] / 4) * 4096 + Math.floor(L[3] / 4); let b = LG.get(key); if (!b) LG.set(key, b = []); b.push(L); }   // (v14.2.6: loot in 4 m buckets: each cart only checks what's next to it)
     for (const c of m.chairs) {
       const G = c.gs; if (c.out) continue;
       G.cd = Math.max(0, G.cd - h); G.boost = Math.max(0, G.boost - h); G.hitT = Math.max(0, (G.hitT || 0) - h);
       this.move(m, c, h);
       const S = g.st; if (Math.hypot(c.x - S.x, c.y - S.y) > S.r && g.t > BR.grace) this.hurt(m, c, [1, 2, 4, 6, 8, 12, 20][Math.min(6, S.ph)] * h, null, true);   // outside the storm circle
-      for (const L of g.L) {                                              // drive over loot to pick it up
-        if (L[4] !== G.lv || G.ramp >= 0 || G.air || Math.hypot(c.x - L[2], c.y - L[3]) > R_CART() + 0.4 || (L[7] === c.k && L[6] > g.t)) continue;   // (not what you just dropped)
-        if (this.take(m, c, L)) { g.L = g.L.filter(x => x !== L); break; }
+      const near = []; { const ci = Math.floor(c.x / 4), cj = Math.floor(c.y / 4); for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) { const b = LG.get((ci + di) * 4096 + cj + dj); if (b) for (const L of b) near.push(L); } }
+      for (const L of near) {                                              // drive over loot to pick it up
+        const ddx = c.x - L[2], ddy = c.y - L[3]; if (ddx > 1 || ddx < -1 || ddy > 1 || ddy < -1) continue;   // (v14.2.2: a quick test first: most loot is nowhere near)
+        if (L[4] !== G.lv || G.ramp >= 0 || G.air || Math.hypot(ddx, ddy) > R_CART() + 0.4 || (L[7] === c.k && L[6] > g.t)) continue;   // (not what you just dropped)
+        if (this.take(m, c, L)) { g.L = g.L.filter(x => x !== L); const b = LG.get(Math.floor(L[2] / 4) * 4096 + Math.floor(L[3] / 4)); if (b) b.splice(b.indexOf(L), 1); break; }
       }
     }
     this.storm(m, h);
@@ -256,13 +279,13 @@ MODES.br = {
     if (S.shrink <= 0) { S.ph++; S.wait = S.ph < PH.length ? PH[S.ph][0] : 0; }
   },
   bullet(m, o, h) {
-    const M = this.map(m), n = 4; let hit = false, lv = 0; const top = Math.max(0, ...M.floors.map(f => f.lv));
+    const M = this.map(m), n = 4; let hit = false, lv = 0; const top = brTop(M);
     for (let s = 0; s < n && !hit; s++) {
       const hz0 = o.z + 0.55; o.x += o.vx * h / n; o.y += o.vy * h / n; o.z += (o.vz || 0) * h / n; const hz = o.z + 0.55; lv = Math.max(0, Math.floor(hz / BR.H));
       if (o.x < 0 || o.y < 0 || o.x > m.width || o.y > m.height || hz < 0.02 || hz > (top + 2) * BR.H) { hit = true; break; }
       if (o.vz) for (let k = 1; k <= top; k++) if ((hz0 - k * BR.H) * (hz - k * BR.H) < 0 && this.floorAt(M, k, o.x, o.y)) { hit = true; break; }   // a floor (or ceiling) stops it
       if (hit) break;
-      if (M.walls.some(w => w.lv === lv && o.x > w.x0 && o.x < w.x1 && o.y > w.y0 && o.y < w.y1) || (lv === 0 && M.trees.some(t => Math.hypot(o.x - t.x, o.y - t.y) < t.r))) { hit = true; break; }
+      if (brWallAt(M, lv, o.x, o.y) || (lv === 0 && brTreesNear(M, o.x, o.y).some(t => Math.hypot(o.x - t.x, o.y - t.y) < t.r))) { hit = true; break; }
       for (const w of MG.all(m, 'dwall')) if (w.lv === lv && this.wallPosts(w).some(p => Math.hypot(o.x - p.x, o.y - p.y) < 0.5)) { w.hp -= BR_GUNS[o.w].dmg * (o.w === 'rocket' ? 3 : 1); hit = true; break; }
       if (hit) break;
       const sh = m.chairs[o.k];
@@ -319,7 +342,7 @@ MODES.br = {
       if (o.gs.team === G.team) continue; const d = MH.dist(c, o); if (d > gun.range * 1.3 || d < 0.3) continue;
       const lead = d / gun.spd, oa = Math.atan2(o.y + (o.vy || 0) * lead - c.y, o.x + (o.vx || 0) * lead - c.x), op = Math.atan2(o.gs.z - G.z + 0.25, d), off = Math.abs(normalizeAngle(oa - a));
       if (off > bo || (c.player && Math.abs(op - p) > 0.28)) continue;
-      if (o.gs.lv === G.lv && !MG.clearPath(c.x, c.y, o.x, o.y, L.walls.filter(w => w.lv === G.lv), 0.05)) continue;
+      if (o.gs.lv === G.lv && !MG.clearPath(c.x, c.y, o.x, o.y, brWallsNear(L, Math.min(c.x, o.x) - 1, Math.min(c.y, o.y) - 1, Math.max(c.x, o.x) + 1, Math.max(c.y, o.y) + 1).filter(w => w.lv === G.lv), 0.05)) continue;   // (v14.2.6: only the walls near the line)
       bo = off; best = { a: oa, p: op };
     }
     if (!c.player) { this.aimP = best ? best.p : 0; return a; }               // the CPU: its own heading, tilted at whoever it is facing
@@ -354,25 +377,34 @@ MODES.br = {
     const N = this.nav(m), { cs, W, H, Lc, g, links } = N, per = W * H;
     const free = k => { if (!g[k]) return k; const L = Math.floor(k / per), i = k % W, j = Math.floor((k % per) / W); for (let r = 1; r < 4; r++) for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) { const a = i + di, b = j + dj; if (a >= 0 && b >= 0 && a < W && b < H && !g[L * per + b * W + a]) return L * per + b * W + a; } return k; };
     const start = free(N.cell(c.x, c.y, c.gs.lv)), goal = free(N.cell(tx, ty, Math.min(Lc - 1, tl))), gx = goal % W, gy = Math.floor((goal % per) / W), gl = Math.floor(goal / per);
-    const gs = new Float32Array(per * Lc).fill(Infinity), from = new Int32Array(per * Lc).fill(-1), via = new Int16Array(per * Lc), heap = [[0, start]]; gs[start] = 0;
-    const push = e => { heap.push(e); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
-    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let s = i; if (l < heap.length && heap[l][0] < heap[s][0]) s = l; if (r < heap.length && heap[r][0] < heap[s][0]) s = r; if (s === i) break; [heap[s], heap[i]] = [heap[i], heap[s]]; i = s; } } return top; };
+    if (!N.buf || N.buf.n !== per * Lc) N.buf = { n: per * Lc, gs: new Float32Array(per * Lc).fill(Infinity), from: new Int32Array(per * Lc).fill(-1), via: new Int16Array(per * Lc) };   // (v14.2.2: the search arrays are made once per map and cleaned up after each search, not built afresh every time: that was most of the lag on big maps)
+    const { gs, from, via } = N.buf, touched = [start]; gs[start] = 0;
+    const clean = () => { for (const k of touched) { gs[k] = Infinity; from[k] = -1; via[k] = 0; } };
+    /* v14.2.6: a faster search: the heap is two typed arrays (no little arrays made per step), the neighbour table is made once */
+    if (!N.hp) N.hp = { f: new Float64Array(1 << 16), k: new Int32Array(1 << 16) };
+    let hf = N.hp.f, hk = N.hp.k, hn = 0;
+    const push = (f, k) => { if (hn >= hf.length) { const f2 = new Float64Array(hf.length * 2), k2 = new Int32Array(hf.length * 2); f2.set(hf); k2.set(hk); N.hp.f = hf = f2; N.hp.k = hk = k2; } let i = hn++; while (i > 0) { const p = (i - 1) >> 1; if (hf[p] <= f) break; hf[i] = hf[p]; hk[i] = hk[p]; i = p; } hf[i] = f; hk[i] = k; };
+    const pop = () => { const top = hk[0], lf = hf[--hn], lk = hk[hn]; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; if (l >= hn) break; let s = l; if (r < hn && hf[r] < hf[l]) s = r; if (hf[s] >= lf) break; hf[i] = hf[s]; hk[i] = hk[s]; i = s; } hf[i] = lf; hk[i] = lk; return top; };
+    const NB = BR_NB;
+    push(0, start);
     let n = 0, found = false;
-    while (heap.length && n++ < 9000) {
-      const [, cur] = pop(); if (cur === goal) { found = true; break; }
-      const L = Math.floor(cur / per), ci = cur % W, cj = Math.floor((cur % per) / W), base = L * per;
-      const visit = (k, w, q) => { const ng = gs[cur] + w; if (ng < gs[k]) { gs[k] = ng; from[k] = cur; via[k] = q ? q.id + 1 : 0; const kl = Math.floor(k / per); push([ng + Math.hypot(k % W - gx, Math.floor((k % per) / W) - gy) + Math.abs(kl - gl) * 4, k]); } };
-      for (const [di, dj, w] of [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.41], [1, -1, 1.41], [-1, 1, 1.41], [-1, -1, 1.41]]) { const a = ci + di, b = cj + dj; if (a < 0 || b < 0 || a >= W || b >= H) continue; const k = base + b * W + a; if (g[k] || (di && dj && (g[base + cj * W + a] || g[base + b * W + ci]))) continue; visit(k, w); }
-      for (const [k, w, q] of links.get(cur) || []) visit(k, w, q);
+    while (hn && n++ < 22000) {   // (v14.2.6: the guess at the distance left is weighted, so the search heads for the goal and seldom needs the whole budget)
+        // (v14.2.3: more room to search on the massive maps)
+      const cur = pop(); if (cur === goal) { found = true; break; }
+      const L = Math.floor(cur / per), rem = cur - L * per, cj = Math.floor(rem / W), ci = rem - cj * W, base = L * per, g0 = gs[cur];
+      for (let t = 0; t < 8; t++) { const di = NB[t * 3], dj = NB[t * 3 + 1], a = ci + di, b = cj + dj; if (a < 0 || b < 0 || a >= W || b >= H) continue; const k = base + b * W + a; if (g[k] || (di && dj && (g[base + cj * W + a] || g[base + b * W + ci]))) continue;
+        const ng = g0 + NB[t * 3 + 2]; if (ng < gs[k]) { if (gs[k] === Infinity) touched.push(k); gs[k] = ng; from[k] = cur; via[k] = 0; const ddx = a - gx, ddy = b - gy; push(ng + (Math.sqrt(ddx * ddx + ddy * ddy) + Math.abs(L - gl) * 4) * 1.6, k); } }
+      const lk = links.get(cur); if (lk) for (const [k, w, q] of lk) { const ng = g0 + w; if (ng < gs[k]) { if (gs[k] === Infinity) touched.push(k); gs[k] = ng; from[k] = cur; via[k] = q.id + 1; const kl = Math.floor(k / per), rr = k - kl * per, kj = Math.floor(rr / W), ki = rr - kj * W; push(ng + (Math.hypot(ki - gx, kj - gy) + Math.abs(kl - gl) * 4) * 1.6, k); } }
     }
-    if (!found) return null; const path = [];
+    N.lastN = n; if (!found) { clean(); return null; } const path = [];
     for (let k = goal; k !== -1 && k !== start; k = from[k]) path.push({ x: (k % W + 0.5) * cs, y: (Math.floor((k % per) / W) + 0.5) * cs, lv: Math.floor(k / per), ramp: via[k] - 1 });
-    return path.reverse();
+    clean(); return path.reverse();
   },
   ai(c, m) {
     const G = c.gs, g = m.gs, S = g.st, M = this.map(m); if (c.out) return { x: 0, y: 0, speed: 0 };
     const sees = o => { if (Math.abs(o.gs.z - G.z) > 1 || o.gs.lv !== G.lv) return false; const d = MH.dist(c, o); if (d > 20 || (d > 7 && Math.abs(normalizeAngle(Math.atan2(o.y - c.y, o.x - c.x) - c.heading)) > 1.5)) return false;   // what is in front of it (or very close)
-      const walls = M.walls.filter(w => w.lv === G.lv); return MG.clearPath(c.x, c.y, o.x, o.y, walls, 0.05) && (G.lv > 0 || MG.clearPath(c.x, c.y, o.x, o.y, M.trees.map(t => ({ x0: t.x - t.r, y0: t.y - t.r, x1: t.x + t.r, y1: t.y + t.r })), 0)); };
+      const near = w => w.x1 > Math.min(c.x, o.x) - 1 && w.x0 < Math.max(c.x, o.x) + 1 && w.y1 > Math.min(c.y, o.y) - 1 && w.y0 < Math.max(c.y, o.y) + 1, walls = brWallsNear(M, Math.min(c.x, o.x) - 1, Math.min(c.y, o.y) - 1, Math.max(c.x, o.x) + 1, Math.max(c.y, o.y) + 1).filter(w => w.lv === G.lv && near(w)), TB = M._tb || (M._tb = M.trees.map(t => ({ x0: t.x - t.r, y0: t.y - t.r, x1: t.x + t.r, y1: t.y + t.r })));   // (cached per map, and only the walls between the two)
+      return MG.clearPath(c.x, c.y, o.x, o.y, walls, 0.05) && (G.lv > 0 || MG.clearPath(c.x, c.y, o.x, o.y, TB.filter(near), 0)); };
     if (G.hp < 55 && G.inv.some(it => it.k === 'med') && G.cd <= 0) { G.sel = G.inv.findIndex(it => it.k === 'med'); c.wantUse = true; }
     else if (G.sh < 50 && G.inv.some(it => it.k === 'pot') && G.cd <= 0 && !(G.seenAt > m.simTime - 2)) { G.sel = G.inv.findIndex(it => it.k === 'pot'); c.wantUse = true; }
     const foe = MG.live(m).filter(o => o.gs.team !== G.team && sees(o)).sort((a, b) => MH.dist(c, a) + (a.gs.down ? 40 : 0) - MH.dist(c, b) - (b.gs.down ? 40 : 0))[0];   // (a standing enemy first: a downed one only when nobody else is about)
@@ -390,13 +422,16 @@ MODES.br = {
     let goal = null, gl = 0; const inStorm = Math.hypot(c.x - S.x, c.y - S.y) > S.r - 3, safe = { x: S.fx || S.x, y: S.fy || S.y };
     const armed = G.inv.some(it => BR_GUNS[it.k] && it.a > 0 && it.k !== 'pistol');
     if (inStorm || (Math.hypot(c.x - S.x, c.y - S.y) > S.r * 0.85 && S.shrink > 0) || (S.shrink > 0 && Math.hypot(c.x - S.fx, c.y - S.fy) > S.fr * 0.9)) { goal = safe; gl = 0; }   // head for the next circle while the storm moves
-    if (!goal || !inStorm) { let best = null, bd = armed ? 24 : 60; for (const L of g.L) { if (Math.hypot(L[2] - S.x, L[3] - S.y) > S.r - 2) continue; const anyGun = G.inv.some(i => BR_GUNS[i.k]), lowAmmo = G.inv.some(i => BR_GUNS[i.k] && i.a < BR_GUNS[i.k].ammo * 0.4); const want = L[1] === 'card' ? 0 : L[1].startsWith('am_') ? (G.am && G.am[BR_AMMO[L[1].slice(3)].i] < BR_AMMO[L[1].slice(3)].max * 0.5 ? 2 : 0) : !BR_GUNS[L[1]] && !BR_ITEMS[L[1]] && L[1] !== 'chest' && L[1] !== 'ammo' ? 0 : L[1] === 'chest' ? (anyGun ? (G.inv.length < BR.slots ? 1.2 : 0) : 5) : L[1] === 'ammo' ? (lowAmmo ? 3 : 0) : L[1] === 'med' && G.hp < 70 ? 3 : BR_GUNS[L[1]] ? (G.inv.some(i => i.k === L[1]) ? 0.3 : G.inv.length < BR.slots ? 2 : 0) : (G.inv.length < BR.slots || G.inv.some(i => i.k === L[1] && i.a < BR_ITEMS[L[1]].stack)) ? 1 : 0; if (!want) continue; const d = Math.hypot(L[2] - c.x, L[3] - c.y) + Math.abs(L[4] - G.lv) * 2 - want * 3 - (L[4] > 0 ? 5 : 0); if (d < bd) { bd = d; best = L; } } if (best) { goal = { x: best[2], y: best[3] }; gl = best[4]; } }
+    if (!goal || !inStorm) { let best = null, bd = armed ? 24 : 60; const anyGun = G.inv.some(i => BR_GUNS[i.k]), lowAmmo = G.inv.some(i => BR_GUNS[i.k] && i.a < BR_GUNS[i.k].ammo * 0.4), lim = bd + 21; for (const L of g.L) { const qx = L[2] - c.x, qy = L[3] - c.y; if (qx > lim || qx < -lim || qy > lim || qy < -lim) continue;   /* (v14.2.3: far-off loot skipped first) */ if (Math.hypot(L[2] - S.x, L[3] - S.y) > S.r - 2) continue; const want = L[1] === 'card' ? 0 : L[1].startsWith('am_') ? (G.am && G.am[BR_AMMO[L[1].slice(3)].i] < BR_AMMO[L[1].slice(3)].max * 0.5 ? 2 : 0) : !BR_GUNS[L[1]] && !BR_ITEMS[L[1]] && L[1] !== 'chest' && L[1] !== 'ammo' ? 0 : L[1] === 'chest' ? (anyGun ? (G.inv.length < BR.slots ? 1.2 : 0) : 5) : L[1] === 'ammo' ? (lowAmmo ? 3 : 0) : L[1] === 'med' && G.hp < 70 ? 3 : BR_GUNS[L[1]] ? (G.inv.some(i => i.k === L[1]) ? 0.3 : G.inv.length < BR.slots ? 2 : 0) : (G.inv.length < BR.slots || G.inv.some(i => i.k === L[1] && i.a < BR_ITEMS[L[1]].stack)) ? 1 : 0; if (!want) continue; const d = Math.hypot(L[2] - c.x, L[3] - c.y) + Math.abs(L[4] - G.lv) * 2 - want * 3 - (L[4] > 0 ? 5 : 0); if (d < bd) { bd = d; best = L; } } if (best) { goal = { x: best[2], y: best[3] }; gl = best[4]; } }
     if (!goal) { const t = MG.live(m).filter(o => o.gs.team !== G.team).sort((a, b) => MH.dist(c, a) - MH.dist(c, b))[0]; if (t && G.inv.some(it => BR_GUNS[it.k] && it.a > 0) && (g.t > 35 || S.ph >= 1 || G.inv.length >= 2)) { goal = t; gl = t.gs.lv; } else if (!G.camp || m.simTime > G.camp.until) { const f = this.map(m).floors.filter(f => Math.hypot((f.x0 + f.x1) / 2 - S.x, (f.y0 + f.y1) / 2 - S.y) < S.r * 0.8); const h = f[Math.floor(Math.random() * f.length)]; G.camp = h && Math.random() < 0.6 ? { x: (h.x0 + h.x1) / 2, y: (h.y0 + h.y1) / 2, lv: h.lv, until: m.simTime + 20 } : { x: safe.x, y: safe.y, lv: 0, until: m.simTime + 10 }; } if (!goal) { goal = G.camp; gl = G.camp.lv; } }   // early on: loot, or take the high ground
     if (c.goTo) { goal = c.goTo; gl = c.goTo.lv; }                       // (a fixed destination: tests and demos)
     if (G.boost <= 0 && Math.hypot(goal.x - c.x, goal.y - c.y) > 18 && G.inv.some(x => x.k === 'boost') && G.cd <= 0 && G.ramp < 0) { const prev = G.sel; G.sel = G.inv.findIndex(x => x.k === 'boost'); c.wantUse = true; G.selBack = prev; }
-    const Nv = c.brNav || (c.brNav = {}), key = Math.round(goal.x) + ',' + Math.round(goal.y) + ',' + gl;
-    if (!Nv.path || m.simTime - Nv.at > 1.4 || Nv.key !== key) { Nv.path = this.route(m, c, goal.x, goal.y, gl); Nv.at = m.simTime; Nv.key = key; }
-    const P = Nv.path; if (!P || !P.length) return MH.to(c, goal.x, goal.y, 0.8);
+    const Nv = c.brNav || (c.brNav = {}), moved = Nv.gx === undefined || Nv.gl !== gl || Math.hypot(goal.x - Nv.gx, goal.y - Nv.gy) > Math.max(2.5, Math.hypot(goal.x - c.x, goal.y - c.y) * 0.2);
+    /* v14.2.6: re-plan when the goal has really moved (not every time a chased cart moves a metre), and only a few CPUs plan in any one step (a big map's search can take a few ms each) */
+    if (Nv.at === undefined || m.simTime - Nv.at > (Nv.path ? 2 : 1.4) || moved) {   // (a search that found nothing waits too, rather than trying again every step)
+      const B = m._rb || (m._rb = { t: -1, n: 0 }); if (B.t !== m.simTime) { B.t = m.simTime; B.n = 0; }
+      if (B.n < 1) { B.n++; Nv.path = this.route(m, c, goal.x, goal.y, gl); Nv.at = m.simTime; Nv.gx = goal.x; Nv.gy = goal.y; Nv.gl = gl; } }
+    const P = Nv.path; if (!P || !P.length) { if (G.lv > 0 && Nv.at !== undefined && !Nv.path) G.letDrop = m.simTime + 2; return MH.to(c, goal.x, goal.y, 0.8); }   // (v14.2.6: no way down found from up here: it may drive off the edge)
     while (P.length > 1 && P[0].lv === G.lv && Math.hypot(P[0].x - c.x, P[0].y - c.y) < 1) P.shift();
     if (G.ramp >= 0) { Nv.enter = -1; const r = M.ramps[G.ramp], up = P.some(q => q.lv > r.lv), ux = [1, 0, -1, 0][r.dir] * (up ? 1 : -1), uy = [0, 1, 0, -1][r.dir] * (up ? 1 : -1); return { x: ux, y: uy, speed: 0.8 }; }   // on a ramp: straight up (or down) it
     const i0 = P.findIndex(q => q.ramp >= 0 && q.lv !== G.lv), stop = i0 < 0 ? P.length : i0;
@@ -407,7 +442,7 @@ MODES.br = {
       if (side < 0.5 && along > -0.6 && along < 1.2) { Nv.enter = q.id; Nv.enterAt = m.simTime; return MH.to(c, cx + ux * half, cy + uy * half, 0.75); }
       return MH.to(c, fx, fy, Math.hypot(c.x - fx, c.y - fy) < 2 ? 0.45 : 0.85);
     }
-    let wp = P[0]; const walls = M.walls.filter(w => w.lv === G.lv);
+    let wp = P[0]; let bx0 = c.x, by0 = c.y, bx1 = c.x, by1 = c.y; for (let i = Math.min(stop - 1, 8); i > 0; i--) { const q = P[i]; if (!q) continue; bx0 = Math.min(bx0, q.x); by0 = Math.min(by0, q.y); bx1 = Math.max(bx1, q.x); by1 = Math.max(by1, q.y); } const walls = brWallsNear(M, bx0 - 1, by0 - 1, bx1 + 1, by1 + 1).filter(w => w.lv === G.lv);   // (v14.2.6: only the walls near the route ahead)
     for (let i = Math.min(stop - 1, 8); i > 0; i--) if (P[i].lv === G.lv && MG.clearPath(c.x, c.y, P[i].x, P[i].y, walls, 0.5)) { wp = P[i]; break; }
     return MH.to(c, wp.x, wp.y, 0.9);
   },

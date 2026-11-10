@@ -28,7 +28,7 @@ Object.assign(View3D.prototype, {
   buildBRWorld() {
     const m = this.m, M = MODES.br.map(m), T = M.theme, H = BR.H, W = m.width, D = m.height;
     if (this.arena) this.scene.remove(this.arena);
-    const g = this.arena = new THREE.Group(), byCol = new Map(), put = (col, geo) => { if (!byCol.has(col)) byCol.set(col, []); byCol.get(col).push(geo); };
+    const g = this.arena = new THREE.Group(), byCol = new Map(), TILE = 80, put = (col, geo) => { geo.computeBoundingBox(); const bb = geo.boundingBox, key = col + ':' + Math.floor((bb.min.x + bb.max.x) / 2 / TILE) + ',' + Math.floor((bb.min.z + bb.max.z) / 2 / TILE); if (!byCol.has(key)) byCol.set(key, []); byCol.get(key).push(geo); };   // (v14.2.2: merged per colour AND per 48 m tile, so far-away parts of a huge map are skipped)
     this.scene.background = new THREE.Color(T.sky); this.scene.fog = new THREE.Fog(T.sky, 45, 150);
     const gt = Look.tex({ downtown: 'asphalt', jungle: 'jungle', port: 'concrete', suburbs: 'grass', canyon: 'dirt' }[m.mini.map] || 'grass').clone(); gt.needsUpdate = true; gt.repeat.set(900 / 7, 900 / 7);
     const gg = G3.layFlat(new THREE.PlaneGeometry(900, 900, 90, 90)), gp = gg.attributes.position, nz = LookWorld.noise(W + D), gc = [];   // the ground, with big soft patches so it never looks like one tile
@@ -55,11 +55,12 @@ Object.assign(View3D.prototype, {
       }
       if (d.t === 'garage') { const cv = G3.canvas(64, 64), c = cv.getContext('2d'); c.fillStyle = '#1f4fa8'; c.fillRect(0, 0, 64, 64); c.fillStyle = '#fff'; c.font = '900 50px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('P', 32, 35); const tx = new THREE.CanvasTexture(cv); tx.encoding = THREE.sRGBEncoding; const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), new THREE.MeshBasicMaterial({ map: tx, side: THREE.DoubleSide })); sign.position.set(d.x + d.w / 2, d.levels * H + 1.6, d.y + d.h + 0.3); g.add(sign); }
     }
-    const FAC = { 0xc9c1b1: 'bldg', 0xe0dbd0: 'mall', 0xd8c3a5: 'house', 0x8a8f96: 'metal', 0xc0392b: 'metal' };   // building fronts: windows on every storey; metal siding
-    for (const [col, geos] of byCol) { const f = FAC[col]; let mt = f ? LookWorld.facade(f) : brSurface(col); if (col === 0xc0392b) { mt = mt.clone(); mt.color.setHex(0xe0705f); }
+    const FAC = Object.assign({ 0xc9c1b1: 'bldg', 0xe0dbd0: 'mall', 0xd8c3a5: 'house', 0x8a8f96: 'metal', 0xc0392b: 'metal' }, globalThis.BR_FAC || {});   // (v14.2.2: + the building styles)   // building fronts: windows on every storey; metal siding
+    for (const [key, geos] of byCol) { const col = +key.split(':')[0], f = FAC[col]; let mt = f ? LookWorld.facade(f) : brSurface(col); if (col === 0xc0392b) { mt = mt.clone(); mt.color.setHex(0xe0705f); }
       const mesh = new THREE.Mesh(f ? brWorldUV(G3.merge(geos), 3, H) : brWorldUV(G3.merge(geos), 3), mt); mesh.castShadow = mesh.receiveShadow = true; g.add(mesh); }
     if (M.trees.length) {                                                  // the forest: one instanced trunk and canopy each
-      g.add(LookWorld.trees(M.trees.map((t, i) => ({ x: t.x, y: t.y, r: t.r, h: 3.6 + (i % 5) * 0.6, s: 2.2 + t.r * 1.6 })), m.mini.map === 'jungle' ? 0.02 : 0));
+      const tiles = new Map(); M.trees.forEach((t, i) => { const k = Math.floor(t.x / 48) + ',' + Math.floor(t.y / 48) + ',' + (t.tint || 0); if (!tiles.has(k)) tiles.set(k, []); tiles.get(k).push({ x: t.x, y: t.y, r: t.r, h: 2.2 + (i % 4) * 0.35, s: 1.5 + t.r * 1.2 }); });   // (v14.2.2: shorter, rounder trees that don't hide the view from a first-floor roof, in tiles so the far ones are skipped)
+      for (const [tk, list] of tiles) { const tg = LookWorld.trees(list, +tk.split(',')[2] || (m.mini.map === 'jungle' ? 0.02 : 0)); const cx = list.reduce((a, t) => a + t.x, 0) / list.length, cz = list.reduce((a, t) => a + t.y, 0) / list.length; tg.children.forEach(x => { x.geometry = x.geometry.clone(); x.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(cx, 3, cz), 44); }); g.add(tg); }   // (a bounding sphere round the whole tile, so the instances are culled correctly)
     }
     LookWorld.dressBR(this, g, m.mini.map || 'downtown', T, W, D);       // sky, haze and the horizon
     this.scene.add(g);
@@ -105,7 +106,7 @@ Object.assign(View3D.prototype, {
   P.buildArena = function () { if (this.m && this.m.mini && modeOf(this.m) && modeOf(this.m).outdoor) return this.buildBRWorld(); return arena.call(this); };
   P.updateMode = function (dt) { if (this.m.kind === 'br') { this.modeS = this.modeS || new THREE.Group(); this.updateBR(dt); } return upd.call(this, dt); };
   P.placeCamera = function (vp, dt) {
-    const c = cam.call(this, vp, dt), m = this.m, M = modeOf(m), far = M && M.outdoor ? 420 : 160; if (c.far !== far) { c.far = far; c.updateProjectionMatrix(); }   // outdoors: see the horizon
+    const c = cam.call(this, vp, dt), m = this.m, M = modeOf(m), far = M && M.outdoor ? 220 : 160;   /* (v14.2.2: was 420; the haze hides everything that far out anyway) */ if (c.far !== far) { c.far = far; c.updateProjectionMatrix(); }   // outdoors: see the horizon
     if (M && M.outdoor && vp.mode === 'broadcast') {                         // a big outdoor map: a high camera chasing the action
       const st = this.camFor(vp.key), f = vp.chair || m.ball, k = 1 - Math.exp(-3 * dt), z = (f.gs && f.gs.z) || 0;
       st.bx = st.bx === undefined ? f.x : st.bx + (f.x - st.bx) * k; st.by = st.by === undefined ? f.y : st.by + (f.y - st.by) * k;
@@ -288,13 +289,13 @@ class BRInvScene extends Phaser.Scene {
   constructor() { super('BRInv'); }
   init(d) { this.d = d; const G = d.chair.gs, held = !G.hol && G.inv[G.sel]; this.cur = held && held.s !== undefined ? held.s : 0; this.pick = -1; }   /* (the bag opens on what is in your hands) */
   create() {
-    const V = CONFIG.view, cx = V.width / 2, cy = V.height / 2 - 20, W = 820, Hh = 360; this.cx = cx; this.cy = cy;
+    const V = CONFIG.view, cx = V.width / 2, cy = V.height / 2 - 14, W = 820, Hh = 430; this.cx = cx; this.cy = cy;
     this.add.rectangle(cx, V.height / 2, V.width, V.height, 0x000000, 0.35); panel(this, cx - W / 2, cy - Hh / 2, W, Hh, { alpha: 0.95, radius: 18 });
     this.add.text(cx, cy - Hh / 2 + 28, 'INVENTORY', { fontFamily: FONT, fontSize: '26px', fontStyle: 'bold', color: THEME.gold_css }).setOrigin(0.5);
     this.g = this.add.graphics(); this.slots = [];
     for (let i = 0; i < BR.slots; i++) { const x = cx + (i - 2) * 150, y = cy - 30, img = this.add.image(x, y - 6, this.d.game.brIcon('pistol')).setDisplaySize(124, 70), t = this.add.text(x + 60, y + 44, '', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(1, 1), n = this.add.text(x - 60, y - 50, String(i + 1), { fontFamily: FONT, fontSize: '14px', color: '#9fb2bf' });
       const z = this.add.zone(x, y, 136, 104).setInteractive({ useHandCursor: true }); z.on('pointerdown', () => { this.cur = i; this.press('a'); }); this.slots.push({ x, y, img, t, n }); }
-    this.info = this.add.text(cx, cy + 50, '', { fontFamily: FONT, fontSize: '18px', color: '#e8eef2', align: 'center' }).setOrigin(0.5);
+    this.info = this.add.text(cx, cy + 44, '', { fontFamily: FONT, fontSize: '18px', color: '#e8eef2', align: 'center' }).setOrigin(0.5);
     this.help = this.add.text(cx, cy + Hh / 2 - 84, '◀ ▶ choose     A: move / swap     Y: hold this     X: drop on the ground     B: close', { fontFamily: FONT, fontSize: '16px', color: '#9fb2bf' }).setOrigin(0.5);
     [['Hold', 'y', -220], ['Drop', 'x', 0], ['Close', 'b', 220]].forEach(([l, k, dx]) => tapButton(this, cx + dx, cy + Hh / 2 - 28, 180, l, () => this.press(k)));
     this.events.once('shutdown', () => { this.d.p.invOpen = false; });
@@ -314,9 +315,11 @@ class BRInvScene extends Phaser.Scene {
     const g = this.g; g.clear();
     this.slots.forEach((s, i) => { const it = brSlotItem(G, i), cur = i === this.cur, held = it && it === G.inv[G.sel], pk = i === this.pick, y = s.y - (pk ? 12 : 0);
       g.fillStyle(cur ? 0x2a3a48 : 0x14202a, 1).fillRoundedRect(s.x - 68, y - 52, 136, 104, 10).lineStyle(cur ? 4 : 2, pk ? 0x3dd6ff : cur ? 0xffd23f : held ? 0x7dff6a : 0x3a4a58, 1).strokeRoundedRect(s.x - 68, y - 52, 136, 104, 10);
+      if (it && BR_GUNS[it.k] && typeof BR_TIER !== 'undefined') { const col = BR_TIER[it.t || 0].col; g.fillStyle(col, 0.32).fillRoundedRect(s.x - 64, y - 48, 128, 96, 8).fillStyle(col, 1).fillRoundedRect(s.x - 64, y + 38, 128, 10, { tl: 0, tr: 0, bl: 8, br: 8 }); }   // v14.2.5: the gun's rarity colour behind it
       if (held) g.fillStyle(0x7dff6a, 1).fillCircle(s.x + 56, y - 40, 5);
       s.img.setVisible(!!it).setY(y - 6); s.t.setY(y + 44); if (it) { s.img.setTexture(d.game.brIcon(it.k)).setDisplaySize(124, 70); s.t.setText(BR_GUNS[it.k] ? String(it.a) : 'x' + it.a); } else s.t.setText(''); });
     const it = brSlotItem(G, this.cur), gun = it && BR_GUNS[it.k];
-    this.info.setText(!it ? (this.pick >= 0 ? 'Empty slot: A puts it here' : 'Empty slot') : gun ? `${brName(it.k, it.t)}   ammo ${it.a}     damage ${gun.dmg}${gun.pellets ? ' x' + gun.pellets : ''}   ${(1 / gun.cd).toFixed(1)} shots/s   range ${gun.range} m${gun.auto ? '   (hold to fire)' : ''}` : `${BR_ITEMS[it.k].name} x${it.a}     ${{ med: 'heals 50', pot: '+50 shield', boost: '3 s of speed', wall: 'a wall that stops bullets' }[it.k] || ''}`);
+    this.info.setColor(gun && typeof BR_TIER !== 'undefined' ? '#' + BR_TIER[it.t || 0].col.toString(16).padStart(6, '0') : '#e8eef2');
+    this.info.setText(!it ? (this.pick >= 0 ? 'Empty slot: A puts it here' : 'Empty slot') : gun ? `${brName(it.k, it.t)}   ammo ${it.a}     damage ${typeof brGunDmg === 'function' ? brGunDmg(it.k, it.t) : gun.dmg}${gun.pellets ? ' x' + gun.pellets : ''}   ${(1 / gun.cd).toFixed(1)} shots/s   range ${gun.range} m${gun.auto ? '   (hold to fire)' : ''}` : `${BR_ITEMS[it.k].name} x${it.a}     ${{ med: 'heals 50', pot: '+50 shield', boost: '3 s of speed', wall: 'a wall that stops bullets' }[it.k] || ''}`);
   }
 }

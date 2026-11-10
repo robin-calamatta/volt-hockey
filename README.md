@@ -3,6 +3,132 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.2.11: your place when you lose, a cheeky kill feed, gentler snipers, one item per press, no random lobby emotes
+
+- **Losing in Volt Royale shows your place, not VICTORY.** While the winners party, your screen says **YOU PLACED #N** (your team's finishing place), with "<WINNER> WINS THIS ONE. Better luck next drop!" underneath.
+  - The confetti, fireworks, cheer and flash are only for the winners.
+- **Kill feed down the left side**, with the newest line at the top.
+  - Each knock-down and elimination gets a cheeky line for how it happened, with a few lines for each kind:
+    - Rockets: "ROBIN was splatted by DEVON", "DEVON sent ROBIN to the moon".
+    - Sniper, shotgun, SMG, rifle, pistol and melee each have their own.
+    - The storm: "ROBIN forgot the storm was purple".
+    - Falls: "ROBIN tested gravity. Gravity won".
+    - Bleeding out, and blowing yourself up with your own rocket.
+    - Knock-downs: "DEVON put ROBIN on the floor".
+  - Headshots say (HEADSHOT!).
+  - Lines are green when your team got the kill and red when your team was hit. They fade after 7 s.
+  - It replaces the old feed under the minimap.
+- **Snipers hit a bit less hard, and rarer ones hit harder.**
+
+  | Rarity | Body shot | Headshot |
+  | --- | --- | --- |
+  | Uncommon | 52 | 65 |
+  | Rare | 60 | 75 |
+  | Epic | 69 | 86 |
+  | Legendary | 78 | 98 |
+
+  The headshot bonus for snipers is now x1.25 (it was x2), so even a legendary never takes a full-health cart out in one shot. The bag shows each gun's real damage for its rarity.
+- **Items need a press each time.** Holding the use button keeps firing a gun. A heal, shield drink, boost or wall is used once, and you let go and press again for the next one.
+- **No random emotes in the lobby.** Your character used to do a random action from your wheel every 9 to 15 seconds. Now it only emotes when you do, or when you try an action on in the Locker.
+
+## v14.2.10: one third-person camera for every game; Light Trails barriers always show
+
+- **Third person works the same in every game as in Volt Royale.** The old third-person camera is gone.
+  - The camera sits behind and above your cart, looks ahead of it, and has the same wide field of view.
+  - It moves in closer when a wall is behind you (the Manhunt, Capture the Flag and King of the Hill arenas).
+  - It uses the same distance setting, now called **Third-person camera distance** (Settings > Controls and screen; 2.75 m by default, 1.5 to 6 m).
+- **Light Trails barriers are always visible.** The 3D barriers were built once and kept. When a new game started on a different map, you saw the old map's barriers (or none) while the new ones still crashed you.
+  - The barriers are now rebuilt whenever the map changes.
+  - They're taller (1.4 m) and more solid.
+  - They also show on the minimap and on the map preview in the game's options.
+- The same rebuild-on-map-change fix applies to the Manhunt, Capture the Flag and King of the Hill arena walls. Manhunt's walls also show on the minimap.
+
+## v14.2.9: Volt Royale third-person camera closer, and adjustable
+
+- The third-person camera in Volt Royale now starts closer: 2.75 m behind your cart and about 1.75 m up (it was 4.35 m in v14.2.8).
+- **You can set the distance yourself:** go to Settings > Controls and screen > **Volt Royale third-person distance**, from 1.5 m to 6 m in 0.25 m steps. The camera's height goes up with the distance. It's saved with your other settings.
+
+## v14.2.8: Volt Royale third-person camera a bit closer
+
+- The third-person camera in Volt Royale is now two thirds as far away as in v14.2.6: about 4.35 m behind you and 2.3 m up, instead of 6.5 m and 3.4 m. It keeps the wide field of view and still looks well ahead.
+
+## v14.2.7: drive under ramps in Volt Royale
+
+- **You can drive under the open ramps.** From the ground, only the low end of a ramp is solid: the part from its foot to about 60% of the way up, where the deck is too low to fit under. Past that, the deck is high enough (about 1.35 m) for a cart to drive straight underneath, from either side.
+  - You still drive onto a ramp at its foot as before. Driving under a ramp never pops you up onto it.
+  - Jumping or falling beside a ramp only bumps you off it if your head would actually hit the deck.
+- The CPUs still go round ramps rather than under them.
+
+## v14.2.6: smoother Volt Royale, Manhunt walls you can see, a Tactical controller layout, a further-back camera
+
+- **Volt Royale is much smoother.** One step of the game takes about a third of the time it did (about 13 ms down to 4 to 6 ms with 24 carts on the huge maps). The big stutters are gone too, when the storm moves and at the start of the game.
+  - **At the start of the game:** the CPU's route map used to be built mid-drop, the moment the first CPU landed, which froze the game for about 0.15 s. It's now built while the match loads.
+  - **When the storm moves:** every CPU used to plan a new route in the same moment. A CPU that was chasing someone also re-planned every time its target moved a metre, and one that found no route tried again every step. Now only one CPU plans per step, they re-plan only when their goal has really moved, and the search is several times faster.
+  - **Smaller fixes:** walls, trees, doors, floors and loot are kept in grids, so each check only looks at what's nearby (picking up loot, bullets, landing, doors, look-to-pick-up). The map in the bag is drawn once instead of every frame.
+  - **CPUs stuck on a roof:** a CPU that can't find a way down may now drive off the edge.
+- **Manhunt's walls are drawn.** The arenas' walls were never drawn (Manhunt has no game mode of its own, so the drawing code skipped it). You bumped into invisible walls on what looked like the open rink, and it seemed like there was only one map. They now show in 3D and in the top-down view.
+- **Four more Manhunt arenas**, twelve in all:
+  - **Crossroads:** four blocks with a spinner in the middle.
+  - **The Spiral:** a square spiral of walls.
+  - **The Islands:** crates and sandbags with no walls.
+  - **The Bunker:** rooms off a corridor, with sliding blast doors.
+- **Tactical controller layout:** go to Settings > Controls and screen > Controller layout. In a match, B and R3 (clicking in the right stick) swap places. Menus keep B as back.
+- **Volt Royale third person is further back:** the camera sits about 6.5 m behind and 3.4 m up, looks 9 m ahead, and has a wider field of view (at least 80°). It comes in closer when a wall or tree is behind you, and stays under the floor above you indoors.
+- **Admin switch for third person in Volt Royale:** a new **Game** tab in admin.html has a "Third person in Volt Royale" checkbox. When it's off, everyone plays Volt Royale in first person (third person and broadcast aren't offered). The game checks it at every match start.
+  - **Server:** `GET /api/game` is public. `GET` and `POST /api/admin/game` need the admin login. It's stored under `cfg/game` and defaults to on.
+
+## v14.2.5: fat shield jug, rarity colours in the bag, see which cart is you
+
+- **The SHIELD JUG is now a fat, squat jug** with a white carry handle, in a darker blue than the small SHIELD SIP bottle. Its icon is much wider and says BIG, so you can tell the two apart on the ground, in the bag and on the hotbar.
+- **Guns in the inventory show their rarity colour:** the slot is tinted, with a coloured bar along the bottom (green uncommon, blue rare, purple epic, orange legendary). The gun's description line is in the same colour.
+- **More room in the inventory:** the panel is taller, and the description line sits under the slots with clear space before the ammo row.
+- **You can always tell which cart is yours in the top-down (2D) view:** a pulsing ring sits under your own cart (yellow for player 1, then cyan, pink and green for players 2 to 4 on the same screen). Your name always shows over it, in every minigame, including Light Trails. In the broadcast camera, your name also shows over your cart.
+
+## v14.2.4: controller fixes for the map and the friends bar
+
+- **Select (View) opens the Volt Royale map**, and pressing it again closes it. It no longer also opens the friends bar.
+- **You can always leave the map with a controller:** B, Select or Start closes it. Start also opens the pause menu. Before, the map could only be closed the first time it was opened in a match.
+- **The friends bar has no button of its own any more**, in a match or in the main menu. Open it from **Friends and party** in the Start / pause menu during a match, or in the main menu (Start on a controller). The menu item shows how many new messages and invites you have, for example "Friends and party (2 new)". The ` key still opens it on a keyboard.
+- The help page now says where to find friends and party, and that Select opens the map.
+
+## v14.2.3: massive maps with named places, a full map, CPUs beat the storm
+- **Both Volt Royale maps are massive now: 760 x 520 m**, each with **twenty named places**:
+  - **Volt Valley:** Volt City, Old Town, The Mines, Harbor Point, Steelworks, Volt Arena, Mount Ember, Maple Grove, Skyfield, Castle Hill, Sunny Acres, Bunker Hill, Dust Canyon, Last Chance Stop, Wildwood, Timber Mill, Crystal Caves, Red Mesas, The Hidden Lab and Thrill Park.
+  - **Frostfall Wilds:** Frost Peak, Glacier Caves, Pine Mill, Winterhold, Snowdrift, Frostfall Fair, Copper Mesas, Red Gulch, Black Site, Ice Harbor, Deepwood, Meadow Farm, Frostfall City, Northfield, Junction Nine, Iron Mines, Ash Mountain, Fort Hollow, Frostfall Arena and Old Factory.
+  - Each place's **name floats in the sky** over it (fading out when you're right underneath), and a banner shows the name when you drive in.
+- **The full map:** the 🗺 MAP button (top right), **M** on the keyboard, or the controller's **View / Back** button.
+  - It shows every place with its name, the biomes, buildings and roads, the storm and the next safe circle, rez garages and pings.
+  - It also shows **where you and your squad are right now**: arrows that point the way you're facing, with names. A downed team-mate gets a red ring.
+  - Click or tap the map to ping a spot. Close it with M, B, Back or ✕.
+- **CPUs put the storm first:**
+  - While the storm waits, they work out the part of the circle that's safe wherever the next circle lands, and head there in good time. They allow for roads not being straight, with up to 30 seconds to spare.
+  - Once it moves, they go well inside the final circle and keep ahead of the edge.
+  - Close to the storm, or inside it, they drop everything: no looting, no fights, no healing, no revives.
+  - A CPU that's driving but not moving (nosed into a wall, stuck on a ramp or a roof edge) now backs off at an angle and finds a new way.
+  - In test games on these maps, storm eliminations dropped from 5-7 a game to about 1.
+- **Smoother:**
+  - CPUs skip far-away loot before checking it.
+  - The path-finder can search further on the massive maps.
+  - Loot is drawn within 50 m (was 70).
+
+## v14.2.2: bigger maps with biomes, smoother, fewer trees and rez garages, shield drinks, look to pick up
+- **Volt Royale maps are bigger: 580 x 380 m**, fifteen places to land on each:
+  - Two new places on both maps: **the Farmstead** (a barn with a hay loft, silos, fields) and **the Truck Stop** (a gas canopy you can drive on, a diner, a garage).
+  - **Biomes:**
+    - Volt Valley: city, badlands, coast, volcanic ash, forest, farmland and desert.
+    - Frostfall Wilds: a snowfield along the north, forest, red desert, farmland and grassland.
+    - The ground changes with the biome. Trees grow by biome too: thick in forests, a few on grassland and farmland, pale pines in the snow, cacti instead in the desert.
+  - **Far fewer trees** (about 950 down to 180-320 per map), and they're shorter, so the view from a first-floor roof is clear.
+  - **Only 3-5 rez garages per map** (was 15-32).
+  - **Every building looks different:** twelve wall styles (brick, stucco, teal and navy glass, sandstone, white clapboard, sage, terracotta, mustard, slate, plum...) and six roof colours, mixed through every town. Doors still work.
+- **Smoother on big maps** (measured with 24 CPU carts):
+  - Simulation time per frame went from about 57 ms to 13 ms. The path-finder no longer builds its search arrays from scratch every time, and walls are kept in an 8 m grid so only nearby ones are checked for collisions and line of sight.
+  - Rendering: the world is drawn in 48 m tiles, so far-away parts are skipped, and the camera's view distance dropped from 420 m to 220 m (hidden in the haze).
+  - Draw calls dropped from about 1,100 to 480 and triangles from 570,000-880,000 to 130,000-200,000, even on the bigger maps.
+- **Shields are sports-drink bottles:** a small blue **SHIELD SIP** (+25, up to 50) and a big **SHIELD JUG** with a handle (+75), each with a white "volt" label and a lightning bolt.
+- **Look at it to pick it up:** guns, items and chests have to be in front of your cart (roughly where you're looking), not just touching it. Ammo, and topping up a stack you already carry, still get picked up just by driving over them.
+- **Touch screens:** the minigames row in the lobby's games menu has big ◀ ▶ buttons to page left and right.
+
 ## v14.2.1: Light Trails fixed, more maps, two huge Volt Royale maps
 - **Light Trails:**
   - Hitting your own trail now crashes you. The game clock was rounded to 0 on every step, so your own trail never counted and trails never faded.

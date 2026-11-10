@@ -56,7 +56,7 @@ const lockCartItem = () => ({ rule: true, label: () => `Switch carts with Y   �
    'Camera and graphics' is its own scene (CameraPageScene) with a live picture of the game behind it. */
 const SETTINGS_PAGES = {
   'Player': () => [
-    { label: () => 'Account, friends and party: the 👥 button (top left), Select on a gamepad, or the ` key' },
+    { label: () => 'Account, friends and party: in the menu (Start on a gamepad, in a match too), or the ` key. In Volt Royale, Select (View) opens the map' },
     nameItem(), { label: () => `Career:  ${(Settings.career || {}).games || 0} matches   ${(Settings.career || {}).wins || 0} wins   ${(Settings.career || {}).goals || 0} goals   ${(Settings.career || {}).shots || 0} shots on net` }],
   'Sound and commentary': () => [slider('Music volume', 'musicVolume', pct), slider('Effects volume', 'sfxVolume', pct), slider('Crowd volume', 'crowdVolume', pct),
     toggle('Cart driving sound', 'cartSound'), slider('Cart driving volume', 'cartVolume', pct),
@@ -78,7 +78,9 @@ const SETTINGS_PAGES = {
     { label: () => `The CPU keeps learning how you play   (${Learn.data.shots} shots, ${Learn.data.passes} passes seen)`, hint: 'Always on: it remembers your habits from game to game' }],
   'Controls and screen': sc => [
     { label: () => 'Controls guide', hint: 'What every button does on a gamepad, keyboard and touch', select: () => sc.scene.start('ControlsGuide', { ctx: sc.ctx, page: 'Controls and screen' }) },
+    { label: () => `Controller layout   ◀ ${Settings.padTactical ? 'Tactical' : 'Standard'} ▶`, hint: 'Tactical: in a match, B and R3 (clicking in the right stick) swap places: whatever B does (drift, and so on) moves to R3, and R3 (melee in Volt Royale) moves to B. Menus keep B as back.', change: () => Settings.toggle('padTactical'), select: () => Settings.toggle('padTactical') },
     { label: () => `Invert right stick Y axis   ◀ ${Settings.invertLook ? 'On' : 'Off'} ▶`, hint: 'On: push the right stick up to look (and aim) down, like a flight game. Works in every game and view.', change: () => Settings.toggle('invertLook'), select: () => Settings.toggle('invertLook') },
+    { ...slider('Third-person camera distance', 'brCamDist', v => v.toFixed(2) + ' m'), hint: 'How far behind your cart the third-person camera sits, in every game (closer: bigger cart, less around you)' },
     { ...slider('Look sensitivity: left / right', 'lookH', v => Math.round(v * 100) + '%'), hint: 'How fast you turn and look left and right in first and third person (lower is slower)' },
     { ...slider('Look sensitivity: up / down', 'lookV', v => Math.round(v * 100) + '%'), hint: 'How fast you aim up and down (Volt Royale) with the right stick or I / K' },
     { label: () => `Touch controls   ◀ ${Settings.touch ? 'On' : 'Off'} ▶`, change: () => TouchPad.toggle(), select: () => TouchPad.toggle() },
@@ -467,6 +469,8 @@ class LobbyScene extends Phaser.Scene {
   }
 }
 
+const MY_RING = [0xffd23f, 0x3dd6ff, 0xff6ad5, 0x7dff6a];   // your own cart's ring (player 1, 2, 3, 4 on this screen)
+const myLabel = (c, label) => { const nm = (c.player && (c.player.name || c.player.tag)) || 'YOU'; return !label ? nm : label.includes(nm) ? label : `${nm} ${label}`; };   // your own cart always shows your name
 class GameScene extends Phaser.Scene {
   constructor(key = 'Game') { super(key); }
   init(data) { this.setup = data; this.online = data.online || null; }     // online: { role: 'host' | 'client', session, match, players, me / sim }
@@ -737,6 +741,7 @@ class GameScene extends Phaser.Scene {
       g.fillStyle(0x0f1820, 1).fillEllipse(b.x + x * r * 0.72, b.y + y * r * 0.72, r * 0.5 * (0.35 + 0.65 * z), r * 0.5 * (0.35 + 0.65 * z));
     }
   }
+  myChairs2D() { const out = new Map(); try { (this.localControls ? this.localControls() : []).forEach(([p], i) => { if (p && p.chair) out.set(p.chair, i); }); } catch (e) {} return out; }
   drawChair(g, c, color, speedLevel) {
     const K = CONFIG.chair, cup = CONFIG.cup, T = (x, y) => c.toWorld(x, y), L = CONFIG.look, hw = K.bodyWidth / 2;
     const poly = (pts, fill, a = 1) => g.fillStyle(fill, a).fillPoints(pts.map(p => T(p[0], p[1])), true);
@@ -970,11 +975,13 @@ class GameScene extends Phaser.Scene {
       g.clear(); this.updateCamera(dt3); this.drawArrows();
       const bs = this.toScreen(m.ball.x, m.ball.y), bz = this.tilted ? this.zoom * this.s0 * (bs.k || 1) : this.zoom, bpx = Math.max(B.radius * (B.drawScale || 1) * bz, B.minDrawRadiusPx || 0);
       if (m.mini && this.drawMode2D && modeOf(m)) this.drawMode2D(g, true);   // a minigame's floor (rings, lava, goals...), under the carts
+      const myC = this.myChairs2D();
       m.chairs.forEach((c, i) => {
         const tag = this.tags[i]; tag.setVisible(!c.benched);
         if (c.benched) return;
+        if (myC.has(c) && !c.out) { const col = MY_RING[myC.get(c) % MY_RING.length], pu = 0.86 + 0.08 * Math.sin(this.time.now / 160); g.fillStyle(col, 0.2).fillCircle(c.x, c.y, pu).lineStyle(0.14, col, 1).strokeCircle(c.x, c.y, pu); }   // v14.2.5: a ring under your own cart, so you can tell which one is you
         this.drawChair(g, c, TEAMS[m.teams[c.side]].color, c.player ? c.player.speedLevel : 0);
-        const sp = this.toScreen(c.x, c.y), k = sp.k || 1, z = this.tilted ? this.zoom * this.s0 * k : this.zoom; const label = m.mini ? this.miniTag(c) : c.player ? (c.player.name || c.player.tag) : (this.demo && c.side === 0 && c.index === 1 ? 'YOU' : ''); tag.setText(label).setScale(Math.max(0.55, Math.min(1.2, k))).setPosition(sp.x, sp.y - 0.75 * z).setVisible(!!label && this.inView(sp, 10));
+        const sp = this.toScreen(c.x, c.y), k = sp.k || 1, z = this.tilted ? this.zoom * this.s0 * k : this.zoom; let label = m.mini ? this.miniTag(c) : c.player ? (c.player.name || c.player.tag) : (this.demo && c.side === 0 && c.index === 1 ? 'YOU' : ''); if (myC.has(c)) label = myLabel(c, label); tag.setText(label).setScale(Math.max(0.55, Math.min(1.2, k))).setPosition(sp.x, sp.y - 0.75 * z).setVisible(!!label && this.inView(sp, 10));
         if (label && !m.noBall) this.fadeTagNearBall(tag, 'flat' + i, bs.x, bs.y, bpx);
       });
       const r = Math.max(B.radius * (B.drawScale || 1), B.minDrawRadiusPx / (this.tilted ? this.zoom * this.s0 : this.zoom));
@@ -1092,7 +1099,7 @@ class PauseScene extends ListMenuScene {
     const m = this.gameScene.match, online = this.gameScene.online, resume = online ? () => { Controls.owner = null; try { this.gameScene.applyCamera(); } catch (e) {} this.scene.stop(); } : () => { Controls.owner = null; this.scene.resume('Game'); this.scene.stop(); };   // online: the match keeps running behind the menu
     const toSettings = { label: () => 'Settings', select: () => this.scene.start('Settings', { from: 'Pause', game: this.gameScene }) };
     const camItem = { label: () => `Camera   ◀ ${CONFIG.view3d.names[Settings.camMode] || ''} ▶`, change: d => { cycleCamMode(d); this.gameScene.apply3d(); }, select: () => { cycleCamMode(1); this.gameScene.apply3d(); } };
-    const social = { label: () => 'Friends and party', select: () => FriendsBar.toggle(true) };
+    const social = { label: () => FriendsBar.menuLabel(), select: () => FriendsBar.toggle(true) };
     const onlineItems = [{ label: () => 'Resume', select: resume }, camItem, toSettings, social, { label: () => 'Leave room', select: () => { Controls.owner = null; this.gameScene.leaveOnline(''); } }];
     const switchTeam = p => () => { if (m.switchSide(p)) Sound.play('select'); else Sound.play('back'); };
     this.buildMenu('PAUSED', online ? onlineItems : [

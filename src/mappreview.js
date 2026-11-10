@@ -4,7 +4,7 @@
 { const sw = setWorld; let last = null; setWorld = function (mini) { last = mini; return sw(mini); }; setWorld.current = () => last; }
 const MapPreview = {
   isMapRow: s => /^\s*(Map|Track|Course|Arena)\b/i.test(String(s || '')),
-  COL: { wall: 0x8e9aa6, crate: 0xb07a45, bags: 0xc9b27a, container: 0x2f6f8f, metal: 0x8e9aa6, akp: 0x2f6fed, akb: 0xff3fd2, ramp: 0xffd23f, gate: 0xff7a1c },
+  COL: { wall: 0x8e9aa6, crate: 0xb07a45, bags: 0xc9b27a, container: 0x2f6f8f, metal: 0x8e9aa6, akp: 0x2f6fed, akb: 0xff3fd2, ramp: 0xffd23f, gate: 0xff7a1c, trailblock: 0xff2a6d },
   /* what's in a map: rectangles, circles, arrows and roads, in metres */
   snapshot(kind, override) {
     const saved = Settings.mg && Settings.mg[kind] ? { ...Settings.mg[kind] } : null, prevWorld = setWorld.current();

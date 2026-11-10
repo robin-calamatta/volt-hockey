@@ -108,15 +108,59 @@ if (typeof BR_FLOORS !== "undefined") BR_FLOORS.grass = 0x5f8a3e;   // (grassy h
     for (let i = 0; i < 40; i++) { const a = i * 2.39, r = 3 + (i % 9) * 3.2; const x = 36 + Math.cos(a) * r * 1.1, y = 46 + Math.sin(a) * r * 0.5; if (x > 2 && x < 50 && y > 42 && y < 60) B.tree(x, y, 0.6); }
   });
 
+  /* ---------------- The Farmstead ---------------- */
+  const farm = build('The Farmstead', { width: 84, height: 64 }, { ground: 0x7a9a4a, sky: 0xb8d8f0, grass: 0x7a9a4a }, 'A big red barn with a hay loft, a farmhouse, silos and fenced fields.', B => {
+    B.building(8, 8, 26, 18, { doors: { s: [[0.5, 4]], e: [[0.5, 3]] }, kind: 'barn', roof: false, loot: 2 }); B.floor(8, 8, 34, 14, 1, 'wood'); B.floor(8, 8, 34, 26, 2, 'roof'); B.ramp(10, 14, 16, 20, 3, 0, 'wood');   // the barn: a loft along the back, a roof over it all
+    B.loot(20, 11, 1); B.loot(28, 11, 1);
+    B.building(46, 8, 16, 12, { doors: { s: [[0.5, 2.4]] }, kind: 'house', loot: 2 });
+    for (const [x, y] of [[70, 10], [76, 10]]) for (let L = 0; L < 3; L++) B.wall(x - 2, y - 2, x + 2, y + 2, L, 'silo');
+    B.side(40, 34, 80, 34, [[0.2, 4]], 0, 'wood'); B.side(40, 58, 80, 58, [[0.8, 4]], 0, 'wood'); B.side(40, 34, 40, 58, [], 0, 'wood'); B.side(80, 34, 80, 58, [], 0, 'wood');
+    for (let i = 0; i < 5; i++) B.wall(46 + i * 6, 44, 48 + i * 6, 46, 0, 'crate');   // hay bales
+    B.building(8, 36, 14, 10, { doors: { e: [[0.5, 2.6]] }, kind: 'hut', loot: 1 }); B.loot(60, 50, 0);
+  });
+  /* ---------------- The Truck Stop ---------------- */
+  const truck = build('The Truck Stop', { width: 70, height: 56 }, { ground: 0x8a8070, sky: 0xd8c8a8, grass: 0x9a8a5a }, 'A gas station with a canopy you can drive on, a diner, a garage and parked rigs.', B => {
+    B.building(8, 8, 18, 12, { doors: { s: [[0.3, 2.4], [0.75, 2.4]] }, kind: 'diner', loot: 2 });
+    B.floor(34, 10, 58, 24, 1, 'metal'); for (const [x, y] of [[36, 12], [56, 12], [36, 22], [56, 22]]) B.wall(x - 0.3, y - 0.3, x + 0.3, y + 0.3, 0, 'column'); B.ramp(58, 13, 64, 21, 2, 0, 'metal');   // the canopy (and a ramp up onto it)
+    for (const x of [42, 50]) B.wall(x - 1, 16, x + 1, 18, 0, 'crate');   // the pumps
+    B.loot(46, 17, 1); B.loot(46, 13, 0);
+    B.building(10, 32, 22, 14, { doors: { e: [[0.5, 5]] }, kind: 'warehouse', loot: 2 });
+    for (const [x, y] of [[40, 34], [40, 42], [52, 34]]) B.wall(x, y, x + 9, y + 3, 0, 'container');
+  });
+
+  /* a huge map: the places, the country between them, biomes, a few rez garages, unique buildings */
+  const BIOME = { snow: { col: 0xf2f6fa, tex: 'concrete', trees: 0.25, tint: 0.12 }, desert: { col: 0xf0d098, tex: 'dirt', trees: 0, cactus: 0.12 }, volcanic: { col: 0x5a4c46, tex: 'dirt', trees: 0 },
+    badlands: { col: 0xb08060, tex: 'dirt', trees: 0.04 }, urban: { col: 0xb0b0ac, tex: 'asphalt', trees: 0.03 }, coast: { col: 0xe8dcb8, tex: 'concrete', trees: 0.03 }, forest: { col: 0x8fc070, tex: 'jungle', trees: 0.5 },
+    farm: { col: 0xd8e090, tex: 'grass', trees: 0.06 }, grass: { col: null, trees: 0.1 } };
+  const STYLES = [['bldg', 0xa0523d, 'a0523d'], ['house', 0xe8dcc0, 'e8dcc0'], ['mall', 0x4f8f9a, '4f8f9a'], ['mall', 0x3d5a80, '3d5a80'], ['bldg', 0xc9a46a, 'c9a46a'], ['house', 0xf0efe8, 'f0efe8'], ['house', 0x8aa58a, '8aa58a'], ['bldg', 0xc8734a, 'c8734a'], ['house', 0xd8b84a, 'd8b84a'], ['bldg', 0x7a7f88, '7a7f88'], ['house', 0xb87f9a, 'b87f9a'], ['mall', 0xe8e4dc, 'e8e4dc']];
+  const ROOFS = [0x8a3a2a, 0x3a3f46, 0x3f6a4a, 0x6a4a2a, 0x2f4f7a, 0x8a8f96];
+  globalThis.BR_FAC = globalThis.BR_FAC || {}; STYLES.forEach(([base, col, hex], i) => { BR_COLS['st' + i] = col; BR_FAC[col] = base + '#' + hex; }); ROOFS.forEach((c, i) => { BR_FLOORS['rf' + i] = c; });
+  BR_COLS.cactus = 0x3f7a3a; BR_COLS.barn = 0xa83a2a; BR_COLS.diner = 0xd8d0c0; BR_FAC[0xa83a2a] = 'house#a83a2a'; BR_FAC[0xd8d0c0] = 'mall#d8d0c0';
+  const rz0 = brRezGarages;
+  const world = (name, theme, blurb, parts, W, H, seed, biomes) => {
+    const r = Look.rnd(seed); brRezGarages = (M, w, h, n, sd) => rz0(M, w, h, Math.min(5, Math.max(3, Math.round(w * h / 45000))), sd);   // (a very few rez garages)
+    let T; try { T = brJoin(name, 'suburbs', theme, blurb, parts, W, H, seed); } finally { brRezGarages = rz0; }
+    const at = (x, y) => (biomes.find(b => x >= b[1] && x < b[3] && y >= b[2] && y < b[4]) || [0, 0, 0, 0, 0, 'grass'])[5];
+    T.pois = parts.map(([M, ox, oy, nm]) => ({ name: nm || M.name, x: ox + M.size.width / 2, y: oy + M.size.height / 2, x0: ox, y0: oy, x1: ox + M.size.width, y1: oy + M.size.height }));   // (v14.2.3: named places, for the sky labels and the map)
+    T.biomes = biomes; for (const b of biomes) T.deco.push({ t: 'biome', x0: b[1], y0: b[2], x1: b[3], y1: b[4], kind: b[5] });
+    const keep = []; for (const t of T.trees) { const B = BIOME[at(t.x, t.y)] || BIOME.grass;            // far fewer trees, by biome; cacti in the desert
+      if (r() < B.trees) { if (B.tint) t.tint = B.tint; keep.push(t); } else if (B.cactus && r() < B.cactus) T.walls.push({ x0: t.x - 0.25, y0: t.y - 0.25, x1: t.x + 0.25, y1: t.y + 0.25, lv: 0, kind: 'cactus', h: 1.7 + r() * 0.8 }); }
+    T.trees = keep;
+    let si = 0; for (const d of T.deco) if (d.t === 'bldg') {                                                 // every building its own colour and roof
+      const st = (si++ * 7 + Math.floor(d.x * 3 + d.y * 5)) % STYLES.length, rf = (si * 5 + Math.floor(d.x + d.y)) % ROOFS.length, e = 0.45;
+      for (const w of T.walls) if (w.lv === d.lv && ['bldg', 'house', 'mall', 'hut', 'warehouse'].includes(w.kind) && w.x0 >= d.x - e && w.x1 <= d.x + d.w + e && w.y0 >= d.y - e && w.y1 <= d.y + d.h + e && (Math.abs(w.x0 - d.x) < e || Math.abs(w.x1 - d.x - d.w) < e || Math.abs(w.y0 - d.y) < e || Math.abs(w.y1 - d.y - d.h) < e)) w.kind = 'st' + st;
+      if (d.kind && ['bldg', 'house', 'mall', 'hut', 'warehouse'].includes(d.kind)) { d.kind0 = d.kind; d.kind = 'st' + st; }   // (so its doors are still found)
+      for (const f of T.floors) if (f.lv === d.lv + 1 && f.kind === 'roof' && Math.abs(f.x0 - d.x) < 0.1 && Math.abs(f.y0 - d.y) < 0.1 && Math.abs(f.x1 - d.x - d.w) < 0.1 && Math.abs(f.y1 - d.y - d.h) < 0.1) f.kind = 'rf' + rf;
+    }
+    return T;
+  };
   const P = globalThis.BR_POI || {}, BB = BR_BASE;
-  BR_MAPS.valley = brJoin('Volt Valley', 'suburbs', { ground: 0x4f7a3a, sky: 0xa6d0f0, grass: 0x4f7a3a }, 'A huge valley with ten places to land: Volt City, Downtown, the Port, the Suburbs, Volt Arena, the Factory, the Airfield, The Mines (tunnels under a mountain), the Volcano (a lava tube underneath, a crater on top) and Bunker Hill (rooms dug in under a hill).',
-    [[P.city, 14, 14], [BB.downtown, 140, 22], [mines, 226, 14], [BB.port, 350, 24],
-     [P.stadium, 20, 132], [volcano, 118, 124], [P.factory, 236, 138], [BB.suburbs, 344, 132],
-     [P.airfield, 14, 252], [bunker, 128, 240], [BB.canyon, 236, 238], [P.castle, 340, 238]], 440, 330, 14201);
-  BR_MAPS.frost = brJoin('Frostfall Wilds', 'jungle', { ground: 0x5a7a3a, sky: 0xb4d0ec, grass: 0x5a7a3a }, 'Wild country with nine places to land: Snow Peak, Thrill Park, the Jungle, the Canyon, the Lumber Camp, the Crystal Caves (a cave maze under a mountain), the Sky Mesas (four heights, bridges and kickers) and the Hidden Lab (underground, with a helipad on top).',
-    [[P.peak, 12, 12], [caves, 130, 18], [BB.jungle, 244, 16], [lumber, 344, 22],
-     [P.park, 12, 128], [mesas, 136, 122], [BB.canyon, 246, 124], [BB.port, 340, 132],
-     [lab, 30, 238], [BB.suburbs, 150, 246], [P.castle, 250, 236], [BB.downtown, 350, 244]], 440, 330, 14202);
+  BR_MAPS.valley = world('Volt Valley', { ground: 0x4f7a3a, sky: 0xa6d0f0, grass: 0x4f7a3a }, 'A massive valley, 760 x 520 m, with twenty named places to land and seven biomes: city, badlands, coast, volcanic ash, forest, farmland and desert. Underground: The Mines, Mount Ember\'s lava tube, Bunker Hill, the Crystal Caves and the Hidden Lab.',
+    [[P.city, 14, 14, 'Volt City'], [BB.downtown, 166, 14, 'Old Town'], [mines, 318, 14, 'The Mines'], [BB.port, 470, 14, 'Harbor Point'], [P.factory, 622, 14, 'Steelworks'], [P.stadium, 14, 142, 'Volt Arena'], [volcano, 166, 142, 'Mount Ember'], [BB.suburbs, 318, 142, 'Maple Grove'], [P.airfield, 470, 142, 'Skyfield'], [P.castle, 622, 142, 'Castle Hill'], [farm, 14, 270, 'Sunny Acres'], [bunker, 166, 270, 'Bunker Hill'], [BB.canyon, 318, 270, 'Dust Canyon'], [truck, 470, 270, 'Last Chance Stop'], [BB.jungle, 622, 270, 'Wildwood'], [lumber, 14, 398, 'Timber Mill'], [caves, 166, 398, 'Crystal Caves'], [mesas, 318, 398, 'Red Mesas'], [lab, 470, 398, 'The Hidden Lab'], [P.park, 622, 398, 'Thrill Park']], 760, 520, 14201,
+    [[0, 0, 0, 304, 128, 'urban'], [0, 304, 0, 456, 128, 'badlands'], [0, 456, 0, 760, 128, 'coast'], [0, 152, 128, 304, 256, 'volcanic'], [0, 608, 128, 760, 520, 'forest'], [0, 0, 256, 304, 384, 'farm'], [0, 304, 256, 608, 384, 'desert'], [0, 0, 384, 152, 520, 'forest'], [0, 152, 384, 456, 520, 'badlands']]);
+  BR_MAPS.frost = world('Frostfall Wilds', { ground: 0x5a7a3a, sky: 0xb4d0ec, grass: 0x5a7a3a }, 'Massive wild country, 760 x 520 m, with twenty named places: a snowfield across the north, forest, red desert, farmland, a city, badlands and an ash mountain. Underground: Glacier Caves, the Black Site, the Iron Mines, Ash Mountain and Fort Hollow.',
+    [[P.peak, 14, 14, 'Frost Peak'], [caves, 166, 14, 'Glacier Caves'], [lumber, 318, 14, 'Pine Mill'], [P.castle, 470, 14, 'Winterhold'], [BB.suburbs, 622, 14, 'Snowdrift'], [P.park, 14, 142, 'Frostfall Fair'], [mesas, 166, 142, 'Copper Mesas'], [BB.canyon, 318, 142, 'Red Gulch'], [lab, 470, 142, 'Black Site'], [BB.port, 622, 142, 'Ice Harbor'], [BB.jungle, 14, 270, 'Deepwood'], [farm, 166, 270, 'Meadow Farm'], [BB.downtown, 318, 270, 'Frostfall City'], [P.airfield, 470, 270, 'Northfield'], [truck, 622, 270, 'Junction Nine'], [mines, 14, 398, 'Iron Mines'], [volcano, 166, 398, 'Ash Mountain'], [bunker, 318, 398, 'Fort Hollow'], [P.stadium, 470, 398, 'Frostfall Arena'], [P.factory, 622, 398, 'Old Factory']], 760, 520, 14202,
+    [[0, 0, 0, 760, 128, 'snow'], [0, 0, 128, 152, 384, 'forest'], [0, 152, 128, 456, 256, 'desert'], [0, 152, 256, 304, 384, 'farm'], [0, 304, 256, 456, 384, 'urban'], [0, 0, 384, 152, 520, 'badlands'], [0, 152, 384, 304, 520, 'volcanic']]);
   /* the menu: just the two big maps (and Random) */
   BR_MAP_KEYS.length = 0; BR_MAP_KEYS.push('valley', 'frost');
   const o = GAME_INFO.br.opts.find(x => x.key === 'map'); o.values = ['random', ...BR_MAP_KEYS]; o.names = ['Random (either map)', ...BR_MAP_KEYS.map(k => `${BR_MAPS[k].name} (${BR_MAPS[k].size.width} x ${BR_MAPS[k].size.height} m)`)]; o.def = 'random';
@@ -143,6 +187,11 @@ if (typeof BR_FLOORS !== "undefined") BR_FLOORS.grass = 0x5f8a3e;   // (grassy h
   P.buildBRWorld = function (...a) {
     const r = bw.apply(this, a), M = MODES.br.map(this.m), g = this.arena; if (!g || !M) return r;
     const dirt = new THREE.MeshStandardMaterial({ color: 0x6b5340, roughness: 0.95 }), lamp = new THREE.MeshStandardMaterial({ color: 0xffd27a, emissive: 0xffb84a, emissiveIntensity: 1.2 });
+    const BTEX = { snow: ['concrete', [1.6, 1.64, 1.7]], desert: ['sand', [1.12, 1.06, 0.95]], volcanic: ['dirt', [0.5, 0.44, 0.44]], badlands: ['dirt', [1.05, 0.9, 0.8]], urban: ['asphalt', [1.3, 1.3, 1.3]], coast: ['sand', [1.2, 1.18, 1.1]], forest: ['jungle', [1, 1.05, 1]], farm: ['grass', [1.3, 1.3, 0.9]] };   // (colour multipliers on the texture)
+    for (const d of M.deco) if (d.t === 'biome' && BTEX[d.kind]) {                    // v14.2.2: biomes: the ground changes from place to place
+      const [tx, col] = BTEX[d.kind], w = d.x1 - d.x0, h = d.y1 - d.y0, t = Look.tex(tx).clone(); t.needsUpdate = true; t.repeat.set(w / 7, h / 7);
+      const pl = new THREE.Mesh(new THREE.PlaneGeometry(w, h).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: t, color: new THREE.Color(col[0], col[1], col[2]), roughness: 0.95 })); pl.position.set(d.x0 + w / 2, -0.004, d.y0 + h / 2); pl.receiveShadow = true; g.add(pl);
+    }
     for (const d of M.deco) if (d.t === 'cavefloor') {
       const pl = new THREE.Mesh(new THREE.PlaneGeometry(d.w, d.h).rotateX(-Math.PI / 2), dirt); pl.position.set(d.x + d.w / 2, 0.015, d.y + d.h / 2); pl.receiveShadow = true; g.add(pl);
       const n = Math.max(1, Math.floor(Math.max(d.w, d.h) / 10)); for (let i = 0; i < n; i++) { const t = (i + 0.5) / n, lx = d.w > d.h ? d.x + d.w * t : d.x + d.w / 2, ly = d.w > d.h ? d.y + d.h / 2 : d.y + d.h * t; const L = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.5), lamp); L.position.set(lx, BR.H - 0.18, ly); g.add(L); }

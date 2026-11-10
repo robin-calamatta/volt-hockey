@@ -1,7 +1,7 @@
 /* Friends and party: a floating 👥 button in the top-left corner of every screen. It opens a window over the game with everything social:
    your account (log in / out, email), your party (members, voice status, invite, remove, party chat, leave), your room (chat, invite),
    invites and friend requests, unread messages, and every friend (online first) with Message / Party / Room / Join / remove / block.
-   Open it with: a click or tap on 👥, the Select (View / Back) button on a gamepad - anywhere, in a match too - or the ` key.
+   Open it with: 'Friends and party' in the main menu or the Start / pause menu (in a match too), or the ` key. (v14.2.4: no button of its own.)
    An offline match pauses while it is open. Mouse, keyboard and gamepad each work on their own (ui_overlay.js). */
 const FriendsBar = {
   root: null, modal: null, open: false, confirm: '', tick: 0, pausedGame: false,
@@ -33,12 +33,11 @@ const FriendsBar = {
     const g = window.voltGame; if (!g) return;
     const show = !g.scene.isActive('Title') && Account.available() && !Forms.isOpen && !(Settings.touch && TouchPad.inGame);   // touch, mid-match: the button would cover the touch controls (it is in the pause menu)
     if (this.pausedGame && !this.open && !Forms.isOpen) { this.pausedGame = false; if (g.scene.isPaused('Game') && !g.scene.isActive('Pause')) g.scene.resume('Game'); }   // login form closed without logging in
-    this.root.style.display = show ? 'flex' : 'none';
+    this.root.style.display = 'none';                          // (v14.2.4: no button of its own: it's in the Start / pause menu and the main menu)
     if (++this.tick % 60 === 0) { this.renderButton(); if (this.open && Party.active && !this.modal.contains(document.activeElement)) this.render(); }
     if (!show || (typeof OSK !== 'undefined' && OSK.input)) return;
     Controls.update(g.loop.frame);                             // keep presses fresh even while the match is paused (once per frame; repeats are ignored)
     const t = performance.now();
-    if (t - (this.lastPad || 0) > 300 && Controls.list().some(s => s.id.startsWith('pad') && s.raw.pressed.social)) { this.lastPad = t; this.toggle(); }   // Select / View
   },
   pauseGame() {                                                // an offline match waits while the window (or the login form) is up
     const g = window.voltGame;
@@ -57,12 +56,13 @@ const FriendsBar = {
     }
     Sound.play(on ? 'select' : 'back'); this.renderButton();
   },
+  menuLabel() { if (typeof Account === 'undefined' || !Account.loggedIn) return 'Log in / sign up'; let n = 0; try { n = Social.unreadTotal() + Social.data.invites.length + Social.data.incoming.length; } catch (e) {} return `Friends and party${n ? ` (${n} new)` : ''}`; },
   renderButton() {
     if (!this.root) return;
     if (!Account.loggedIn) { this.root.innerHTML = '<span class="ic">👤</span> Log in'; this.root.title = 'Log in or sign up'; return; }
     const on = Social.data.friends.filter(f => f.online).length, unread = Social.unreadTotal(), inv = Social.data.invites.length + Social.data.incoming.length;
     this.root.innerHTML = `<span class="ic">👥</span><b>${on}</b>${Party.active ? ` · 🎉${Party.members.length}` : ''}${unread + inv ? ` <i>${unread + inv}</i>` : ''}`;
-    this.root.title = 'Friends and party (Select on a gamepad, ` on the keyboard)';
+    this.root.title = 'Friends and party (in the menu, or ` on the keyboard)';
   },
   btn(act, label, who = '', cls = '') { return `<button class="a ${cls}" data-act="${act}" data-who="${esc(who)}" data-key="${act}:${esc(who)}">${label}</button>`; },
   render() {

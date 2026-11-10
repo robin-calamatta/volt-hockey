@@ -30,7 +30,7 @@ const TRAIL_MAPS = {
   diamond:  { name: 'Diamond', size: { width: 46, height: 28 }, blocks: [[0.48, 0.15, 0.52, 0.25], [0.48, 0.75, 0.52, 0.85], [0.18, 0.47, 0.26, 0.53], [0.74, 0.47, 0.82, 0.53], [0.35, 0.33, 0.39, 0.39], [0.61, 0.33, 0.65, 0.39], [0.35, 0.61, 0.39, 0.67], [0.61, 0.61, 0.65, 0.67]] }
 };
 const TRAIL_KEYS = Object.keys(TRAIL_MAPS);
-const trailBlocks = m => { const M = TRAIL_MAPS[m.mini && m.mini.map] || TRAIL_MAPS.classic, y0 = m.centerY - m.height / 2; return M._abs && M._w === m.width ? M._abs : (M._w = m.width, M._abs = M.blocks.map(([a, b, c, d]) => ({ x0: a * m.width, y0: y0 + b * m.height, x1: c * m.width, y1: y0 + d * m.height }))); };
+const trailBlocks = m => { const M = TRAIL_MAPS[m.mini && m.mini.map] || TRAIL_MAPS.classic, y0 = m.centerY - m.height / 2, key = m.width + ':' + m.height + ':' + m.centerY; return M._abs && M._w === key ? M._abs : (M._w = key, M._abs = M.blocks.map(([a, b, c, d]) => ({ x0: a * m.width, y0: y0 + b * m.height, x1: c * m.width, y1: y0 + d * m.height }))); };
 const inBlock = (m, x, y, pad) => trailBlocks(m).some(b => x > b.x0 - pad && x < b.x1 + pad && y > b.y0 - pad && y < b.y1 + pad);
 const trailSegs = (m, skipC) => {                       // every live trail segment: [x0, y0, x1, y1, owner k, newest time]
   const g = m.gs, out = [];
@@ -104,9 +104,11 @@ const trailCol = c => MINI.palette[c.k % MINI.palette.length];
   P.updateMode = function (dt) {
     const r = um.call(this, dt), m = this.m;
     if (!m || m.kind !== 'trails') { if (this.trailG) { this.scene.remove(this.trailG); this.trailG = null; } return r; }
-    if (this.trailG && this.trailG.parent !== this.scene) { this.trailG = null; }   // (a new scene: build again)
+    const tk = (m.mini && m.mini.map) + ':' + m.width + ':' + m.height;
+    if (this.trailG && (this.trailG.parent !== this.scene || this.trailKey !== tk)) { if (this.trailG.parent) this.trailG.parent.remove(this.trailG); this.trailG = null; }   // (a new scene, or a new map: build again. v14.2.10: a new game on another map used to keep the last map's blocks, so the new ones were invisible)
+    this.trailKey = tk;
     if (!this.trailG) { this.trailG = new THREE.Group(); this.scene.add(this.trailG); this.trailM = new Map();
-      for (const b of trailBlocks(m)) { const w = b.x1 - b.x0, d = b.y1 - b.y0, box = new THREE.Mesh(new THREE.BoxGeometry(w, 1.0, d), new THREE.MeshBasicMaterial({ color: 0xff2a6d, transparent: true, opacity: 0.55, fog: false })); box.position.set((b.x0 + b.x1) / 2, 0.5, (b.y0 + b.y1) / 2);
+      for (const b of trailBlocks(m)) { const w = b.x1 - b.x0, d = b.y1 - b.y0, box = new THREE.Mesh(new THREE.BoxGeometry(w, 1.4, d), new THREE.MeshBasicMaterial({ color: 0xff2a6d, transparent: true, opacity: 0.8, fog: false })); box.position.set((b.x0 + b.x1) / 2, 0.7, (b.y0 + b.y1) / 2);
         const edge = new THREE.LineSegments(new THREE.EdgesGeometry(box.geometry), new THREE.LineBasicMaterial({ color: 0xffd0e0, fog: false })); edge.position.copy(box.position); this.trailG.add(box, edge); } }
     const g = m.gs || {}, life = (m.mini && m.mini.life) || 7, tNow = g.t || 0, pulse = 0.85 + 0.15 * Math.sin(performance.now() / 90);
     for (const c of m.chairs) {
@@ -141,3 +143,15 @@ const trailCol = c => MINI.palette[c.k % MINI.palette.length];
   };
 }
 { const mc = miniCfg; miniCfg = function (kind, ...a) { const c = mc(kind, ...a); if (kind === 'trails' && c && (!c.map || c.map === 'random' || !TRAIL_MAPS[c.map])) c.map = TRAIL_KEYS[Math.floor(Math.random() * TRAIL_KEYS.length)]; return c; }; }   // (Random: a different map each game)
+
+/* v14.2.10: the barriers show on the map preview (in the game's options) and on the minimap too */
+MODES.trails.walls = m => trailBlocks(m).map(b => ({ ...b, kind: 'trailblock' }));
+{ const P = GameScene.prototype, mm = P.drawMinimap;
+  P.drawMinimap = function (...a) {
+    const r = mm.apply(this, a), m = this.match; if (!m || !this.mapG || !(m.kind === 'trails' || (m.kind === 'hunt' && typeof Arena !== 'undefined' && Arena.map(m)))) return r;
+    const g = this.mapG, Mm = CONFIG.view3d.minimap, C = CONFIG.court, B = CONFIG.courtBase || C, fit = Math.min(1, B.width / C.width, B.height / C.height), s = Mm.scale * fit, ox = Mm.x + (B.width - C.width * fit) * Mm.scale, oy = Mm.y;
+    const list = m.kind === 'trails' ? trailBlocks(m) : Arena.walls(m), col = m.kind === 'trails' ? 0xff2a6d : 0x9aa6b2;
+    for (const b of list) g.fillStyle(col, 0.9).fillRect(ox + b.x0 * s, oy + b.y0 * s, Math.max(1.5, (b.x1 - b.x0) * s), Math.max(1.5, (b.y1 - b.y0) * s));
+    return r;
+  };
+}

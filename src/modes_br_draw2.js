@@ -17,7 +17,7 @@
   P.updateBR = function (dt) {
     upd.call(this, dt); const m = this.m, g = m.gs, t = performance.now() / 1000, M = MODES.br.map(m), sc = this.sc;
     const eyes = (sc.setup.players || []).map(p => p.chair).filter(Boolean); if (sc.online) { const c = sc.brMyChair && sc.brMyChair(); if (c) eyes.push(c); }
-    const me = eyes[0], near = (x, y) => !eyes.length || eyes.some(c => Math.hypot(c.x - x, c.y - y) < 70);
+    const me = eyes[0], near = (x, y) => !eyes.length || eyes.some(c => Math.hypot(c.x - x, c.y - y) < 50);   // (v14.2.3: was 70)
     for (const L of g.L || []) { const mesh = this.brLoot.get(L[0]); if (!mesh) continue; mesh.visible = near(L[2], L[3]); if (!mesh.userData.pickup || !mesh.visible) continue;   // (far away: not drawn)
       mesh.position.set(L[2], L[4] * BR.H, L[3]); mesh.rotation.y = 0; const it = mesh.userData.item; it.rotation.y = t * 1.3 + L[0]; it.position.y = 0.55 + Math.sin(t * 2 + L[0]) * 0.07; }
     if (!this.rezG) {                                                       // rez garages: a roof over the tunnel, and a sign that is green when ready
@@ -143,11 +143,19 @@ Object.assign(GameScene.prototype, {
     for (const L of m.gs.L || []) if (L[1] === 'card' && me && m.chairs[L[5]] && m.chairs[L[5]].gs.team === me.gs.team) g.fillStyle(0xffd23f, 1).fillRect(ox + L[2] * s - 2, oy + L[3] * s - 3, 4, 6);
   };
   const pc = View3D.prototype.placeCamera;
-  View3D.prototype.placeCamera = function (vp, dt) {                       // Volt Royale third person: further back and higher, looking ahead of the cart
-    const c = pc.call(this, vp, dt); if (!(this.m.kind === 'br' && vp.mode === 'third' && vp.chair)) return c;
+  View3D.prototype.placeCamera = function (vp, dt) {                       // third person (every game from v14.2.10): behind and above the cart, looking ahead of it
+    const c = pc.call(this, vp, dt); if (!(vp.mode === 'third' && vp.chair && this.m)) return c; const br = this.m.kind === 'br';   // (v14.2.10: every game's third person works this way now)
     const ch = vp.chair, z = (ch.gs && ch.gs.z) || 0, st = this.camFor(vp.key), k = 1 - Math.exp(-6 * dt), h = ch.heading; st.th = st.th === undefined ? h : st.th + normalizeAngle(h - st.th) * k;
-    const bx = ch.x - Math.cos(st.th) * 4.2, by = ch.y - Math.sin(st.th) * 4.2; c.position.set(bx, z + 2.5, by); c.lookAt(ch.x + Math.cos(st.th) * 6, z + 0.9, ch.y + Math.sin(st.th) * 6);
-    if (!vp.spect) { const pt = brPitch(ch) * 0.6; if (pt) { const d = new THREE.Vector3(); c.getWorldDirection(d); const yaw = Math.atan2(d.z, d.x), p0 = Math.asin(Math.max(-1, Math.min(1, d.y))) + pt; c.lookAt(c.position.x + Math.cos(yaw) * Math.cos(p0), c.position.y + Math.sin(p0), c.position.z + Math.sin(yaw) * Math.cos(p0)); } }
+    /* v14.2.6: further back and higher (v14.2.9: 2.75 m behind and 1.75 m up by default; Settings > Controls and screen > Third-person camera distance) with a wider view, so you see around you and well ahead. It comes in closer
+       when a wall is behind you, and stays under the floor above you indoors */
+    const M = br ? MODES.br.map(this.m) : null, AW = !br && typeof Arena !== 'undefined' && Arena.map(this.m) ? Arena.walls(this.m) : null, lv = (ch.gs && ch.gs.lv) || 0, cx = Math.cos(st.th), cy = Math.sin(st.th); const far = Math.max(1.5, Math.min(6, Settings.brCamDist || 2.75)); let back = far;
+    for (let d = 0.6; d <= far; d += 0.25) { const x = ch.x - cx * d, y = ch.y - cy * d; if (br ? (brWallAt(M, lv, x, y) || (lv === 0 && brTreesNear(M, x, y).some(t => Math.hypot(x - t.x, y - t.y) < t.r + 0.2))) : AW && AW.some(w => x > w.x0 - 0.2 && x < w.x1 + 0.2 && y > w.y0 - 0.2 && y < w.y1 + 0.2)) { back = Math.max(0.8, d - 0.5); break; } }
+    let up = 0.85 + back * 0.33; const bx = ch.x - cx * back, by = ch.y - cy * back; if (br && (MODES.br.floorAt(M, lv + 1, bx, by) || MODES.br.floorAt(M, lv + 1, ch.x, ch.y))) up = Math.min(up, BR.H - 0.35);
+    st.camBack = st.camBack === undefined ? back : st.camBack + (back - st.camBack) * (back < st.camBack ? 1 : k * 0.6);   // (snaps in, eases back out)
+    const bb = st.camBack; st.camUp = st.camUp === undefined ? up : st.camUp + (up - st.camUp) * (up < st.camUp ? 1 : k);
+    c.position.set(ch.x - cx * bb, z + st.camUp, ch.y - cy * bb); c.lookAt(ch.x + cx * 9, z + 1.0, ch.y + cy * 9);
+    const fov = this.widen(Math.max(80, Settings.fov3d || 74), (vp.rect && vp.rect.w && vp.rect.h) ? vp.rect.w / vp.rect.h : 16 / 9); if (c.fov !== fov) { c.fov = fov; c.updateProjectionMatrix(); }
+    if (br && !vp.spect) { const pt = brPitch(ch) * 0.6; if (pt) { const d = new THREE.Vector3(); c.getWorldDirection(d); const yaw = Math.atan2(d.z, d.x), p0 = Math.asin(Math.max(-1, Math.min(1, d.y))) + pt; c.lookAt(c.position.x + Math.cos(yaw) * Math.cos(p0), c.position.y + Math.sin(p0), c.position.z + Math.sin(yaw) * Math.cos(p0)); } }
     c.updateMatrixWorld(); return c;
   };
 }
@@ -155,9 +163,9 @@ Object.assign(GameScene.prototype, {
 /* ---- the bag screen: your slots, your ammo (X on an ammo type drops a pack), and the full map with the storm ---- */
 { const P = BRInvScene.prototype, cr = P.create, up = P.update, pr = P.press;
   P.create = function () {
-    cr.call(this); const V = CONFIG.view; this.help.setText('◀ ▶ choose     A: move / swap     Y: hold this     X: drop     ▼ ammo     B or ▲: close').setY(this.cy - 150);
-    this.ammoT = AMMO_KEYS.map((k, i) => this.add.text(this.cx - 330 + i * 165, this.cy + 92, '', { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#ffffff', align: 'center' }).setOrigin(0.5));
-    this.ammoI = AMMO_KEYS.map((k, i) => this.add.image(this.cx - 330 + i * 165, this.cy + 58, this.d.game.brIcon('am_' + k)).setDisplaySize(68, 38));   // v14.1.8: a picture of the rounds over each ammo count
+    cr.call(this); this.mapS = null; const V = CONFIG.view; this.help.setText('◀ ▶ choose     A: move / swap     Y: hold this     X: drop     ▼ ammo     B or ▲: close').setY(this.cy - 150);
+    this.ammoT = AMMO_KEYS.map((k, i) => this.add.text(this.cx - 330 + i * 165, this.cy + 134, '', { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#ffffff', align: 'center' }).setOrigin(0.5));
+    this.ammoI = AMMO_KEYS.map((k, i) => this.add.image(this.cx - 330 + i * 165, this.cy + 98, this.d.game.brIcon('am_' + k)).setDisplaySize(68, 38));   // v14.1.8: a picture of the rounds over each ammo count
     this.ammoCur = -1; this.mapG = this.add.graphics(); this.mapT = this.add.text(V.width - 16, 16, '', { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#ffd23f', align: 'right' }).setOrigin(1, 0);
   };
   P.press = function (k) {
@@ -174,9 +182,10 @@ Object.assign(GameScene.prototype, {
     this.ammoT.forEach((t, i) => { const A = BR_AMMO[AMMO_KEYS[i]]; t.setText(`${A.name}\n${G.am[i]} / ${A.max}`); if (this.ammoI) this.ammoI[i].setAlpha(G.am[i] ? 1 : 0.4); t.setColor(this.ammoCur === i ? '#ffd23f' : G.am[i] ? '#ffffff' : '#6b7a86').setScale(this.ammoCur === i ? 1.1 : 1); });
     if (this.ammoCur >= 0) this.info.setText(`${BR_AMMO[AMMO_KEYS[this.ammoCur]].name}: X drops a pack for a team-mate.  ▲ back to your slots`);
     const V = CONFIG.view, M = MODES.br.map(m), S = m.gs.st, sz = 196, s = sz / Math.max(m.width, m.height), x0 = V.width - sz - 14, y0 = 136, g = this.mapG; g.clear();   // the map (under the minimap)
-    g.fillStyle(0x0d151b, 0.92).fillRect(x0 - 6, y0 - 6, m.width * s + 12, m.height * s + 12).fillStyle(MODES.br.map(m).theme.ground, 1).fillRect(x0, y0, m.width * s, m.height * s);
-    for (const f of M.floors) if (f.lv === 1) g.fillStyle(0x9aa1a8, 0.8).fillRect(x0 + f.x0 * s, y0 + f.y0 * s, (f.x1 - f.x0) * s, (f.y1 - f.y0) * s);
-    for (const w of M.walls) if (w.lv === 0) g.fillStyle(0x3a3f45, 1).fillRect(x0 + w.x0 * s, y0 + w.y0 * s, Math.max(1, (w.x1 - w.x0) * s), Math.max(1, (w.y1 - w.y0) * s));
+    if (!this.mapS) { const q = this.mapS = this.add.graphics(); q.setDepth((g.depth || 0) - 0.01); this.children.moveBelow(q, g);   // (v14.2.6: the buildings are drawn once when the bag opens, not every frame)
+      q.fillStyle(0x0d151b, 0.92).fillRect(x0 - 6, y0 - 6, m.width * s + 12, m.height * s + 12).fillStyle(MODES.br.map(m).theme.ground, 1).fillRect(x0, y0, m.width * s, m.height * s);
+      for (const f of M.floors) if (f.lv === 1) q.fillStyle(0x9aa1a8, 0.8).fillRect(x0 + f.x0 * s, y0 + f.y0 * s, (f.x1 - f.x0) * s, (f.y1 - f.y0) * s);
+      for (const w of M.walls) if (w.lv === 0 && w.kind !== 'door') q.fillStyle(0x3a3f45, 1).fillRect(x0 + w.x0 * s, y0 + w.y0 * s, Math.max(1, (w.x1 - w.x0) * s), Math.max(1, (w.y1 - w.y0) * s)); }
     (M.rez || []).forEach((q, i) => g.fillStyle(m.gs.gar[i] > m.gs.t ? 0xff4d4d : 0x7dff6a, 1).fillRect(x0 + q.cx * s - 4, y0 + q.cy * s - 4, 8, 8));
     g.lineStyle(3, 0x9b4dff, 1).strokeCircle(x0 + S.x * s, y0 + S.y * s, S.r * s); if (S.wait > 0 || S.shrink > 0) g.lineStyle(2, 0xffffff, 0.9).strokeCircle(x0 + S.fx * s, y0 + S.fy * s, S.fr * s);
     const me = this.d.chair; for (const o of m.chairs) if (!o.out && o.gs.team === me.gs.team) g.fillStyle(o === me ? 0xffd23f : 0x3dd6ff, 1).fillCircle(x0 + o.x * s, y0 + o.y * s, o === me ? 5 : 4);

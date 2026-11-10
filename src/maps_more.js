@@ -1,4 +1,4 @@
-/* v14.2.1: Manhunt gets eight arenas (walls to hide behind, loops to run round, sliding gates and spinners), plus the open rink.
+/* v14.2.1: Manhunt gets eight arenas (twelve from v14.2.6) (walls to hide behind, loops to run round, sliding gates and spinners), plus the open rink.
    They use the same arena kit as Capture the Flag and King of the Hill (modes_arena.js): carts bump off the walls, the CPU paths round
    them, and they're drawn in 3D and 2D. Pick one under Map, or Random for a different one each game. */
 const W_ = (x0, y0, x1, y1, k = 'wall') => [x0, y0, x1, y1, k], CR = (x, y, s = 1.2) => [x - s / 2, y - s / 2, x + s / 2, y + s / 2, 'crate'];
@@ -27,7 +27,22 @@ ARENA_MAPS.hunt = {
   fort: { name: 'The Fort', size: { width: 54, height: 34 }, blurb: 'A fort in the middle with a gate on each side, and cover in every corner.',
     walls: [W_(18, 9, 24.5, 9.6), W_(29.5, 9, 36, 9.6), W_(18, 24.4, 24.5, 25), W_(29.5, 24.4, 36, 25), W_(18, 9.6, 18.6, 14.5), W_(18, 19.5, 18.6, 24.4), W_(35.4, 9.6, 36, 14.5), W_(35.4, 19.5, 36, 24.4),
       W_(5, 5, 9, 5.6, 'bags'), W_(45, 28.4, 49, 29, 'bags'), W_(5, 28.4, 9, 29, 'bags'), W_(45, 5, 49, 5.6, 'bags'), CR(27, 17, 1.6)],
-    moving: [{ type: 'spin', x: 27, y: 4.5, len: 2, speed: 0.8 }, { type: 'spin', x: 27, y: 29.5, len: 2, speed: -0.8 }] }
+    moving: [{ type: 'spin', x: 27, y: 4.5, len: 2, speed: 0.8 }, { type: 'spin', x: 27, y: 29.5, len: 2, speed: -0.8 }] },
+  /* v14.2.6: four more */
+  cross: { name: 'Crossroads', size: { width: 52, height: 34 }, blurb: 'Four city blocks and a crossroads in the middle with a spinner on it.',
+    walls: [W_(6, 5, 21, 13), W_(31, 5, 46, 13), W_(6, 21, 21, 29), W_(31, 21, 46, 29), CR(13.5, 17, 1.2), CR(38.5, 17, 1.2)],
+    moving: [{ type: 'spin', x: 26, y: 17, len: 2.6, speed: 0.75 }, { type: 'gate', w: 0.7, h: 5, a: [26, 2.5], b: [26, -3], period: 8 }, { type: 'gate', w: 0.7, h: 5, a: [26, 31.5], b: [26, 37], period: 8, phase: 0.5 }] },
+  spiral: { name: 'The Spiral', size: { width: 50, height: 34 }, blurb: 'A square spiral of walls: run it round and round, or cut through the gaps.',
+    walls: [W_(5, 4, 45, 4.6), W_(44.4, 4.6, 45, 30), W_(9, 29.4, 44.4, 30), W_(9, 9, 9.6, 29.4), W_(9.6, 9, 38, 9.6), W_(37.4, 9.6, 38, 24.5), W_(15, 23.9, 37.4, 24.5), W_(15, 14.5, 15.6, 23.9), W_(15.6, 14.5, 31, 15.1),
+      W_(25, 4.6, 25.6, 6.5, 'bags'), W_(20, 24.5, 20.6, 27, 'bags'), CR(23, 19.5, 1.4)],
+    moving: [{ type: 'slide', w: 1.6, h: 1.6, a: [12, 12], b: [12, 26], period: 6 }] },
+  islands: { name: 'The Islands', size: { width: 56, height: 34 }, blurb: 'Islands of crates and sandbags in open water... well, open floor: cover everywhere, walls nowhere.',
+    walls: [...[[10, 8], [22, 6], [34, 8], [46, 6], [10, 26], [22, 28], [34, 26], [46, 28], [16, 17], [28, 17], [40, 17]].flatMap(([x, y], i) => [CR(x, y, 1.6), i % 2 ? W_(x - 2.5, y + 1.4, x + 2.5, y + 2, 'bags') : W_(x - 2.5, y - 2, x + 2.5, y - 1.4, 'bags')])],
+    moving: [{ type: 'spin', x: 22, y: 17, len: 1.8, speed: 1.1 }, { type: 'spin', x: 34, y: 17, len: 1.8, speed: -1.1 }] },
+  bunker: { name: 'The Bunker', size: { width: 60, height: 36 }, blurb: 'A long bunker with rooms off a corridor down the middle, and blast doors that slide.',
+    walls: [...[[6, 12], [16, 24], [28, 36], [40, 48], [52, 54]].flatMap(([a, b]) => [W_(a, 12, b, 12.6), W_(a, 23.4, b, 24)]), ...[6, 18, 30, 42, 54].flatMap(x => [W_(x - 0.3, 3, x + 0.3, 12), W_(x - 0.3, 24, x + 0.3, 33)]),
+      W_(6, 3, 54, 3.6), W_(6, 32.4, 54, 33), CR(12, 7.5, 1.4), CR(36, 28.5, 1.4)],
+    moving: [...[14, 26, 38, 50].flatMap((x, i) => [{ type: 'gate', w: 4, h: 0.7, a: [x, 12.3], b: [x + 4.5, 12.3], period: 6 + i, phase: i * 0.25 }, { type: 'gate', w: 4, h: 0.7, a: [x, 23.7], b: [x - 4.5, 23.7], period: 7 + i, phase: 0.5 - i * 0.1 }])] }
 };
 {
   const mv0 = Arena.movers; Arena.movers = function (m) { if (m && !m.gs) m.gs = {}; return mv0.call(this, m); };   // (Manhunt has no mode state of its own)
@@ -58,4 +73,9 @@ ARENA_MAPS.hunt = {
     let goal = null; if (c.side === 1) { const prey = m.chairs.filter(o => o.side === 0 && !o.out).sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))[0]; if (prey) goal = { x: prey.x, y: prey.y }; }
     return Arena.steer(c, m, cmd, goal);
   };
+}
+
+/* v14.2.6: Manhunt has no mode of its own, so its arena's walls were never drawn (you bumped into invisible walls on an open rink). Draw them in 3D and 2D */
+{ const up = View3D.prototype.updateMini; View3D.prototype.updateMini = function (dt) { const r = up.call(this, dt); if (this.m && this.m.kind === 'hunt' && !modeOf(this.m)) Arena.draw3d(this); return r; };
+  const P = GameScene.prototype, d2 = P.drawMini2D; P.drawMini2D = function (g) { const m = this.match; if (m && m.kind === 'hunt' && !modeOf(m)) { Arena.draw2d(m, g, true); Arena.draw2d(m, g, false); } return d2.call(this, g); };
 }
