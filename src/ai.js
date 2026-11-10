@@ -44,7 +44,7 @@ function netBoxes(m) {
   return m.aiBoxes;
 }
 function boxesFor(m, side, c) {                                      // obstacles for a cart of `side`: both nets, plus the crease it must not enter (the foe's)
-  if (!m.aiCreaseBoxes) m.aiCreaseBoxes = m.creases.map((z, i) => { const pad = CONFIG.chair.radius + CONFIG.ai.creasePad, far = z.mouthX + z.dir * (CONFIG.crease.bulge + pad), back = m.nets[i].backX - z.dir * 0.8, cy = z.cy; return { x0: Math.min(back, far), x1: Math.max(back, far),   /* spans the net too, so the quickest way out is never through the mouth */ y0: cy - z.half - pad, y1: cy + z.half + pad }; });
+  if (!m.aiCreaseBoxes) m.aiCreaseBoxes = m.creases.map((z, i) => { const pad = CONFIG.chair.radius + CONFIG.ai.creasePad, far = z.mouthX + z.dir * (CONFIG.crease.bulge + pad), back = z.mouthX - z.dir * 0.05, cy = z.cy;   /* v14.2: stops at the goal mouth (the net box covers the net). It used to reach 0.8 m behind the net, so a ball sitting behind the net was out of every attacker's reach and stayed there */ return { x0: Math.min(back, far), x1: Math.max(back, far),   /* spans the net too, so the quickest way out is never through the mouth */ y0: cy - z.half - pad, y1: cy + z.half + pad }; });
   const ownCrease = c && c.role !== 'goalie' && !c.player ? [m.aiCreaseBoxes[side]] : [];   // two carts of one team may not share their own crease, so only the goalie goes in
   return side === undefined ? netBoxes(m) : [netBoxes(m)[side], m.aiCreaseBoxes[1 - side], ...ownCrease];      // own net, and the foe's crease (which already spans the foe's net)
 }
@@ -186,6 +186,10 @@ class TeamBrain {
       return { x: bp.x + u.x * d, y: bp.y + u.y * d };
     }
     if ((role === 'screen' || role === 'press') && !H) return this.rolePoint('cover', x);                  // nobody has the ball: nothing to screen or press
+    if (role === 'screen' && A.v2 && x.foes.length) {                              // v14.2: a real pick: park in the path of the defender who would get to our carrier first, close enough to body-block them
+      const cand = x.foes.filter(k => k.role !== 'goalie'), pool = cand.length ? cand : x.foes, f = pool.reduce((a, k) => (aiEta(k, H, x.D) < aiEta(a, H, x.D) ? k : a), pool[0]);
+      const u = aiUnit(H.x - f.x, H.y - f.y), gap = CONFIG.chair.radius * 2 + A.screenGap; return { x: f.x + u.x * gap + f.vx * 0.15, y: f.y + u.y * gap + f.vy * 0.15 };
+    }
     if (role === 'screen') { if (!x.foes.length) return this.rolePoint('cover', x); const f = x.foes.reduce((a, k) => (aiDist(k, H) < aiDist(a, H) ? k : a), x.foes[0]), u = aiUnit(f.x - H.x, f.y - H.y); return { x: H.x + u.x * A.screenDist, y: H.y + u.y * A.screenDist }; }
     if (role === 'press') { const u = aiUnit(x.ownMouth.x - H.x, x.ownMouth.y - H.y); return { x: H.x + u.x * A.pressDist, y: H.y + u.y * A.pressDist }; }
     if (role === 'mark') {
@@ -414,6 +418,16 @@ function goaliePlan(c, m, D, now) {
   const standX = own.mouthX + dir * (A.goalieStand + advance), bs = Math.hypot(ball.vx, ball.vy), inward = -ball.vx * dir;       // inward: how fast the ball comes at our net
   const foeNear = m.chairs.some(k => !k.benched && k.side !== c.side && aiDist(k, ball) < A.goalieClearFoe);
   if (aiDist(c, ball) < A.goalieClearRange && bs < A.goalieClearSpeed && !foeNear && inFront > 0.35) { aiStat(m, 'goalie.clear'); return chasePlan(c, m, D, now); }
+  /* v14.2: a slow ball at the goal mouth, by a post or in our crease: nobody else may go in there, so the goalie sweeps it out sideways
+     towards the boards (it used to stand next to it until the crease rule reset it to centre ice) */
+  const ownZ = inCrease(m.creases[c.side], ball.x, ball.y, 0.15), nearMouth = Math.abs(ball.y - cy) < half + 1.4 && inFront > -0.25 && inFront < CONFIG.crease.bulge + 1.3;
+  if (bs < 0.8 && nearMouth && (ownZ || !foeNear) && aiDist(c, ball) < 4.5) {
+    aiStat(m, 'goalie.sweep'); const sy = Math.sign(ball.y - cy) || (c.y > cy ? 1 : -1), away = aiUnit(dir * 0.8, sy);
+    const stage = { x: ball.x - away.x * 0.95, y: ball.y - away.y * 0.95 }; if (dir * (stage.x - own.mouthX) < 0.3) stage.x = own.mouthX + dir * 0.3;
+    const rel = { x: c.x - ball.x, y: c.y - ball.y }, along = rel.x * away.x + rel.y * away.y, lat = Math.abs(-rel.x * away.y + rel.y * away.x);
+    if ((along < -0.25 && lat < 0.45) || aiDist(c, stage) < 0.35) return { goal: { x: ball.x + away.x * 1.4, y: ball.y + away.y * 1.4 }, speed: 1, drive: true, crash: true, through: true, fast: true };
+    return { goal: stage, speed: 1, drive: true, crash: true, fast: true, face: Math.atan2(away.y, away.x) };
+  }
   if (!c.gk || now > c.gk.until) c.gk = { until: now + A.goalieNoiseEvery, err: (Math.random() * 2 - 1) * D.aimError * A.goalieNoise };    // weaker levels misjudge by a little
   let y;
   if (inward > A.goalieReact) { y = ball.y + ball.vy * (dir * (ball.x - standX) / inward); aiStat(m, 'goalie.track'); }       // a shot: meet it on the line
@@ -421,6 +435,11 @@ function goaliePlan(c, m, D, now) {
     const carrier = m.chairs.find(k => !k.benched && k.side !== c.side && aiHas(k, ball)), t = carrier || ball, near = true;
     const dd = aiDist(t, { x: own.mouthX, y: cy }), k = A.goalieShade + (A.goalieShadeNear - A.goalieShade) * clamp((A.goalieBlockRange - dd) / (A.goalieBlockRange - A.goalieTight), 0, 1);   // the closer they come, the more we mirror them across the mouth
     y = cy + (t.y - cy) * k;
+    if (A.v2 && carrier && dd < A.goalieBlockRange && Math.abs(own.mouthX - t.x) > 0.6) {    // v14.2: stand on the shooter's angle: the line from them to the middle of the net (and lean to where their cup points)
+      const f = (standX - t.x) / (own.mouthX - t.x), yb = t.y + (cy - t.y) * f, hx = Math.cos(carrier.heading), hy = Math.sin(carrier.heading), toNet = -dir;
+      let yl = yb; if (hx * toNet > 0.35) { const tt = (own.mouthX - t.x) / hx, yAim = t.y + hy * tt; if (Math.abs(yAim - cy) < half + 0.8) yl = t.y + (yAim - t.y) * f; }
+      y = yb * (1 - A.goalieRead) + yl * A.goalieRead;
+    }
   }
   const reach = half - A.goalieEdge; y = clamp(y + c.gk.err, cy - reach, cy + reach);
   const ex = standX - c.x, ey = y - c.y;

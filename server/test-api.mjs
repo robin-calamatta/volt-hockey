@@ -8,14 +8,15 @@ const call = async (m, p, body, token, q) => { const r = await api(m, p, q || {}
 let pass = 0; const ok = (name, cond) => { assert.ok(cond, name); pass++; console.log('  ok  ' + name); };
 
 // accounts
-let r = await call('POST', '/register', { username: 'Robin', password: 'hunter22', age: 34, email: 'robin@example.com' }); ok('register an adult', r.token && r.user.adult === true);
+let r = await call('POST', '/register', { legal: 'test', username: 'Robin', password: 'hunter22', age: 34, email: 'robin@example.com' }); ok('register an adult', r.token && r.user.adult === true);
 const robin = r.token;
-r = await call('POST', '/register', { username: 'robin', password: 'whatever1', age: 20, email: 'other@example.com' }); ok('usernames are unique (any case)', r._status === 409);
-r = await call('POST', '/register', { username: 'xx_fuck_xx', password: 'whatever1', age: 20, email: 'x@example.com' }); ok('rude usernames refused', r._status === 400);
-r = await call('POST', '/register', { username: 'Kid', password: 'abc', age: 12, email: 'kid@example.com' }); ok('short passwords refused', r._status === 400);
-r = await call('POST', '/register', { username: 'Kid', password: 'abcdef', age: 12, email: 'kid@example.com' }); ok('register an under-18 player', r.user.adult === false);
+r = await call('POST', '/register', { legal: 'test', username: 'robin', password: 'whatever1', age: 20, email: 'other@example.com' }); ok('usernames are unique (any case)', r._status === 409);
+r = await call('POST', '/register', { legal: 'test', username: 'xx_fuck_xx', password: 'whatever1', age: 20, email: 'x@example.com' }); ok('rude usernames refused', r._status === 400);
+r = await call('POST', '/register', { username: 'NoTerms', password: 'hunter22', age: 30, email: 'nt@example.com' }); ok('sign-up without agreeing to the EULA refused', r._status === 400);
+r = await call('POST', '/register', { legal: 'test', username: 'Kid', password: 'abc', age: 12, email: 'kid@example.com' }); ok('short passwords refused', r._status === 400);
+r = await call('POST', '/register', { legal: 'test', username: 'Kid', password: 'abcdef', age: 12, email: 'kid@example.com' }); ok('register an under-18 player', r.user.adult === false);
 const kid = r.token;
-r = await call('POST', '/register', { username: 'Sam', password: 'abcdef', age: 25, email: 'sam@example.com' }); const sam = r.token;
+r = await call('POST', '/register', { legal: 'test', username: 'Sam', password: 'abcdef', age: 25, email: 'sam@example.com' }); const sam = r.token;
 r = await call('POST', '/login', { username: 'ROBIN', password: 'wrong!!' }); ok('wrong password refused', r._status === 401);
 r = await call('POST', '/login', { username: 'ROBIN', password: 'hunter22' }); ok('log in (any case)', !!r.token);
 r = await call('POST', '/login', { username: 'Robin@Example.com', password: 'hunter22' }); ok('log in with your email', !!r.token && r.user.name === 'Robin');
@@ -63,8 +64,8 @@ r = await call('POST', '/friends/request', { username: 'Robin' }, kid); r = awai
 r = await call('POST', '/report', { username: 'Kid', where: 'room', text: 'test' }, robin); ok('report', r.ok && [...mem.keys()].some(k => k.startsWith('r/')));
 
 // email and password reset
-r = await call('POST', '/register', { username: 'Dupe', password: 'abcdef', age: 30, email: 'ROBIN@example.com' }); ok('an email can only belong to one account', r._status === 409);
-r = await call('POST', '/register', { username: 'NoMail', password: 'abcdef', age: 30, email: 'nope' }); ok('a valid email is required', r._status === 400);
+r = await call('POST', '/register', { legal: 'test', username: 'Dupe', password: 'abcdef', age: 30, email: 'ROBIN@example.com' }); ok('an email can only belong to one account', r._status === 409);
+r = await call('POST', '/register', { legal: 'test', username: 'NoMail', password: 'abcdef', age: 30, email: 'nope' }); ok('a valid email is required', r._status === 400);
 r = await call('GET', '/me', null, sam); ok('your email is shown masked', r.user.email === 's•••m@example.com');
 r = await call('POST', '/reset/request', { who: 'nobody@example.com' }); ok('reset for an unknown email looks the same', r.ok && outbox.length === 0);
 r = await call('POST', '/reset/request', { who: 'Sam' }); ok('reset by username sends an email', r.ok && outbox.length === 1 && outbox[0].to === 'sam@example.com');
@@ -78,7 +79,7 @@ r = await call('POST', '/login', { username: 'sam', password: 'newpass1' }); ok(
 r = await call('POST', '/reset/confirm', { token: link[1], password: 'again123' }); ok('a reset link works only once', r._status === 410);
 r = await call('POST', '/email', { email: 'sam2@example.com', password: 'wrong' }, sam2); ok('changing email needs your password', r._status === 403);
 r = await call('POST', '/email', { email: 'sam2@example.com', password: 'newpass1' }, sam2); ok('change your email', r.ok && r.user.email.endsWith('@example.com'));
-r = await call('POST', '/register', { username: 'Sam3', password: 'abcdef', age: 30, email: 'sam@example.com' }); ok('the old email is free again', !!r.token);
+r = await call('POST', '/register', { legal: 'test', username: 'Sam3', password: 'abcdef', age: 30, email: 'sam@example.com' }); ok('the old email is free again', !!r.token);
 
 // admin
 const adm = async (m, p, body, t, q) => { const r = await api(m, p, q || {}, body, t ? { 'x-admin-token': t } : {}); return { ...r.body, _status: r.status }; };

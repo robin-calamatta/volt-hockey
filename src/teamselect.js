@@ -138,7 +138,7 @@ const TeamSelect = {
               { side: 'AWAY', get: () => Settings.teamB, set: t => { Settings.teamB = t; Settings.save(); }, carts: practice ? cartsFor('sizeB') : null }],
       settings: [
         { label: () => `Difficulty   ◀ ${Settings.difficulty} ▶`, change: d => Settings.cycleDifficulty(d) },
-        speedCapItem('Max cart speed'), lockCartItem(),
+        lockCartItem(),
         ...(practice ? [] : [{ label: () => `Game clock   ◀ ${times(Settings.timeSpeed)} ▶`, change: d => Settings.adjust('timeSpeed', d) }]),
         { label: () => 'How to play', select: () => this.scene.start('HowTo', { kind: 'hockey', back: { scene: 'Setup', data: { practice } } }) }
       ],
@@ -160,7 +160,7 @@ const TeamSelect = {
         { label: () => `CPU skill   ◀ ${Settings.seasonDifficulty} ▶`, change: d => cycle('seasonDifficulty', levels, d) },
         { label: () => `Game length   ◀ ${Settings.seasonPeriod / 60} min periods ▶`, change: d => cycle('seasonPeriod', C.periodChoices, d) },
         { label: () => `Season   ◀ ${games(Settings.seasonDouble)} games ▶`, change: () => { Settings.seasonDouble = !Settings.seasonDouble; Settings.save(); }, select: () => { Settings.seasonDouble = !Settings.seasonDouble; Settings.save(); } },
-        speedCapItem('Max cart speed'), lockCartItem()
+        lockCartItem()
       ],
       onNext: () => this.start(), onBack: () => this.scene.start('SeasonMenu')
     });

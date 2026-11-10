@@ -12,10 +12,10 @@ const STYLE = {
 };
 // The controls guide (Settings > Controls and screen > Controls guide). Edit freely: one block per device.
 const CONTROLS_GUIDE = [
-  ['GAMEPAD', ['Left stick   drive  (1st / 3rd person: up = go, ◀ ▶ = turn)', 'B (hold, while turning)   drift: let go for a boost (bigger when the bar is purple)', 'Right stick   look around (springs back)', 'L3 (hold)   push to talk      D-pad ▲   tap: quick chat, hold: emoji wheel', 'D-pad ▼   camera      Select (View)   friends and party', 'RB / LB   half spin', 'D-pad ◀ ▶   speed down / up', 'X   full press on / off  (minigames: A or X uses a power-up)', 'Y   switch cart', 'Start   pause      A / B   select / back']],
-  ['KEYBOARD 1', ['WASD   drive', 'T   camera view', 'Tab chat   1-9 quick chat   G (hold) talk   ` friends   H (hold) emote wheel', 'R / Z   half spin', 'X   full press  (minigames: Space or X = power-up)', 'V / C   speed up / down', 'F   switch cart', 'Esc   pause', 'Space / Backspace   select / back']],
-  ['KEYBOARD 2', ['Arrows   drive', 'P   camera view', 'L (hold)   push to talk', '. / ,   spin', '] / [   half spin', '\\   full press  (minigames: Right Shift or \\ = power-up)', "' / ;   speed up / down", '/   switch cart', 'Right Shift / Right Ctrl   select / back']],
-  ['TOUCH', ['Stick   drive', 'VIEW   camera view', '💬   chat      🎙   talk (hold) / mic on-off (tap)', 'Spin buttons   spin', 'Small spin buttons   half spin', 'PRESS   full press  (minigames: A = power-up)', '+ / -   speed up / down', 'Cart button   switch cart', 'II   pause', 'Settings > Touch and screen   move the buttons']]
+  ['GAMEPAD', ['Left stick   drive  (1st / 3rd person: up = go, ◀ ▶ = turn)', 'B (hold, while turning)   drift: let go for a boost (bigger when the bar is purple)', 'Right stick   look around (springs back)', 'L3 (hold)   push to talk      D-pad ▲   tap: quick chat, hold: emoji wheel', 'D-pad ▼   camera      Select (View)   friends and party', 'RB / LB   half spin', 'D-pad ◀   ping (Volt Royale)', 'X   full press on / off  (minigames: A or X uses a power-up)', 'Y   switch cart', 'Start   pause      A / B   select / back']],
+  ['KEYBOARD 1', ['WASD   drive', 'T   camera view', 'Tab chat   1-9 quick chat   G (hold) talk   ` friends   H (hold) emote wheel', 'R / Z   half spin', 'X   full press  (minigames: Space or X = power-up)', 'C   ping (Volt Royale)', 'F   switch cart', 'Esc   pause', 'Space / Backspace   select / back']],
+  ['KEYBOARD 2', ['Arrows   drive', 'P   camera view', 'L (hold)   push to talk', '. / ,   spin', '] / [   half spin', '\\   full press  (minigames: Right Shift or \\ = power-up)', ";   ping (Volt Royale)", '/   switch cart', 'Right Shift / Right Ctrl   select / back']],
+  ['TOUCH', ['Stick   drive', 'VIEW   camera view', '💬   chat      🎙   talk (hold) / mic on-off (tap)', 'Spin buttons   spin', 'Small spin buttons   half spin', 'PRESS   full press  (minigames: A = power-up)', 'Cart button   switch cart', 'II   pause', 'Settings > Touch and screen   move the buttons']]
 ];
 const pct = v => Math.round(v * 100) + '%', times = v => v.toFixed(1) + 'x';
 const teamColorHex = i => '#' + TEAMS[i].color.toString(16).padStart(6, '0');
@@ -65,8 +65,8 @@ const SETTINGS_PAGES = {
     { label: () => 'Hear the play-by-play caller', select: () => sampleCall('goalLead') },
     { label: () => 'Hear the colour commentator', select: () => sampleCall('lull') }],
   'Game rules': () => [
-    slider('Game clock speed', 'timeSpeed', times), slider('Starting cart speed (D-pad ◀ ▶ in game)', 'speedLevel', v => `${v} of ${CONFIG.speedLevels.length}`),
-    speedCapItem(), lockCartItem(),
+    slider('Game clock speed', 'timeSpeed', times),
+    lockCartItem(),
     toggle('Cart collisions', 'collisions'), toggle('Penalties', 'penalties'),
     slider('Penalty time (in the sin bin)', 'penaltySeconds', v => `${v} s`),
     { rule: true, label: () => `Penalties carry over after a goal   ◀ ${Settings.penaltyCarry ? 'On' : 'Off'} ▶`, change: () => Settings.toggle('penaltyCarry'), select: () => Settings.toggle('penaltyCarry'), hint: 'On: a penalty keeps running after a goal and into the next period. If the team that is short gets scored on, all its penalties end.' }],
@@ -91,7 +91,7 @@ const SETTINGS_HINTS = {
   'Voice chat': 'Voice on or off, push to talk, microphone, mic volume, hear yourself, voice volume',
   'Sound and commentary': 'Master volume, speakers, music, effects and crowd volume, commentator voice and captions',
   'Camera and graphics': 'First person, 2D view, third person and broadcast on / off, field of view, court, crowd, graphics quality',
-  'Game rules': 'Game clock, cart speeds, switching carts, collisions, penalties',
+  'Game rules': 'Game clock, switching carts, collisions, penalties',
   'Ball and carts': 'Turning speed, stick length, ball bounce, grip and friction',
   'CPU opponent': 'Difficulty, and what the CPU has learned about your play',
   'Controls and screen': 'Controls guide, right-stick look, touch buttons, fullscreen'
@@ -383,7 +383,7 @@ class SetupScene extends ListMenuScene {
       { label: () => `Right team   ◀ ${TEAMS[Settings.teamB].name} ▶`, change: d => Settings.cycleTeam('teamB', d) },
       ...(this.practice ? [size('Left team size', 'sizeA'), size('Right team size', 'sizeB')] : []),
       { label: () => `Difficulty   ◀ ${Settings.difficulty} ▶`, change: d => Settings.cycleDifficulty(d) },
-      speedCapItem('Max cart speed'), lockCartItem(),
+      lockCartItem(),
       ...(this.practice ? [] : [{ label: () => `Game clock   ◀ ${times(Settings.timeSpeed)} ▶`, change: d => Settings.adjust('timeSpeed', d) }]),
       { label: () => 'How to play', hint: 'The rules and controls of hockey, with a demo game', select: () => this.scene.start('HowTo', { kind: 'hockey', back: { scene: 'Setup', data: { practice: this.practice } } }) },
       { label: () => 'Choose players', select: toLobby },
@@ -552,8 +552,6 @@ class GameScene extends Phaser.Scene {
           if (m.mini && (input.pressed.spinCW || (MD && MD.holdFire && input.held && input.held.spinCW))) m.useBy(me); else if (!m.mini && input.pressed.x) m.togglePress(me.side);   /* (v14: minigame items and fire on RT only) */
           if (input.pressed.y) m.switchChair(me);
         }
-        if (input.pressed.speedUp && me.speedLevel < Settings.speedCap) { me.speedLevel++; Sound.play('blip'); }
-        if (input.pressed.speedDown && me.speedLevel > 1) { me.speedLevel--; Sound.play('blip'); }
       }
       this.pre3d(dt); m.update(dt); o.session.tick(dt);
       this.pingText.setText(`${o.session.roster.length} player${o.session.roster.length > 1 ? 's' : ''} online   room ${o.session.code}`);
@@ -787,7 +785,7 @@ class GameScene extends Phaser.Scene {
     g.lineStyle(0.1, color).strokePoints(CUP_POINTS.map(p => T(p.x, p.y)), false);
     g.lineStyle(0.06, 0x0b0f12).strokePoints([T(crossX, -0.14), T(crossX, 0.14)], false);
     g.lineStyle(cup.stickColliderRadius * 2, 0x0b0f12).strokePoints([T(0.2, 0), T(tipX, 0)], false);
-    if (speedLevel) this.drawSpeedRing(g, c, speedLevel);
+    /* (v14.1.5: no speed ring: every cart runs at full speed) */
   }
   update(time, delta) {
     if (!this.clockText || !this.clockText.active || !this.world || !this.world.scene) return;      // the scene is being torn down (backing out to the menu): nothing left to draw
@@ -812,8 +810,6 @@ class GameScene extends Phaser.Scene {
         if (m.mini && (p.src.pressed.spinCW || (MD && MD.holdFire && p.src.held && p.src.held.spinCW))) m.useBy(p); else if (!m.mini && p.src.pressed.x) m.togglePress(p.side);   // X: use / fire (some games: hold to keep firing)
         if (p.src.pressed.y) m.switchChair(p);
       }
-      if (p.src.pressed.speedUp && p.speedLevel < Settings.speedCap) { p.speedLevel++; Sound.play('blip'); }   // RB
-      if (p.src.pressed.speedDown && p.speedLevel > 1) { p.speedLevel--; Sound.play('blip'); }                      // LB
       if (p.src.pressed.start && m.state !== 'over') { Sound.play('select'); Controls.owner = p.src; this.scene.launch('Pause', { game: this }); return this.scene.pause(); }
     }
     if (!this.scene.isActive('Pause') && !this.scene.isActive('JoinMenu')) for (const src of Controls.list()) {     // a device nobody is using presses Start: choose a side and jump in

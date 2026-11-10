@@ -45,6 +45,10 @@ const Items3D = {
   geo(k) {
     if (this.cache[k]) return this.cache[k];
     const B = (w, h, d, x = 0, y = 0, z = 0, rz = 0) => new THREE.BoxGeometry(w, h, d).rotateZ(rz).translate(x, y, z), C = (r, l, x = 0, y = 0, z = 0, seg = 12) => new THREE.CylinderGeometry(r, r, l, seg).rotateZ(Math.PI / 2).translate(x, y, z), V = (r, h, x = 0, y = 0, z = 0, seg = 12) => new THREE.CylinderGeometry(r, r, h, seg).translate(x, y, z);
+    /* a cartridge standing up at (x, z) from height y0: brass case, a narrower neck, then the bullet (a cone), with an optional coloured tip */
+    const RND = (x, z, y0, cr, ch, nr, nh, bh, bcol, tip) => { const brassC = 0xc9a24a, parts = [[V(cr, ch, x, y0 + ch / 2, z, 12), brassC], [V(cr * 1.06, 0.004, x, y0 + 0.002, z, 12), 0xa8822f]]; let top = y0 + ch, br = cr * 0.92;
+      if (nr) { parts.push([V(nr, nh, x, top + nh / 2, z, 12), brassC]); top += nh; br = nr * 0.95; }
+      parts.push([bh <= 0.012 ? new THREE.SphereGeometry(br, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, bh / br, 1).translate(x, top, z) : new THREE.ConeGeometry(br, bh, 12).translate(x, top + bh / 2, z), bcol]);   /* (short pistol rounds: a round nose) */ if (tip) parts.push([new THREE.ConeGeometry(br * 0.42, bh * 0.4, 10).translate(x, top + bh * 0.8 + 0.001, z), tip]); return parts; };
     const dark = 0x2b2f34, black = 0x15171a, metal = 0x6b737b, wood = 0x7a5232, brass = 0xc9a24a, acc = (BR_GUNS[k] || {}).col || 0xffffff;
     const P = {
       pistol: [[B(0.17, 0.045, 0.032, 0.04, 0.025), dark], [B(0.05, 0.095, 0.03, -0.012, -0.035, 0, 0.28), black], [C(0.008, 0.04, 0.14, 0.03), metal], [B(0.1, 0.008, 0.034, 0.05, 0.048), acc]],
@@ -60,10 +64,16 @@ const Items3D = {
       fullkit: [[B(0.26, 0.16, 0.12), 0xf4f4f2], [B(0.262, 0.03, 0.122, 0, 0.0), 0x2ecc71], [B(0.07, 0.016, 0.022, -0.05, 0.082), 0xe74c3c], [B(0.022, 0.016, 0.07, -0.05, 0.082), 0xe74c3c], [B(0.05, 0.016, 0.06, 0.06, 0.082), 0x3d8bff], [B(0.12, 0.02, 0.03, 0, 0.095), black]],
       boost: [[V(0.045, 0.16, 0, 0, 0, 14), 0xffd23f], [V(0.047, 0.02, 0, 0.03, 0, 14), black], [V(0.047, 0.02, 0, -0.03, 0, 14), black], [V(0.02, 0.04, 0, 0.1, 0, 10), metal]],
       wall: [[B(0.07, 0.24, 0.2), 0x7d8790], [B(0.074, 0.24, 0.02, 0, 0, 0.09), 0x3dd6ff], [B(0.074, 0.24, 0.02, 0, 0, -0.09), 0x3dd6ff], [B(0.074, 0.03, 0.12), black]],
-      am_light: [[B(0.13, 0.07, 0.09), 0xd8b25a], ...[-0.035, -0.012, 0.012, 0.035].map(z => [V(0.008, 0.04, 0.0, 0.055, z, 8), brass])],
-      am_shells: [[B(0.13, 0.08, 0.1), 0xa83232], ...[-0.03, 0, 0.03].map(z => [V(0.013, 0.05, 0.0, 0.06, z, 10), 0xd04040])],
-      am_medium: [[B(0.15, 0.08, 0.09), 0x4d6b35], ...[-0.035, -0.012, 0.012, 0.035].map(z => [V(0.009, 0.055, 0.0, 0.065, z, 8), brass])],
-      am_heavy: [[B(0.17, 0.09, 0.1), 0x3a3f6b], ...[-0.025, 0.025].map(z => [V(0.013, 0.07, 0.0, 0.08, z, 10), brass])],
+      /* v14.1.8: ammo looks like what it is. Light: a box of short pistol rounds. Shells: red shotgun shells with brass heads.
+         Medium: pointed rifle rounds in a stripper clip. Heavy: three big long sniper rounds on an ammo can. */
+      am_light: [[B(0.15, 0.035, 0.11, 0, -0.012), 0xc9b48a], [B(0.15, 0.006, 0.11, 0, 0.007), 0x8a6f45], [B(0.15, 0.05, 0.004, 0, 0.0, -0.057, 0), 0xc9b48a], [B(0.06, 0.02, 0.003, 0, -0.005, 0.0565), 0xe8d9b0],
+        ...[-0.05, -0.025, 0, 0.025, 0.05].flatMap(x => [-0.03, 0, 0.03].flatMap(z => RND(x, z, 0.008, 0.0065, 0.024, 0, 0, 0.011, 0xb87333)))],
+      am_shells: [...[-0.045, -0.015, 0.015, 0.045].flatMap(x => [[V(0.0145, 0.07, x, 0.035, 0, 14), 0xc62828], [V(0.0152, 0.018, x, 0.009, 0, 14), brass], [V(0.0154, 0.003, x, 0.0015, 0, 14), 0x9c7a2e], [V(0.009, 0.0015, x, 0.0705, 0, 10), 0x7f1d1d]]),
+        [C(0.0145, 0.07, 0.0, 0.0145, 0.045, 14), 0xc62828], [C(0.0152, 0.018, -0.044, 0.0145, 0.045, 14), brass]],
+      am_medium: [[B(0.15, 0.006, 0.02, 0, 0.004), 0x8d939a], [B(0.15, 0.012, 0.004, 0, 0.012, 0.009), 0x8d939a], [B(0.15, 0.012, 0.004, 0, 0.012, -0.009), 0x8d939a],
+        ...[-0.056, -0.028, 0, 0.028, 0.056].flatMap(x => RND(x, 0, 0.007, 0.0085, 0.05, 0.0055, 0.01, 0.022, 0xb87333)), [B(0.07, 0.04, 0.05, -0.02, 0.02, -0.06), 0x4d6b35], [B(0.072, 0.008, 0.052, -0.02, 0.044, -0.06), 0x3a5228]],
+      am_heavy: [[B(0.2, 0.05, 0.09, 0, -0.025), 0x4b5a32], [B(0.202, 0.008, 0.092, 0, 0.002), 0x3a4626], [B(0.06, 0.01, 0.012, 0, 0.012), 0x2b2f34], [B(0.03, 0.03, 0.094, 0.07, -0.025), 0x3a4626],
+        ...[-0.05, 0, 0.05].flatMap(x => RND(x, 0, 0.006, 0.0135, 0.1, 0.009, 0.016, 0.05, 0xb87333, 0x15171a))],
       am_rockets: [[C(0.035, 0.3, 0, 0, 0, 12), 0x5d6b3a], [new THREE.ConeGeometry(0.035, 0.07, 12).rotateZ(-Math.PI / 2).translate(0.185, 0, 0), 0xc0392b], [B(0.04, 0.09, 0.006, -0.13, 0), black], [B(0.04, 0.006, 0.09, -0.13, 0), black]],
       card: [[B(0.012, 0.16, 0.11), 0xf2c200], [B(0.014, 0.13, 0.085), 0xfff3c4], [B(0.016, 0.04, 0.04, 0, 0.02), 0xe0a400]]
     }[k] || [[B(0.15, 0.15, 0.15), 0x888888]];

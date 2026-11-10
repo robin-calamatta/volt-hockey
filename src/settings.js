@@ -66,3 +66,6 @@ const Settings = {
     this[key] = i; this.save();
   }
 };
+/* v14.1.5: cart speed modes are gone: every cart always runs at full speed (old saves and hosts can't turn it down) */
+for (const k of ['speedLevel', 'speedCap']) Object.defineProperty(Settings, k, { get: () => CONFIG.speedLevels.length, set() {}, enumerable: true, configurable: true });
+Settings.maxSpeed = () => 1;

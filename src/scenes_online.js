@@ -206,7 +206,6 @@ class RoomScene extends ListMenuScene {
       { label: () => 'START MATCH', select: () => this.startHost() },
       { label: () => 'Close room', select: () => this.leave() }
     ] : host ? [
-      speedCapItem('Max cart speed (locked for all)'),
       toggle('Cart collisions', 'collisions'), toggle('Penalties', 'penalties'), slider('Penalty time', 'penaltySeconds', v => `${v} s`), toggle('Penalties carry over after a goal', 'penaltyCarry'), lockCartItem(), slider('Game clock speed', 'timeSpeed', times),   // rules: only the host can change these, and they are fixed for everyone at kick-off
       { label: () => `Left team   ◀ ${teamName(cfg().teamA)} ▶`, change: d => cycle('teamA', d) },
       { label: () => `Right team   ◀ ${teamName(cfg().teamB)} ▶`, change: d => cycle('teamB', d) },

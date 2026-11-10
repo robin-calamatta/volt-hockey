@@ -352,7 +352,7 @@ function miniAI(c, m, h) {
     if (c.item === 'oil' && others.some(o => behind(o) < 5)) use();
   } else if (m.kind === 'balloons') {
     const foes = others.filter(o => m.enemies(c, o)), B = MINI.balloons;
-    const threat = foes.find(o => { const f = o.toWorld(B.front, 0), r = c.toWorld(B.rear, 0), d = Math.hypot(f.x - r.x, f.y - r.y); return d < 2.6 && Math.hypot(o.vx, o.vy) > 1; });
+    const threat = foes.find(o => { const f = o.toWorld(B.front, 0), r = c.toWorld(B.rear, 0), d = Math.hypot(f.x - r.x, f.y - r.y); return d < 1.9 + 1.8 * (D.setup === undefined ? 0.4 : D.setup) && Math.hypot(o.vx, o.vy) > 1; });   /* (v14.2: a better driver sees a threat coming sooner) */
     const prey = foes.filter(o => o.safeLeft <= 0).sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))[0];
     if (threat && c.safeLeft <= 0 && Math.random() < (D.pressure || 0.6)) { const ax = c.x - threat.x, ay = c.y - threat.y, s = c.k % 2 ? 1 : -1; cmd = to(c.x + ax - ay * s * 1.5, c.y + ay + ax * s * 1.5); }   // swerve away
     else if (prey) {

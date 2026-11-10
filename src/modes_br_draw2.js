@@ -157,6 +157,7 @@ Object.assign(GameScene.prototype, {
   P.create = function () {
     cr.call(this); const V = CONFIG.view; this.help.setText('◀ ▶ choose     A: move / swap     Y: hold this     X: drop     ▼ ammo     B or ▲: close').setY(this.cy - 150);
     this.ammoT = AMMO_KEYS.map((k, i) => this.add.text(this.cx - 330 + i * 165, this.cy + 92, '', { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#ffffff', align: 'center' }).setOrigin(0.5));
+    this.ammoI = AMMO_KEYS.map((k, i) => this.add.image(this.cx - 330 + i * 165, this.cy + 58, this.d.game.brIcon('am_' + k)).setDisplaySize(68, 38));   // v14.1.8: a picture of the rounds over each ammo count
     this.ammoCur = -1; this.mapG = this.add.graphics(); this.mapT = this.add.text(V.width - 16, 16, '', { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#ffd23f', align: 'right' }).setOrigin(1, 0);
   };
   P.press = function (k) {
@@ -170,7 +171,7 @@ Object.assign(GameScene.prototype, {
     else if (Pp.down) { this.ammoCur = 0; Sound.play('blip'); }
     up.call(this, time, delta); if (!this.scene.isActive()) return;
     const G = this.d.chair.gs, m = this.d.game.match;
-    this.ammoT.forEach((t, i) => { const A = BR_AMMO[AMMO_KEYS[i]]; t.setText(`${A.icon} ${A.name}\n${G.am[i]} / ${A.max}`).setColor(this.ammoCur === i ? '#ffd23f' : G.am[i] ? '#ffffff' : '#6b7a86').setScale(this.ammoCur === i ? 1.1 : 1); });
+    this.ammoT.forEach((t, i) => { const A = BR_AMMO[AMMO_KEYS[i]]; t.setText(`${A.name}\n${G.am[i]} / ${A.max}`); if (this.ammoI) this.ammoI[i].setAlpha(G.am[i] ? 1 : 0.4); t.setColor(this.ammoCur === i ? '#ffd23f' : G.am[i] ? '#ffffff' : '#6b7a86').setScale(this.ammoCur === i ? 1.1 : 1); });
     if (this.ammoCur >= 0) this.info.setText(`${BR_AMMO[AMMO_KEYS[this.ammoCur]].name}: X drops a pack for a team-mate.  ▲ back to your slots`);
     const V = CONFIG.view, M = MODES.br.map(m), S = m.gs.st, sz = 196, s = sz / Math.max(m.width, m.height), x0 = V.width - sz - 14, y0 = 136, g = this.mapG; g.clear();   // the map (under the minimap)
     g.fillStyle(0x0d151b, 0.92).fillRect(x0 - 6, y0 - 6, m.width * s + 12, m.height * s + 12).fillStyle(MODES.br.map(m).theme.ground, 1).fillRect(x0, y0, m.width * s, m.height * s);

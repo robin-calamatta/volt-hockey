@@ -81,11 +81,12 @@ export function createApi(store, opts = {}) {
     if (!ChatFilter.ok(name)) bad('Please choose a different username.');
     if (pass.length < LIMITS.passMin || pass.length > LIMITS.passMax) bad(`Passwords are at least ${LIMITS.passMin} characters.`);
     if (!(age >= 5 && age <= 120)) bad('Please enter your age.');
+    const legal = str(b.legal, 40).trim(); if (!legal) bad('Please confirm your age is real and agree to the EULA and Privacy Notice.');   // v14.1.7: the sign-up agreement is required and recorded
     const email = checkEmail(b.email);
     if (await getUser(name)) bad('That username is taken.', 409);
     const taken = await store.get(emailKey(email)); if (taken) bad('That email is already used by another account.', 409);
     const salt = crypto.randomBytes(16).toString('hex');
-    const u = { name, salt, hash: await scrypt(pass, salt), adult: age >= 18, over16: age >= 16, created: now(), prefs: null, progress: null, friends: {}, blocked: [], invites: [], unread: {}, lastSeen: now(), status: null };
+    const u = { name, salt, hash: await scrypt(pass, salt), adult: age >= 18, over16: age >= 16, created: now(), prefs: null, progress: null, friends: {}, blocked: [], invites: [], unread: {}, lastSeen: now(), status: null, legal: { v: legal, at: now() } };
     await claimEmail(u, email); await saveUser(u);
     const idx = await names(); idx[name.toLowerCase()] = { n: name, a: u.adult ? 1 : 0 }; await store.set('names', idx);
     return { token: await newSession(u), user: me(u) };

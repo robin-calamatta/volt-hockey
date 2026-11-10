@@ -14,12 +14,29 @@ const ARENA_KIT = {
   slalom:    { k: [[0.08, 0.12, 0], [0.92, 0.88, Math.PI]] },
   delivery:  { k: [[0.5, 0.35, 0], [0.5, 0.65, Math.PI]], b: [[0.5, 0.5]] }
 };
+/* v14.1: more maps: every one of these games has three layouts to pick from (or Random, a different one each game) */
+const PI = Math.PI, line = (x0, y0, x1, y1, n) => Array.from({ length: n }, (_, i) => [x0 + (x1 - x0) * i / (n - 1), y0 + (y1 - y0) * i / (n - 1)]);
+const ARENA_MORE = {
+  bomb: [['The Cross', { p: [...line(0.42, 0.5, 0.58, 0.5, 3), [0.5, 0.3], [0.5, 0.7]], k: [[0.18, 0.5, 0], [0.82, 0.5, PI]], b: [[0.25, 0.2], [0.75, 0.8]] }], ['Pinball', { b: [[0.25, 0.3], [0.5, 0.22], [0.75, 0.3], [0.25, 0.7], [0.5, 0.78], [0.75, 0.7], [0.5, 0.5]], k: [[0.1, 0.5, 0], [0.9, 0.5, PI]] }]],
+  sumo: [['Corners', { b: [[0.4, 0.35], [0.6, 0.35], [0.4, 0.65], [0.6, 0.65]] }], ['The Post', { p: [[0.5, 0.5]], b: [[0.36, 0.5], [0.64, 0.5]] }]],
+  lava: [['Island Hop', { k: [[0.2, 0.25, 0], [0.8, 0.25, PI], [0.2, 0.75, 0], [0.8, 0.75, PI], [0.5, 0.5, PI / 2]], p: [[0.5, 0.2], [0.5, 0.8]] }], ['Volcano', { b: [[0.5, 0.5]], k: [[0.35, 0.5, PI], [0.65, 0.5, 0], [0.5, 0.3, -PI / 2], [0.5, 0.7, PI / 2]] }]],
+  multiball: [['Midfield Wall', { p: line(0.5, 0.3, 0.5, 0.7, 4), k: [[0.38, 0.15, PI], [0.62, 0.85, 0]] }], ['Bumper Alley', { b: [[0.35, 0.3], [0.35, 0.7], [0.65, 0.3], [0.65, 0.7]], k: [[0.5, 0.5, 0]] }]],
+  giant: [['Goalposts', { p: [[0.25, 0.35], [0.25, 0.65], [0.75, 0.35], [0.75, 0.65]], k: [[0.5, 0.2, PI], [0.5, 0.8, 0]] }], ['Launchpad', { k: [[0.3, 0.5, 0], [0.7, 0.5, PI], [0.5, 0.15, 0], [0.5, 0.85, PI]], b: [[0.5, 0.5]] }]],
+  imposter: [['The Maze', { p: [...line(0.25, 0.2, 0.25, 0.6, 4), ...line(0.5, 0.4, 0.5, 0.8, 4), ...line(0.75, 0.2, 0.75, 0.6, 4)], k: [[0.12, 0.85, 0], [0.88, 0.85, PI]] }], ['Forest', { p: [[0.15, 0.2], [0.3, 0.45], [0.2, 0.75], [0.45, 0.25], [0.55, 0.6], [0.4, 0.82], [0.7, 0.3], [0.8, 0.55], [0.68, 0.8], [0.88, 0.2]] }]],
+  night: [['Rooms', { p: [...line(0.35, 0.1, 0.35, 0.4, 3), ...line(0.35, 0.6, 0.35, 0.9, 3), ...line(0.65, 0.1, 0.65, 0.4, 3), ...line(0.65, 0.6, 0.65, 0.9, 3)], k: [[0.5, 0.5, 0]] }], ['Graveyard', { p: line(0.15, 0.3, 0.85, 0.3, 6).concat(line(0.15, 0.7, 0.85, 0.7, 6)), b: [[0.5, 0.5]] }]],
+  stunt: [['Big Air', { k: [[0.25, 0.5, 0], [0.75, 0.5, PI], [0.5, 0.2, PI / 2], [0.5, 0.8, -PI / 2], [0.15, 0.15, 0.6], [0.85, 0.85, PI + 0.6]] }], ['Slalom Jumps', { k: [[0.2, 0.3, 0], [0.4, 0.7, 0], [0.6, 0.3, 0], [0.8, 0.7, 0]], p: [[0.3, 0.5], [0.5, 0.5], [0.7, 0.5]] }]],
+  slalom: [['Towers', { p: [[0.3, 0.12], [0.7, 0.88], [0.5, 0.05], [0.5, 0.95]], k: [[0.08, 0.88, 0], [0.92, 0.12, PI]] }], ['Bumpers', { b: [[0.2, 0.12], [0.8, 0.88], [0.2, 0.88], [0.8, 0.12]] }]],
+  delivery: [['Ring Road', { p: [[0.35, 0.35], [0.65, 0.35], [0.35, 0.65], [0.65, 0.65]], k: [[0.5, 0.2, 0], [0.5, 0.8, PI]] }], ['Shortcuts', { k: [[0.3, 0.5, PI / 2], [0.7, 0.5, -PI / 2], [0.5, 0.5, 0]], b: [[0.2, 0.2], [0.8, 0.8]] }]]
+};
+for (const [k, list] of Object.entries(ARENA_MORE)) { const I = GAME_INFO[k]; if (!I) continue; I.opts = I.opts || [];
+  if (!I.opts.some(o => o.key === 'layout')) I.opts.push({ key: 'layout', label: 'Map', values: ['random', 0, 1, 2], names: ['Random (a new one each game)', 'Classic', list[0][0], list[1][0]], def: 'random', hint: 'Where the jumps, towers and bumpers are.' }); }
 const AK = { kLen: 2.4, kW: 1.8, rise: typeof STUNT !== 'undefined' ? STUNT.rise : 0.55, towerR: 0.55, bumperR: 0.6 };
 /* put the pieces in when a game starts */
-for (const [k, L] of Object.entries(ARENA_KIT)) {
+for (const [k, L0] of Object.entries(ARENA_KIT)) {
   const M = MODES[k]; if (!M || !M.init) continue; const init = M.init;
   M.init = function (m, ...a) {
     const r = init.call(this, m, ...a), W = m.width, H = m.height, y0 = m.centerY - H / 2, X = f => MG.r2(W * f), Y = f => MG.r2(y0 + H * f);
+    let pick = (modeOpts(k) || {}).layout; if (pick === undefined || pick === 'random') pick = Math.floor(Math.random() * 3); const L = +pick === 0 || !ARENA_MORE[k] ? L0 : ARENA_MORE[k][+pick - 1][1];
     for (const [fx, fy] of L.p || []) MG.add(m, { t: 'akp', x: X(fx), y: Y(fy), r: AK.towerR });
     for (const [fx, fy] of L.b || []) MG.add(m, { t: 'akb', x: X(fx), y: Y(fy), r: AK.bumperR });
     for (const [fx, fy, a] of L.k || []) MG.add(m, { t: 'ramp', x: X(fx), y: Y(fy), a: MG.r2(a), len: AK.kLen, w: AK.kW, kick: 1 });

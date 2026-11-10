@@ -192,7 +192,7 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
             if ((U.left -= h) <= 0) { T.hp = Math.round(T.hp); T.sh = Math.round(T.sh); this.spend(c, U.s); G.use = null; m.sfx('select'); if (t !== c && c.player && !c.player.remote) Progress.ev('healMate'); } } }
         else if (G.ads && !c.wantAdsUsed) { const it = G.inv[G.sel]; if (it && BR_ITEMS[it.k] && BR_ITEMS[it.k].heal) { c.wantAdsUsed = true; this.healMate(c, m); } }
         if (!G.ads) c.wantAdsUsed = false;
-        if (G.down) { if (!m.chairs.some(o => o.gs && o.gs.rvk === c.k && o.gs.rv > 0)) G.dhp -= BR.downHp / BR.bleed * h;   /* (no bleeding while a team-mate is reviving you) */ if (G.dhp <= 0) this.finish(m, c, m.chairs[G.kb] || null); continue; }
+        if (G.down) { if (!(G.srz > 0 || G.rvN > 0 || m.chairs.some(o => o.gs && o.gs.rvk === c.k && o.gs.rv > 0))) G.dhp -= BR.downHp / BR.bleed * h;   /* (v14.1.5: no bleeding while a team-mate revives you or you're getting yourself up at a rez garage; storm and hits still hurt) */ if (G.dhp <= 0) this.finish(m, c, m.chairs[G.kb] || null); continue; }
         const rt = c.wantInt ? this.reviveTarget(m, c) : null;           // reviving: hold B next to a downed team-mate
         if (rt) { if (G.rvk !== rt.k) { G.rvk = rt.k; G.rv = 0; } G.rv += h / BR.reviveTime; if (G.rv >= 1) { Object.assign(rt.gs, { down: 0, dhp: 0, hp: BR.reviveHp }); G.rv = 0; G.rvk = -1; m.sfx('select'); MG.notice(m, `${MG.up(m.name(c))} REVIVED ${MG.up(m.name(rt))}`, 1.8); if (c.player && !c.player.remote) Progress.ev('revive'); } }
         else { G.rv = 0; G.rvk = -1; }
@@ -258,7 +258,7 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
       const held = G.inv[G.sel]; if (held && BR_GUNS[held.k] && held.a <= 0 && G.rl <= 0) this.reload(c, m);
       const attacked = (G.hurtAt !== undefined && g.t - G.hurtAt < 2.5) || MG.live(m).some(o => o.gs.team !== G.team && !o.gs.down && MH.dist(c, o) < 10 && Math.abs(o.gs.z - G.z) < 1);
       const dn = mates(m, c).filter(o => o.gs.down).sort((a, b) => MH.dist(c, a) - MH.dist(c, b))[0];   // a team-mate down and nobody shooting at you: go and revive them
-      if (dn && !attacked && MH.dist(c, dn) < 80 && G.hp >= 25) {
+      if (dn && !attacked && MH.dist(c, dn) < 80 && G.hp >= 25 && !(G.inStorm && !(G.hp > 50 && G.rv > 0.5))) {   /* (v14.2: in the storm, only finish a revive that's nearly done with health to spare) */
         if (MH.dist(c, dn) < 2 && Math.abs(dn.gs.z - G.z) < 1) { c.wantInt = true; return { x: dn.x - c.x, y: dn.y - c.y, speed: 0 }; }
         const save = c.goTo; c.goTo = { x: dn.x, y: dn.y, lv: dn.gs.lv }; const out = M0.ai.call(this, c, m); c.goTo = save; if (out && MH.dist(c, dn) < 6 && !(out.speed > 0.3)) { const a = Math.atan2(dn.y - c.y, dn.x - c.x); return { x: Math.cos(a), y: Math.sin(a), speed: 0.6 }; } return out;
       }

@@ -78,8 +78,7 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
       if (k === 'chest' || k === 'ammo') { this.openBox(m, c, L); return false; }
       if (c.player && BR_GUNS[k] && !c.gs.down) {                          /* v14: a gun never turns into ammo. Holding a gun: you swap it (it drops where you are), even for the same gun. */
         const G = c.gs, held = !G.hol && G.inv[G.sel];
-        if (held && BR_GUNS[held.k]) { this.swapFar(m, c, L); return false; }
-        if (G.inv.length < BR.slots) { G.inv.push({ k, a: L[5], t: L[12] || 0 }); brSlots(G); m.sfx('pickup'); this.say(m, c, brName(k, L[12] || 0)); if (G.hol) G.last = G.inv.length - 1; return true; }
+        if (G.inv.length < BR.slots) {   /* (v14.1: an open slot always gets the new gun first; you only swap when the bag is full) */ G.inv.push({ k, a: L[5], t: L[12] || 0 }); brSlots(G); m.sfx('pickup'); this.say(m, c, brName(k, L[12] || 0)); if (G.hol) G.last = G.inv.length - 1; return true; }
         if (held) { this.swapFar(m, c, L); return false; }
       }
       const r = P2.take.call(this, m, c, L); brSlots(c.gs); return r;

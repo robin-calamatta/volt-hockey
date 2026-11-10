@@ -322,8 +322,6 @@ class HostSession {
       if (ev === 'cw') p.spinQueued = 1; else if (ev === 'ccw') p.spinQueued = -1; else if (ev === 'hcw') p.spinQueued = 0.5; else if (ev === 'hccw') p.spinQueued = -0.5;
       else if (ev === 'x') this.match.togglePress(p.side);
       else if (ev === 'use' && this.match.useBy) this.match.useBy(p);
-      else if (ev === 'up') p.speedLevel = Math.min(Settings.speedCap, p.speedLevel + 1);
-      else if (ev === 'down') p.speedLevel = Math.max(1, p.speedLevel - 1);
       else if (ev === 'sw') this.match.switchChair(p);
       else if (typeof ev === 'string' && ev.startsWith('emo:') && p.chair) Emotes.recv(this.match, p.chair, ev.slice(4));   // a guest's emoji
       else if ((ev === 'cyc:1' || ev === 'cyc:-1') && p.chair && !p.chair.out && modeOf(this.match) && modeOf(this.match).cycle) modeOf(this.match).cycle(p.chair, this.match, ev === 'cyc:-1' ? -1 : 1);
@@ -472,8 +470,6 @@ class ClientSim {
       if (BRP) brPadEvents(L, input, dt, this.clock);
       else if (this.m.mini && !(L.me && L.me.invOpen)) { const M = modeOf(this.m), hold = M && M.holdFire && input.held && input.held.spinCW && this.clock - (L.holdAt || 0) > 0.08; if (p.spinCW || hold) { L.pending.push('use'); L.holdAt = this.clock; } } else if (p.x) L.pending.push('x');
       if (spin) { Sound.play('screech'); L.spins.push({ t: this.clock, dir: Math.sign(spin), amt: Math.abs(spin) }); if (L.spins.length > 8) L.spins.shift(); }
-      if (p.speedUp && L.me.speedLevel < Settings.speedCap) { L.me.speedLevel++; L.pending.push('up'); }
-      if (p.speedDown && L.me.speedLevel > 1) { L.me.speedLevel--; L.pending.push('down'); }
       if (p.y && !BRP && !(L.me && L.me.invOpen)) L.pending.push('sw');
       const v = screenToCourt(input.ax, input.ay, L.me && L.me.chair && L.me.chair.x, L.me && L.me.chair && L.me.chair.y, L.me);                            // the stick is read on screen; the host (and our prediction) work in court directions
       L.in = { ax: v.x, ay: v.y };

@@ -69,7 +69,7 @@ Object.assign(BR_COLS, { seat: 0x2f5fa8, stone: 0x9a948a, hangar: 0xc8ced4, silo
         const k = Math.min(1, (g.t - L[9]) / 0.55); if (k < 1) { const e = k, x = L[10] + (L[2] - L[10]) * e, y = L[11] + (L[3] - L[11]) * e, hgt = 1.6 * 4 * e * (1 - e); mesh.position.set(x, base + hgt + (U.pickup ? 0 : 0.25), y); if (U.item) U.item.rotation.set(k * 9, k * 6, 0); }
         else if (k < 1.4 / 0.55 && U.item) { const b = (g.t - L[9] - 0.55); U.item.position.y = 0.55 + Math.abs(Math.sin(b * 9)) * 0.18 * Math.exp(-b * 6); }
       }
-      if (U.cardBeam) { const mate = m.chairs[L[5]] && m.chairs[L[5]].gs.team === myTeam; U.cardBeam.visible = mate; U.cardRing.visible = mate; U.cardBeam.material.opacity = 0.25 + 0.15 * Math.sin(t * 4); U.cardRing.scale.setScalar(1 + 0.15 * Math.sin(t * 5)); }
+      if (U.cardBeam) { const mate = m.chairs[L[5]] && m.chairs[L[5]].gs.team === myTeam; mesh.visible = mate || myTeam < 0;   /* (v14.1.5: an enemy's rez card is invisible to you) */ U.cardBeam.visible = mate; U.cardRing.visible = mate; U.cardBeam.material.opacity = 0.25 + 0.15 * Math.sin(t * 4); U.cardRing.scale.setScalar(1 + 0.15 * Math.sin(t * 5)); }
     }
     /* doors */
     if (!this.doorG && M.doors) { this.doorG = M.doors.map(d => { const grp = new THREE.Group(), hinge = new THREE.Group(), len = d.len - 0.08;

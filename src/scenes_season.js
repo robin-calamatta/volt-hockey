@@ -43,7 +43,7 @@ class SeasonSetupScene extends ListMenuScene {
       { label: () => `CPU skill   ◀ ${Settings.seasonDifficulty} ▶`, change: d => cycle('seasonDifficulty', levels, d) },
       { label: () => `Game length   ◀ ${Settings.seasonPeriod / 60} min periods ▶`, change: d => cycle('seasonPeriod', C.periodChoices, d) },
       { label: () => `Season   ◀ ${games(Settings.seasonDouble)} games ▶`, change: () => { Settings.seasonDouble = !Settings.seasonDouble; Settings.save(); }, select: () => { Settings.seasonDouble = !Settings.seasonDouble; Settings.save(); } },
-      speedCapItem('Max cart speed'), lockCartItem(),
+      lockCartItem(),
       { label: () => 'START SEASON', select: () => this.start() },
       { label: () => 'Back', select: () => this.scene.start('SeasonMenu') }
     ], 250);

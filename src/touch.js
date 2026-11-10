@@ -16,8 +16,8 @@ const TOUCH = {
     a:        { kind: 'button', x: 0.94, y: 0.88, size: 62,  button: 'a',        label: 'A', sub: 'OK',    name: 'A: select / rematch' },
     b:        { kind: 'button', x: 0.64, y: 0.90, size: 56,  button: 'b',        label: 'B', sub: 'BACK',  name: 'B: back' },
     y:        { kind: 'button', x: 0.93, y: 0.36, size: 60,  button: 'y',        label: '⇄', sub: 'CART',  name: 'Switch cart (Y)' },
-    speedUp:  { kind: 'button', x: 0.07, y: 0.25, size: 54,  button: 'speedUp',  label: '+', sub: 'SPEED', name: 'Cart speed up (RB)' },
-    speedDown:{ kind: 'button', x: 0.165, y: 0.25, size: 54,  button: 'speedDown',label: '−', sub: 'SPEED', name: 'Cart speed down (LB)' },
+    speedUp:  { kind: 'button', x: 0.07, y: 0.25, size: 54,  button: 'speedUp',  label: '+', sub: 'HIT', name: 'Melee (Volt Royale)' },
+    speedDown:{ kind: 'button', x: 0.165, y: 0.25, size: 54,  button: 'speedDown',label: '−', sub: 'PING', name: 'Ping (Volt Royale)' },
     camera:   { kind: 'button', x: 0.93, y: 0.235, size: 50, button: 'camera',   label: '◉', sub: 'VIEW',  name: 'Camera view (1st / 3rd person, broadcast, 2D)' },
     start:    { kind: 'button', x: 0.50, y: 0.92, size: 50,  button: 'start',    label: 'II', sub: '',     name: 'Pause' },
     quick:    { kind: 'button', x: 0.165, y: 0.40, size: 54,  button: 'quick',    label: '🙌', sub: 'EMOTE', name: 'Emotes (hold for the wheel); Volt Royale: tap for your bag' },
@@ -141,16 +141,16 @@ const TouchPad = {
   },
   toggle() { Settings.touch = !Settings.touch; Settings.save(); this.sync(); },
   /* v13.5.4: every game gets the buttons it uses, named for what they do there, and no others.
-     hockey: SPIN on the two big buttons (LB / RB), PRESS (X), CART (Y), DRIFT (hold B), SPEED + / −
-     minigames: SPIN, DRIFT, SPEED, and X named for the game's action (USE an item, FIRE, ZAP) when it has one
+     hockey: SPIN on the two big buttons (LB / RB), PRESS (X), CART (Y), DRIFT (hold B)
+     minigames: SPIN, DRIFT, and X named for the game's action (USE an item, FIRE, ZAP) when it has one
      Volt Royale: FIRE, AIM, JUMP, GRAB (X), AWAY (Y), DRIFT, MELEE, the bag, ITEM ◀ ▶, and AIM UP / DOWN */
   profile(g) {
     const m = g && g.match; if (!m) return null; const k = m.mini ? m.mini.kind : 'hockey', common = ['stick', 'a', 'b', 'start', 'camera', 'quick'];
     if (k === 'br') return { key: 'br', show: [...common, 'spinCW', 'spinCCW', 'halfCW', 'halfCCW', 'x', 'y', 'speedUp', 'aimUp', 'aimDown'], press: {}, labels: typeof BR_TOUCH !== 'undefined' ? BR_TOUCH : {} };
     const spin = { spinCW: 'halfCW', spinCCW: 'halfCCW' }, spinL = { spinCW: ['↻', 'SPIN'], spinCCW: ['↺', 'SPIN'], b: ['💨', 'DRIFT'], a: ['A', 'OK'] };
-    if (k === 'hockey') return { key: 'hockey', show: [...common, 'spinCW', 'spinCCW', 'x', 'y', 'speedUp', 'speedDown'], press: spin, labels: { ...spinL, x: ['X', 'PRESS'], y: ['⇄', 'CART'] } };
+    if (k === 'hockey') return { key: 'hockey', show: [...common, 'spinCW', 'spinCCW', 'x', 'y'], press: spin, labels: { ...spinL, x: ['X', 'PRESS'], y: ['⇄', 'CART'] } };
     const lines = ((GAME_INFO[k] || {}).controls || []).join(' '), act = /Zap/.test(lines) ? ['⚡', 'ZAP'] : /Fire:/.test(lines) ? ['🎯', 'FIRE'] : lines.includes(CTRL.item) ? ['★', 'USE'] : null;
-    return { key: 'mini:' + k, show: [...common, 'spinCW', 'spinCCW', 'speedUp', 'speedDown', ...(act ? ['x'] : [])], press: { ...spin, x: 'spinCW' }, labels: { ...spinL, ...(act ? { x: act } : {}) } };   // (the touch USE / FIRE / ZAP button presses RT)
+    return { key: 'mini:' + k, show: [...common, 'spinCW', 'spinCCW', ...(act ? ['x'] : [])], press: { ...spin, x: 'spinCW' }, labels: { ...spinL, ...(act ? { x: act } : {}) } };   // (the touch USE / FIRE / ZAP button presses RT)
   },
   applyProfile(g) {
     const P = this.profile(g); if (!P) return; const m = g.match, wait = m.state === 'over' || !!m.readyText; if (wait) P.labels = { ...P.labels, a: ['A', m.state === 'over' ? 'AGAIN' : 'READY'], ...(m.state === 'over' ? { b: ['B', 'LOBBY'] } : {}) };   /* (the result and ready screens) */

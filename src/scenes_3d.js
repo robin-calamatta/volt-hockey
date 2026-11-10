@@ -137,7 +137,8 @@ Object.assign(GameScene.prototype, {
       if (vp.p && vp.chair && vp.mode !== 'broadcast') {
         const n = CONFIG.speedLevels.length, lv = vp.p.speedLevel || 0, x0 = R.x + 18, y0 = R.y + R.h - 22 - (this.match && this.match.kind === 'br' && !this.flat ? 44 : 0);   // (Volt Royale: health and shield sit under it)
         const D = vp.chair.dr, F = CONFIG.drift, drifting = D && !vp.chair.out && (D.on || D.boost > 0), now = this.time.now;
-        if (!drifting) {
+        if (!drifting) {   /* v14.1.5: no speed modes any more, so no SPEED meter (the drift meter still shows while you drift) */
+        } else if (false) {
           g.fillStyle(0x0d151b, 0.6).fillRoundedRect(x0 - 8, y0 - 28, n * 16 + 84, 40, 8);
           for (let i = 0; i < n; i++) g.fillStyle(i < lv ? 0xffffff : 0x55626c, i < lv ? 1 : 0.6).fillRect(x0 + 66 + i * 16, y0 - i * 3.5, 11, 6 + i * 3.5);
           this.pooled(this.vpText, nv++, { ...vpStyle, fontSize: '17px' }).setText('SPEED').setOrigin(0, 0.5).setPosition(x0, y0 - 8).setColor('#9fb2bf').setVisible(true);

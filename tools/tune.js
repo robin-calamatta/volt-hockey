@@ -12,14 +12,15 @@ const KNOBS = {
   pressureDist: [0.9, 2.2], driveSpeed: [0.7, 1], driveClear: [0.5, 1.3], driveTight: [0.2, 0.8], edgeRange: [0.4, 1.2], shotHalfWidth: [0.5, 1.4], passHalfWidth: [0.3, 1],
   rushClear: [1.5, 5], wingWide: [2.5, 6], wingBack: [0, 2], guardCut: [0.3, 1], markLane: [0.6, 1.8], tackleMin: [0.3, 0.95], tackleRange: [1.5, 5],
   oneTimerMin: [0.15, 0.6], aimCreep: [0.5, 1], cupApproachMin: [0.2, 0.7], cupApproachRamp: [3, 9], carryTurnRate: [1.2, 3.2],
-  scoopSlant: [0.6, 1.2], scoopOffset: [0.1, 0.5], scoopPeelRate: [0.8, 3], crashClear: [0.2, 0.8], swerveDist: [0.7, 1.6], swervePass: [0.9, 1.8]
+  scoopSlant: [0.6, 1.2], scoopOffset: [0.1, 0.5], scoopPeelRate: [0.8, 3], crashClear: [0.2, 0.8], swerveDist: [0.7, 1.6], swervePass: [0.9, 1.8],
+  screenGap: [0, 0.8], screenRange: [3, 8], goalieRead: [0, 1], goalieStand: [0.5, 1.4], goalieAdvance: [0.4, 2], goalieShade: [0.2, 0.8], goalieReact: [0.8, 2.5], creasePad: [0.35, 1.0], supportAhead: [1, 3.5], coverDist: [2, 4.5]
 };
 
 function world() {                                                  // a fresh copy of the game code with no browser
   const ctx = { console, Math, performance, Object, Array, JSON, Map, Set, Float32Array, localStorage: { getItem() { return null; }, setItem() { } }, setTimeout, clearTimeout };
   ctx.window = ctx; vm.createContext(ctx);
-  for (const f of ['config', 'teams', 'settings', 'physics', 'chair', 'ai', 'match']) vm.runInContext(fs.readFileSync(SRC + f + '.js', 'utf8') + '\n', ctx, { filename: f });
-  ctx.Sound = { play() { } }; return ctx;
+  for (const f of ['config', 'teams', 'settings', 'physics', 'chair', 'brain', 'brain_weights', 'ai', 'match', 'ai2']) vm.runInContext(fs.readFileSync(SRC + f + '.js', 'utf8') + '\n', ctx, { filename: f });
+  ctx.Sound = { play() { } }; ctx.Commentary = { pick() { return null; }, parse(x) { return x; } }; ctx.Commentator = { speak() { } }; return ctx;
 }
 
 /* ---- worker: plays one candidate against the defaults and reports a score ---- */
@@ -84,5 +85,5 @@ function save(t) {                                                   // Supersta
   const half = {}, round = o => JSON.stringify(o);
   for (const k in KNOBS) half[k] = +((defaults[k] + t[k]) / 2).toFixed(3);
   fs.writeFileSync(OUT, '/* Written by tools/tune.js: AI numbers found by self-play. Delete this file (and its <script> line) to go back to the hand-set defaults. */\n' +
-    `CONFIG.difficulties.Superstar.tune = ${round(t)};\nCONFIG.difficulties.Pro.tune = ${round(t)};\nCONFIG.difficulties.Hard.tune = ${round(half)};\n`);
+    `CONFIG.difficulties.Superstar.tune = ${round(t)};\nCONFIG.difficulties.Pro.tune = ${round(t)};\nCONFIG.difficulties.Hard.tune = ${round(half)};\n/* The harder-than-hard tier and the middle tiers play with the tuned tactics too (their skill numbers still set how well they carry them out). */\nCONFIG.difficulties.Legend.tune = CONFIG.difficulties.Superstar.tune;\nCONFIG.difficulties.Normal.tune = CONFIG.difficulties.Hard.tune;\n`);
 }

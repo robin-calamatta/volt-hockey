@@ -8,9 +8,9 @@ function world() {
   let seed = 1; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
   const M = Object.create(Math); M.random = rnd;
   const ctx = { console, Math: M, performance, Object, Array, JSON, Map, Set, Float32Array, Float64Array, localStorage: { getItem() { return null; }, setItem() { } }, setTimeout, clearTimeout }; ctx.window = ctx; vm.createContext(ctx);
-  for (const f of ['config', 'teams', 'settings', 'physics', 'chair', 'brain', 'ai', 'match']) vm.runInContext(fs.readFileSync(SRC + f + '.js', 'utf8') + '\n', ctx, { filename: f });
+  for (const f of ['config', 'teams', 'settings', 'physics', 'chair', 'brain', 'ai', 'match', 'ai2']) vm.runInContext(fs.readFileSync(SRC + f + '.js', 'utf8') + '\n', ctx, { filename: f });
   try { vm.runInContext(fs.readFileSync(SRC + 'tuned.js', 'utf8') + '\n', ctx); } catch (e) { }
-  ctx.Sound = { play() { } }; ctx.setSeed = s => { seed = s >>> 0 || 1; };
+  ctx.Sound = { play() { } }; ctx.Commentary = { pick() { return null; }, parse(x) { return x; } }; ctx.setSeed = s => { seed = s >>> 0 || 1; };
   vm.runInContext(`Settings.penalties = true;
   function trial(s, secs) { setSeed(s * 2654435761 + 7);
     const m = new Match({ teamA: 0, teamB: 1, players: [], practice: false, sizes: [2, 2], difficulty: 'Hard' });
@@ -41,7 +41,7 @@ const nW = Math.max(1, Math.min(os.cpus().length, 4)), workers = Array.from({ le
 workers.forEach(w => w.on('message', ({ id, r }) => { waiting.get(id)(r); waiting.delete(id); }));
 let rr = 0; const evalOn = (params, seeds) => new Promise(res => { const id = nid++; waiting.set(id, res); workers[rr++ % nW].send({ id, params, seeds }); });
 (async () => {
-  let bestMean = -9;
+  let bestMean = (await evalOn(theta, Array.from({ length: 32 }, (_, i) => 900000 + i))).mean; console.log('start held-out reward', bestMean.toFixed(3));   // (only ever replace the weights with better ones)
   for (let g = 0; g < gens; g++) {
     const seeds = Array.from({ length: K }, (_, i) => 100000 + g * 1000 + i), sigma = sigma0 * (1 - 0.6 * g / gens), eps = [];
     for (let i = 0; i < pairs; i++) eps.push(theta.map(() => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }));

@@ -51,22 +51,24 @@ pskin('hometown', 'Hometown Hero', '🏠', { outfit: 'hoodie', shirt: '#7c8794',
   (G, put) => { put(SK.shell((c, w, h) => { c.fillStyle = '#7c8794'; c.fillRect(0, 0, w, h); c.fillStyle = '#c0392b'; c.fillRect(0, 150, w, 16); PR.text(c, 'HOME', 128, 70, 46, '#ffffff'); PR.text(c, 'TEAM', 128, 112, 46, '#ffffff'); c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect(90, 186, 76, 40); }, 'home')); }, null, true);
 
 /* Lil Bro: a little guy riding on your lap, in a blue jersey with a white maple leaf */
-pskin('lilbro', 'Lil Bro', '🧒', { outfit: 'tee', shirt: '#e74c3c', hat: 'cap', hatCol: '#1f3f8f', face: 'grin', hair: '#3b2a1e', hairStyle: 'short', skin: '#e8b48a' },
+pskin('lilbro', 'Lil Bro', '🧒', { outfit: 'tee', shirt: '#d52b1e', hat: 'none', hatCol: '#d52b1e', face: 'grin', hair: '#e9c862', hairStyle: 'short', skin: '#efc29b' },   // (v14.1.2: blonde, a red Canada jersey at home, blue away; the little guy is always in blue)
   (G, put, p) => {
-    const { sx } = SK.K(), kid = new THREE.Group(), jer = p.jersey || '#1f5fd1', skin = SK.M(p.kskin || '#f0c49c', { r: 0.6 }), x0 = sx + 0.14;
+    const { sx } = SK.K(), kid = new THREE.Group(), jer = '#1f5fd1', skin = SK.M(p.kskin || '#f0c49c', { r: 0.6 }), x0 = sx + 0.14;
     const jt = SK.tex(256, 128, (c, w, h) => { c.fillStyle = jer; c.fillRect(0, 0, w, h); c.fillStyle = '#ffffff'; c.fillRect(0, 96, w, 10); PR.leaf(c, 64, 48, 0.62); PR.text(c, '9', 192, 52, 60, '#ffffff'); }, 'kidjersey' + jer);
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.072, 0.1, 4, 14).scale(0.9, 1, 1.15), SK.M(0xffffff, { map: jt, r: 0.6 })); body.position.set(0, 0.17, 0); kid.add(body);
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.068, 20, 14), skin); head.position.set(0.01, 0.33, 0); kid.add(head);
     const face = new THREE.Mesh(new THREE.SphereGeometry(0.0685, 20, 14, Math.PI - 0.74, 1.48, Math.PI / 2 - 0.5, 1.08), new THREE.MeshStandardMaterial({ map: Avatar.faceTex('grin'), alphaTest: 0.3, roughness: 0.7 })); face.position.copy(head.position); kid.add(face);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.071, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), SK.M(p.kcap || '#ffffff', { r: 0.7 })); cap.position.set(0.005, 0.345, 0); kid.add(cap);
-    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.008, 16).scale(1.3, 1, 1.1), SK.M(p.kcap || '#ffffff', { r: 0.7 })); brim.position.set(0.075, 0.36, 0); kid.add(brim);
+    const blond = SK.M('#e9c862', { r: 0.75 }), hair = new THREE.Mesh(new THREE.SphereGeometry(0.072, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.58).rotateZ(0.35), blond); hair.position.set(-0.004, 0.338, 0); kid.add(hair);   // blonde hair, a little fringe
+    for (const z of [-0.03, 0, 0.03]) { const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8).scale(0.7, 1, 1.1), blond); tuft.position.set(0.05, 0.375, z); tuft.rotation.z = -0.5; kid.add(tuft); }
     for (const sd of [-1, 1]) { const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.03, 0.12, 4, 8), SK.M('#22303f', { r: 0.8 })); leg.rotation.z = -1.25; leg.position.set(0.1, 0.07, sd * 0.04); kid.add(leg);
       const shoe = new THREE.Mesh(SK.rbox(0.07, 0.035, 0.045, 0.012), SK.M('#f4f4f2', { r: 0.5 })); shoe.position.set(0.18, 0.04, sd * 0.04); kid.add(shoe);
       const arm = new THREE.Group(), a = new THREE.Mesh(new THREE.CapsuleGeometry(0.022, 0.09, 4, 8).translate(0, 0.06, 0), SK.M(jer, { r: 0.6 })), hnd = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), skin); hnd.position.y = 0.125; arm.add(a, hnd); arm.position.set(0, 0.22, sd * 0.085); arm.rotation.x = sd * 0.5; arm.userData.sd = sd; kid.add(arm); }
     kid.position.set(x0 + 0.06, 0.6, 0); kid.scale.setScalar(1.2); kid.userData.tick = t => { const k = Math.sin(t * 2.2); kid.rotation.y = 0.15 * Math.sin(t * 0.7); kid.children.forEach(ch => { if (ch.userData.sd === 1) { ch.rotation.x = 0.4 + 0.9 * Math.max(0, k); ch.rotation.z = -0.25 * Math.max(0, Math.sin(t * 9)) * Math.max(0, k); } else if (ch.userData.sd === -1) ch.rotation.x = -0.5; }); };
     kid.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.self = true; } }); G.add(kid); G.userData.ticks.push(kid.userData.tick);
-    put(SK.shell((c, w, h) => { c.fillStyle = p.dad || '#e74c3c'; c.fillRect(0, 0, w, h); PR.leaf(c, 128, 100, 0.95, '#ffffff'); PR.text(c, 'BIG BRO', 384, 100, 44, '#ffffff'); }, 'bigbro' + (p.dad || '')));
-  }, { name: 'Away Kit', look: { shirt: '#1f5fd1', hatCol: '#e74c3c' }, pal: { jersey: '#ffffff', dad: '#1f5fd1', kcap: '#e74c3c', kskin: '#c68a5c' } });
+    const dad = p.dad || '#d52b1e';                                     // the rider: a Canada hockey jersey (red at home, blue away): stripes round the middle, the big maple leaf
+    put(SK.shell((c, w, h) => { c.fillStyle = dad; c.fillRect(0, 0, w, h); c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, 14); c.fillRect(0, 168, w, 14); c.fillRect(0, 194, w, 8); c.fillStyle = '#111214'; c.fillRect(0, 182, w, 6);
+      c.fillStyle = '#ffffff'; c.beginPath(); c.arc(128, 96, 66, 0, 7); c.fill(); PR.leaf(c, 128, 96, 1.15, dad); PR.text(c, 'CANADA', 384, 58, 34, '#ffffff'); PR.text(c, '87', 384, 116, 86, '#ffffff'); PR.text(c, 'BIG BRO', 384, 156, 22, '#ffffff'); }, 'bigbro2' + dad, 1.06));
+  }, { name: 'Away Kit', look: { shirt: '#1f5fd1', hatCol: '#1f5fd1' }, pal: { dad: '#1f5fd1' } });
 
 /* Biker: open-face helmet with goggles, leather jacket with patches, bandana */
 pskin('biker', 'Biker', '🏍️', { outfit: 'tee', shirt: '#1b1d20', hat: 'none', hatCol: '#1b1d20', face: 'stache', hair: '#3b2a1e', hairStyle: 'buzz', skin: '#d29a6c' },
@@ -125,23 +127,77 @@ pskin('knight', 'Star Knight', '✨', { outfit: 'tee', shirt: '#6b4a2b', hat: 'n
     G.userData.sleeves = true;
   }, { name: 'Shadow', look: { shirt: '#1b1d20', hair: '#1d1611', skin: '#c68a5c' }, pal: { robe: '#1b1d20', tunic: '#3a3d42', glow: 0xff3b3b } });
 
-/* Good Boy: a dog. Fur, snout, floppy ears, a collar with a gold tag */
-pskin('dog', 'Good Boy', '🐶', { outfit: 'tee', shirt: '#c8955a', hat: 'none', hatCol: '#000', face: 'smile', hair: '#c8955a', hairStyle: 'bald', skin: '#c8955a' },
-  (G, put, p) => {
-    const { hx, hy, tx } = SK.K(), fur = SK.M(p.fur || '#c8955a', { r: 0.9 }), light = SK.M(p.light || '#f1dcc0', { r: 0.9 }), dark = SK.M(p.dark || '#5e3b22', { r: 0.85 }), black = SK.M(0x111111, { r: 0.2, cc: 1 });
-    put(new THREE.SphereGeometry(0.12, 28, 20).scale(1.02, 0.95, 0.94).translate(hx, hy + 0.005, 0), fur);
-    put(new THREE.SphereGeometry(0.068, 22, 16).scale(1.25, 0.78, 0.88).translate(hx + 0.1, hy - 0.04, 0), light);   // the snout
-    put(new THREE.SphereGeometry(0.025, 16, 12).scale(1.1, 0.85, 1.25).translate(hx + 0.18, hy - 0.022, 0), black);    // the nose
-    put(new THREE.SphereGeometry(0.03, 14, 10).scale(1, 0.4, 1.1).translate(hx + 0.14, hy - 0.085, 0), SK.M('#e8607a', { r: 0.5 }));   // tongue
-    for (const sd of [-1, 1]) {
-      put(new THREE.SphereGeometry(0.021, 16, 12).translate(hx + 0.093, hy + 0.035, sd * 0.045), black); put(new THREE.SphereGeometry(0.007, 8, 6).translate(hx + 0.11, hy + 0.043, sd * 0.04), SK.M(0xffffff, { e: 0xffffff, ei: 0.6 }));   // eyes
-      put(new THREE.BoxGeometry(0.03, 0.008, 0.035).translate(hx + 0.09, hy + 0.068, sd * 0.046), dark);                                              // brows
-      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.07, 18, 14).scale(0.42, 1.25, 0.32), dark); ear.position.set(hx - 0.01, hy - 0.03, sd * 0.118); ear.rotation.x = sd * -0.25; ear.castShadow = true; ear.userData.self = true; ear.userData.sd = sd; G.add(ear);
-      ear.userData.tick = t => { ear.rotation.x = sd * (-0.25 - 0.12 * Math.max(0, Math.sin(t * 3 + sd))); }; G.userData.ticks.push(ear.userData.tick);
-    }
-    put(new THREE.TorusGeometry(0.075, 0.018, 8, 26).rotateX(Math.PI / 2).translate(tx + 0.02, 1.0, 0), SK.M(p.collar || '#d8262e', { r: 0.5, cc: 1 })); put(new THREE.CylinderGeometry(0.022, 0.022, 0.006, 16).rotateZ(Math.PI / 2).translate(tx + 0.1, 0.95, 0), SK.M(0xf2c200, { r: 0.2, m: 1 }));
-    put(SK.shell((c, w, h) => { c.fillStyle = p.fur || '#c8955a'; c.fillRect(0, 0, w, h); c.fillStyle = p.light || '#f1dcc0'; c.beginPath(); c.ellipse(128, 120, 54, 110, 0, 0, 7); c.fill(); c.fillStyle = p.dark || '#5e3b22'; c.beginPath(); c.ellipse(360, 80, 46, 34, 0.4, 0, 7); c.fill(); }, 'dog' + (p.fur || '')));
-  }, { name: 'Husky', look: { shirt: '#8a9099', hair: '#8a9099', skin: '#8a9099' }, pal: { fur: '#8a9099', light: '#f4f4f2', dark: '#3a3f46', collar: '#2f6fed' } });
+/* v14.1: the dogs. Rocky: a white coat with light brown patches and a brown patch over one eye. Good Girl: black, longer ears, a white chest,
+   a thin white blaze from the top of the brow down to a nose that's white on its front third (black nostrils), and a white nape that wraps round to the chest. */
+function dogBuild(G, put, p) {
+  const { hx, hy, tx } = SK.K(), fur = SK.M(p.fur, { r: 0.92 }), white = SK.M('#f6f3ec', { r: 0.92 }), patch = SK.M(p.patch || p.fur, { r: 0.92 }), black = SK.M(0x111111, { r: 0.2, cc: 1 }), eyeM = SK.M(0x1a1008, { r: 0.1, cc: 1 });
+  put(new THREE.SphereGeometry(0.12, 32, 22).scale(1.02, 0.95, 0.94).translate(hx, hy + 0.005, 0), fur);
+  put(new THREE.SphereGeometry(0.068, 24, 16).scale(1.25, 0.78, 0.88).translate(hx + 0.1, hy - 0.04, 0), p.girl ? fur : white);              // the muzzle
+  put(new THREE.SphereGeometry(0.05, 18, 12).scale(1.1, 0.5, 0.9).translate(hx + 0.1, hy - 0.075, 0), p.girl ? fur : white);                // the jaw
+  const nx = hx + 0.18, ny = hy - 0.022;
+  put(new THREE.SphereGeometry(0.026, 20, 14).scale(1.1, 0.85, 1.25).translate(nx, ny, 0), black);                                              // the nose
+  if (p.girl) {
+    put(new THREE.SphereGeometry(0.0268, 20, 14, Math.PI - 0.95, 1.9, Math.PI / 2 - 0.95, 1.9).scale(1.1, 0.85, 1.25).translate(nx + 0.0008, ny, 0), white);   // white on the front third
+    for (const sd of [-1, 1]) put(new THREE.SphereGeometry(0.0075, 10, 8).scale(0.6, 0.8, 1.1).translate(nx + 0.027, ny - 0.006, sd * 0.011), black);       // the nostrils
+    /* the blaze: a thin white line over the top of the brow and down the bridge of the muzzle to the nose */
+    const pts = []; for (let k = 0; k <= 10; k++) { const th = 0.25 + k * 0.105; pts.push(new THREE.Vector3(hx + 0.1225 * Math.sin(th) * 1.02, hy + 0.005 + 0.1225 * Math.cos(th) * 0.95, 0)); }
+    for (let k = 1; k <= 6; k++) { const u = k / 6; pts.push(new THREE.Vector3(hx + 0.115 + u * 0.055, hy + 0.012 - u * 0.012 + 0.012 * Math.sin(u * Math.PI) * 0.3, 0)); }
+    put(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.0065, 6).scale(1, 1, 1.6), white);
+    put(new THREE.TorusGeometry(0.082, 0.03, 10, 28).rotateX(Math.PI / 2).scale(1, 1.2, 1).translate(tx + 0.01, 1.0, 0), white);                // the white nape, round to the chest
+  } else {
+    for (const sd of [-1, 1]) put(new THREE.SphereGeometry(0.006, 8, 6).translate(nx + 0.026, ny - 0.006, sd * 0.01), SK.M(0x000000, { r: 0.9 }));
+    put(new THREE.SphereGeometry(0.045, 20, 14).scale(0.55, 1, 1).translate(hx + 0.088, hy + 0.04, -0.045), patch);                           // the patch over his eye
+    put(new THREE.SphereGeometry(0.06, 20, 14, 0, Math.PI * 2, 0, 1.2).scale(0.9, 0.6, 0.9).rotateZ(0.5).translate(hx - 0.04, hy + 0.06, 0.04), patch);   // a patch on the crown
+  }
+  put(new THREE.SphereGeometry(0.03, 14, 10).scale(1, 0.4, 1.1).translate(hx + 0.14, hy - 0.09, 0), SK.M('#e8607a', { r: 0.5 }));            // tongue
+  for (const sd of [-1, 1]) {
+    put(new THREE.SphereGeometry(0.021, 16, 12).translate(hx + 0.095, hy + 0.035, sd * 0.045), eyeM); put(new THREE.SphereGeometry(0.007, 8, 6).translate(hx + 0.112, hy + 0.043, sd * 0.04), SK.M(0xffffff, { e: 0xffffff, ei: 0.6 }));
+    const earM = p.girl ? fur : patch, len = p.girl ? 1.9 : 1.25;
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.07, 20, 16).scale(0.42, len, 0.3).translate(0, -0.03 * (len - 1.25) / 0.65, 0), earM); ear.position.set(hx - 0.01, hy - 0.03, sd * 0.118); ear.rotation.x = sd * -0.22; ear.castShadow = true; ear.userData.self = true; G.add(ear);
+    G.userData.ticks.push(t => { ear.rotation.x = sd * (-0.22 - 0.12 * Math.max(0, Math.sin(t * 3 + sd))); });
+  }
+  put(new THREE.TorusGeometry(0.078, 0.014, 8, 26).rotateX(Math.PI / 2).translate(tx + 0.02, p.girl ? 0.965 : 1.0, 0), SK.M(p.collar, { r: 0.5, cc: 1 })); put(new THREE.CylinderGeometry(0.022, 0.022, 0.006, 16).rotateZ(Math.PI / 2).translate(tx + 0.1, 0.93, 0), SK.M(0xf2c200, { r: 0.2, m: 1 }));
+  put(SK.shell((c, w, h) => { c.fillStyle = p.fur; c.fillRect(0, 0, w, h);
+    if (p.girl) { c.fillStyle = '#f6f3ec'; c.beginPath(); c.moveTo(70, 0); c.lineTo(186, 0); c.quadraticCurveTo(170, 120, 128, 210); c.quadraticCurveTo(86, 120, 70, 0); c.fill(); c.fillRect(0, 0, w, 16); }   // white chest, white collar line
+    else { c.fillStyle = p.patch; for (const [x, y, rx, ry] of [[200, 60, 40, 30], [330, 140, 60, 44], [440, 60, 46, 34], [40, 170, 34, 26]]) { c.beginPath(); c.ellipse(x, y, rx, ry, 0.4, 0, 7); c.fill(); } }
+  }, 'dog' + p.fur + (p.girl ? 'g' : '')));
+}
+pskin('dog', 'Rocky', '🐶', { outfit: 'tee', shirt: '#f6f3ec', hat: 'none', hatCol: '#000', face: 'smile', hair: '#f6f3ec', hairStyle: 'bald', skin: '#f6f3ec' }, dogBuild);
+PSKINS[PSKINS.length - 1].pal = { fur: '#f6f3ec', patch: '#c9965e', collar: '#d8262e' };
+PSKINS.push({ id: 'dog_2', name: 'Ophie', icon: '🐕', look: { outfit: 'tee', shirt: '#18181a', hat: 'none', hatCol: '#000', face: 'smile', hair: '#18181a', hairStyle: 'bald', skin: '#18181a' }, build: dogBuild, pal: { fur: '#18181a', girl: true, collar: '#ff5fa2' }, alt: true });
+
+/* Mew: a cat. Pointy ears with pink insides, green eyes with slit pupils, whiskers, a little pink nose, a tabby coat and a tail that curls and flicks. */
+function catBuild(G, put, p) {
+  const { hx, hy, tx, sx } = SK.K(), fur = SK.M(p.fur, { r: 0.92 }), light = SK.M(p.light, { r: 0.92 }), pink = SK.M('#f29bb5', { r: 0.6 }), black = SK.M(0x0e0e10, { r: 0.2, cc: 1 });
+  const tab = SK.tex(256, 128, (c, w, h) => { c.fillStyle = p.fur; c.fillRect(0, 0, w, h); c.strokeStyle = p.stripe; c.lineCap = 'round';
+    c.lineWidth = p.tabby ? 9 : 6; for (let x = 6; x < w; x += p.tabby ? 18 : 26) { c.beginPath(); c.moveTo(x, 0); c.quadraticCurveTo(x + 9, 24, x - 3, p.tabby ? 58 : 44); c.stroke(); }
+    if (p.tabby) { c.lineWidth = 5; c.beginPath(); c.moveTo(48, 40); c.lineTo(56, 22); c.lineTo(64, 36); c.lineTo(72, 22); c.lineTo(80, 40); c.stroke(); for (const y of [70, 84]) { c.beginPath(); c.moveTo(20, y); c.quadraticCurveTo(64, y - 8, 108, y); c.stroke(); } } }, 'tabby' + p.fur + (p.tabby ? 't' : ''));
+  put(new THREE.SphereGeometry(0.118, 32, 22).scale(1, 0.93, 1.04).translate(hx, hy + 0.0, 0), SK.M(0xffffff, { map: tab, r: 0.9 }));
+  put(new THREE.SphereGeometry(0.05, 20, 14).scale(1.1, 0.75, 1.3).translate(hx + 0.088, hy - 0.04, 0), light);                                  // the muzzle
+  put(new THREE.SphereGeometry(0.014, 12, 10, 0, Math.PI * 2, 0, Math.PI / 2).rotateZ(-Math.PI / 2 - 0.3).scale(1, 1, 1.3).translate(hx + 0.14, hy - 0.02, 0), pink);   // the nose
+  for (const sd of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.024, 18, 14).scale(0.6, 1, 1), SK.M(p.eye, { r: 0.05, cc: 1, e: p.eye, ei: 0.25 })); eye.position.set(hx + 0.098, hy + 0.025, sd * 0.045); G.add(eye); eye.userData.self = true;
+    const pup = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.034, 0.008), black); pup.position.set(hx + 0.113, hy + 0.025, sd * 0.045); G.add(pup); pup.userData.self = true;
+    G.userData.ticks.push(t => { const bl = (t % 4.2) < 0.12 ? 0.1 : 1; eye.scale.y = bl; pup.scale.y = bl; });
+    const ear = new THREE.Group(), outer = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.085, 4).scale(0.55, 1, 1), fur), inner = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.06, 4).scale(0.4, 1, 1), pink); inner.position.set(0.012, -0.008, 0); ear.add(outer, inner);
+    ear.position.set(hx - 0.005, hy + 0.1, sd * 0.065); ear.rotation.x = sd * 0.35; ear.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.self = true; } }); G.add(ear);
+    G.userData.ticks.push(t => { ear.rotation.x = sd * (0.35 + (Math.sin(t * 0.9 + sd * 2) > 0.95 ? 0.25 : 0)); });
+    for (const a of [-0.18, 0, 0.18]) put(new THREE.CylinderGeometry(0.0018, 0.0018, 0.16, 4).rotateX(Math.PI / 2).rotateY(-sd * a * 0.6).rotateX(a).translate(hx + 0.12, hy - 0.045 + a * 0.04, sd * 0.075), SK.M(0xf4f4f2, { r: 0.4 }));
+  }
+  put(new THREE.TorusGeometry(0.078, 0.014, 8, 26).rotateX(Math.PI / 2).translate(tx + 0.02, p.tabby ? 0.955 : 1.0, 0), SK.M(p.collar, { r: 0.5, cc: 1 }));
+  put(new THREE.SphereGeometry(0.02, 14, 10).translate(tx + 0.1, 0.94, 0), SK.M(0xf2c200, { r: 0.2, m: 1 }));                                     // the bell
+  put(SK.shell((c, w, h) => { c.fillStyle = p.fur; c.fillRect(0, 0, w, h); c.strokeStyle = p.stripe; c.lineWidth = p.tabby ? 16 : 12; c.lineCap = 'round'; for (let x = p.tabby ? 0 : 200; x < 512; x += p.tabby ? 30 : 36) { c.beginPath(); c.moveTo(x, 0); c.quadraticCurveTo(x + 14, 60, x - 4, 120); c.quadraticCurveTo(x - 16, 180, x + 6, 256); c.stroke(); }
+    c.fillStyle = p.lightCss; c.beginPath(); c.ellipse(128, 120, 54, 120, 0, 0, 7); c.fill(); if (p.tabby) c.fillRect(0, 0, w, 22); }, 'cat' + p.fur + (p.tabby ? 't' : '')));
+  if (p.tabby) put(new THREE.TorusGeometry(0.084, 0.032, 10, 28).rotateX(Math.PI / 2).scale(1, 1.25, 1).translate(tx + 0.01, 0.985, 0), light);   // the white neck, all the way round
+  const ringTex = p.tabby ? SK.tex(64, 64, (c, w, h) => { c.fillStyle = p.fur; c.fillRect(0, 0, w, h); c.fillStyle = p.stripe; for (let y = 0; y < h; y += 16) c.fillRect(0, y, w, 7); }, 'tailrings' + p.fur) : null, tailM = ringTex ? SK.M(0xffffff, { map: ringTex, r: 0.9 }) : fur;
+  /* the tail: out behind the seat, curling up at the end, flicking */
+  const segs = [], tail = new THREE.Group(); let par = tail; for (let k = 0; k < 9; k++) { const s = new THREE.Group(), m = new THREE.Mesh(new THREE.CapsuleGeometry(0.022 - k * 0.0012, 0.05, 4, 8).rotateZ(Math.PI / 2).translate(-0.035, 0, 0), k > 6 ? SK.M(p.tip, { r: 0.9 }) : tailM); m.castShadow = true; s.add(m); s.position.x = k ? -0.068 : 0; par.add(s); segs.push(s); par = s; }
+  tail.position.set(sx - 0.42, 0.5, 0); G.add(tail);
+  G.userData.ticks.push(t => segs.forEach((s, k) => { s.rotation.z = -0.22 - (k > 4 ? 0.22 : 0) + 0.06 * Math.sin(t * 2 - k * 0.6); s.rotation.y = 0.18 * Math.sin(t * 1.6 - k * 0.5); }));
+}
+pskin('cat', 'Mew', '🐱', { outfit: 'tee', shirt: '#8f9196', hat: 'none', hatCol: '#000', face: 'smile', hair: '#8f9196', hairStyle: 'bald', skin: '#8f9196' }, catBuild);
+PSKINS[PSKINS.length - 1].pal = { fur: '#8f9196', stripe: '#1c1c1f', light: '#f6f5f2', lightCss: '#f6f5f2', eye: 0x5fd35f, tip: '#1c1c1f', collar: '#d8262e', tabby: true };   // (Mew: a classic grey, black and white tabby with a white neck)
+PSKINS.push({ id: 'cat_2', name: 'Midnight', icon: '🐈‍⬛', look: { outfit: 'tee', shirt: '#1d1d22', hat: 'none', hatCol: '#000', face: 'smile', hair: '#1d1d22', hairStyle: 'bald', skin: '#1d1d22' }, build: catBuild, pal: { fur: '#1d1d22', stripe: '#2b2b33', light: '#2a2a30', lightCss: '#2a2a30', eye: 0xf2c200, tip: '#1d1d22', collar: '#c44dff' }, alt: true });
 
 /* Hockey Pro: a proper hockey helmet with a visor and a striped jersey */
 pskin('hockeypro', 'Hockey Pro', '🏒', { outfit: 'tee', shirt: '#c8102e', hat: 'none', hatCol: '#000', face: 'focus', hair: '#6b4a2b', hairStyle: 'short', skin: '#e8b48a' },
@@ -322,7 +378,7 @@ cskin('cruiser', 'Star Cruiser', '🛸', { body: 0xe8ebf0, trim: 0x3a3f46, accen
     const eng = new THREE.Mesh(SK.rbox(0.03, 0.06, 0.4, 0.01), glow); eng.position.set(back - 0.02, 0.3, 0); add(eng);
   }, { name: 'Dark Side', paint: { body: 0x16181c, accent: 0xff3b3b }, pal: { panel: 0x16181c, glow: 0xff3b3b } });
 
-/* Dog House (Good Boy): a red kennel roof over the backrest, paw prints, a bone on the nose, a wagging tail */
+/* Dog House (Rocky): a red kennel roof over the backrest, paw prints, a bone on the nose, a wagging tail */
 cskin('doghouse', 'Dog House', '🦴', { body: 0xb3261e, trim: 0xf4f4f2, accent: 0xf4f4f2, base: 0x3b2a1e },
   (add, p, tick) => {
     const { bk, nose, back } = CK(), roof = SK.M(p.roof || 0x3b2a1e, { r: 0.8 }), white = SK.M(0xf4f4f2, { r: 0.5 });
@@ -404,6 +460,13 @@ cskin('racer', 'Volt Racer', '🏁', { body: 0x1f4fd1, trim: 0xffd23f, accent: 0
   }, { name: 'Papaya', paint: { body: 0xff7a1c, trim: 0x111214, accent: 0x111214 }, pal: { wing: 0xff7a1c, endc: 0x111214, chk: '#111214' } });
 
 /* ================= putting them on ================= */
+const LEGS = {                                                           // (leg colour = the top's colour unless the skin says otherwise; shoes: boots, skates, paws)
+  rookie: { shoes: '#f4f4f2' }, hometown: { shoes: '#f4f4f2' }, lilbro: { legs: '#22303f', shoes: '#f4f4f2' }, lilbro_2: { legs: '#22303f', shoes: '#f4f4f2' }, biker: { legs: '#17181a', shoes: '#0c0c0d' }, rockstar: { legs: '#17181a', shoes: '#0c0c0d' },
+  engineer: { shoes: '#f4f4f2' }, knight: { legs: '#5a3d26', shoes: '#2b1d12' }, knight_2: { legs: '#1b1d20', shoes: '#0c0c0d' }, dog: { legs: '#f6f3ec' }, dog_2: { legs: '#18181a' },
+  hockeypro: { shoes: '#111214' }, pilot: { legs: '#6b3f22', shoes: '#1b1208' }, pilot_2: { legs: '#2a2c30', shoes: '#0c0c0d' }, trucker: { legs: '#4a6d9c', shoes: '#5e3b22' },
+  astro: { legs: '#eceff3', shoes: '#9aa3ad' }, lumber: { shoes: '#3b2a1e' }, dj: { legs: '#121214', shoes: '#c44dff' }, dj_2: { legs: '#121214', shoes: '#7dff6a' }, captain: { shoes: '#d8262e' }, captain_2: { shoes: '#ffd23f' },
+  cat: { legs: '#8f9196', shoes: '#f6f5f2' }, cat_2: { legs: '#1d1d22' }
+};
 const PSK = Object.fromEntries(PSKINS.map(s => [s.id, s])), CSK = Object.fromEntries(CSKINS.map(s => [s.id, s]));
 const Skins = {
   expand(look) {                                                          // a look (old or new) -> the full look the renderer understands
@@ -418,6 +481,10 @@ const Skins = {
     if (opts && opts.layer !== undefined) G.traverse(o => { if (o.isMesh && (o.userData.self || !before.has(o))) o.layers.set(opts.layer); });
     group.userData.sleeves = G.userData.sleeves !== undefined ? G.userData.sleeves : group.userData.sleeves; group.userData.bare = !!G.userData.bare;
   },
+  /* v14.1: the legs (and the shoes or paws) match the skin, not the old navy trousers */
+  legsFor(look) { const S = PSK[look.ps] || {}, base = (look.ps || '').replace(/_2$/, ''), legs = (LEGS[look.ps] || LEGS[base] || {}).legs || look.shirt || '#2f3b55', shoes = (LEGS[look.ps] || LEGS[base] || {}).shoes || null;
+    const c = new THREE.Color(legs), dark = '#' + c.clone().multiplyScalar(0.55).getHexString(); return { legs, shoes: shoes || (S.pal && S.pal.fur ? legs : dark) }; },
+  dressLegs(group, look) { const L = this.legsFor(look), pm = SK.M(L.legs, { r: 0.8 }), sm = SK.M(L.shoes, { r: 0.55 }); for (const ch of group.children) { const p = ch.userData && ch.userData.part; if (!ch.isMesh) continue; if (p === 'pants' || p === 'selfPants') ch.material = pm; else if (p === 'shoes') ch.material = sm; } },
   /* the cart: repaint the bow / trim / stripe / motor box, then add the skin's fascia and add-ons */
   dressCart(group, cs, opts = {}) {
     const S = CSK[cs] || CSK.classic; const old = group.getObjectByName('cartskin'); if (old) group.remove(old);
@@ -439,7 +506,7 @@ const Skins = {
 
 /* the renderer: every look goes through the skins */
 { const dress0 = Avatar.dress.bind(Avatar), cart0 = Avatar.cart.bind(Avatar), clean0 = Avatar.cleanLook.bind(Avatar), rand0 = Avatar.randomLook;
-  Avatar.dress = function (group, look, opts = {}) { if (!group || !look) return dress0(group, look, opts); const L = Skins.expand(look); dress0(group, L, opts); Skins.dressPlayer(group, L, opts); Skins.dressCart(group, L.cs, { keepTeam: !!opts.shirt }); };
+  Avatar.dress = function (group, look, opts = {}) { if (!group || !look) return dress0(group, look, opts); const L = Skins.expand(look); dress0(group, L, opts); Skins.dressPlayer(group, L, opts); Skins.dressLegs(group, L); Skins.dressCart(group, L.cs, { keepTeam: !!opts.shirt }); };
   Avatar.cart = function (look) { return cart0(look); };
   Avatar.cleanLook = function (L) { if (!L || typeof L !== 'object') return null; return { ps: PSK[L.ps] ? L.ps : 'rookie', cs: CSK[L.cs] ? L.cs : 'classic' }; };
   Avatar.randomLook = function (seed) { const r = Look.rnd(seed * 7919 + 13), pick = a => a[Math.floor(r() * a.length)]; return { ps: pick(PSKINS).id, cs: pick(CSKINS).id }; };

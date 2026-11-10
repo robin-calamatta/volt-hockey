@@ -27,7 +27,7 @@ const teamsMatter = cfg => !!cfg && (!cfg.mini || cfg.mini.mode === 'teams');
     ].map(it => ({ ...it, select: it.select && (() => !this.opening && it.select()), change: it.change && (d => !this.opening && it.change(d)) }));
   };
   P.ruleItems = function () {
-    return [speedCapItem('Max cart speed (locked for all)'), toggle('Cart collisions', 'collisions'), toggle('Penalties', 'penalties'), slider('Penalty time', 'penaltySeconds', v => `${v} s`),
+    return [toggle('Cart collisions', 'collisions'), toggle('Penalties', 'penalties'), slider('Penalty time', 'penaltySeconds', v => `${v} s`),
       toggle('Penalties carry over after a goal', 'penaltyCarry'), lockCartItem(), slider('Game clock speed', 'timeSpeed', times)];
   };
 

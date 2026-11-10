@@ -16,14 +16,13 @@ const CTRL = {                                                         // contro
   spin: 'Spin (a half turn that whacks things): LB / RB  /  R Z  /  ] [  /  SPIN buttons',
   item: 'Use a power-up / fire: RT  /  E  /  .  /  touch ★ USE',
   drift: 'Drift: hold B while turning (Backspace  /  Right Ctrl  /  touch 💨 DRIFT): let go when the bar is purple for the biggest boost',
-  speed: 'Cart speed: D-pad ◀ ▶  /  C V  /  ; \'  /  touch SPEED + −',
   pause: 'Pause: Start  /  Esc  /  II'
 };
 const GAME_INFO = {
   hockey: { name: 'Volt Hockey', cat: 'hockey', blurb: 'The real thing: teams of power carts, a ball and two nets.',
     goal: 'Score more goals than the other team before the clock runs out.',
     rules: ['Carry the ball in the T-stick on the front of your cart and push it into the other team\'s net.', 'Spin your cart to slap the ball hard: a spin shot.', 'Do not drive into the crease you are attacking, and only one cart per team may be in its own crease.', 'A hard hit from behind or head-on is a foul: that cart sits in the sin bin and the other team has a power play.', 'A ball left untouched in a crease is reset to the middle.', 'Level at full time: golden goal overtime.'],
-    controls: [CTRL.drive, CTRL.drift, CTRL.spin, 'Switch cart: Y  /  F  /  /', 'Full press (goalie joins the attack): X', CTRL.speed, CTRL.pause] },
+    controls: [CTRL.drive, CTRL.drift, CTRL.spin, 'Switch cart: Y  /  F  /  /', 'Full press (goalie joins the attack): X', CTRL.pause] },
   balloons: { name: 'Balloon Bash', cat: 'party', blurb: 'Pop the balloons on everyone else\'s back.',
     goal: 'Be the last cart (or team) with balloons left.',
     rules: ['Every cart carries balloons on its back.', 'Hit someone\'s back with the front of your cart: one balloon pops and they restart somewhere safe.', 'A cart that just restarted blinks: it cannot be popped for 2 seconds.', 'No balloons left: you are out and watch from the sin bin.', 'When the clock runs out, the most balloons left wins.', 'Power-ups: BOOST, ZAP (pops a balloon from range) and OIL.'],

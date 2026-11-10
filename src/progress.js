@@ -104,7 +104,7 @@ const Progress = {
     if (changed && !['dist', 'practiceSec', 'brDmg'].includes(type)) Settings.save();
   },
   addXp(xp, why) {
-    const before = this.tier(), lvBefore = this.level(); this.P.xp += xp; Settings.save();
+    const before = this.tier(), lvBefore = this.level(); (this.xpLog = this.xpLog || []).push({ xp, why, at: Date.now() }); this.P.xp += xp; Settings.save();
     this.toast(`+${xp} XP`, why);
     if (this.level() > lvBefore) { const t = this.tier(), rw = t > before ? PASS[t] : null; this.toast(`LEVEL ${this.level()}!`, rw ? `Season pass reward unlocked: ${rw.name} ${rw.icon}` : SEASON1.name + ': ' + SEASON1.title, true); }
   },
@@ -158,7 +158,7 @@ const Progress = {
     if (online) this.ev('online');
     if (!sc.setup.practice || m.mini) {                                   // XP for playing: time, eliminations, goals, a win (quests give more)
       const mins = Math.min(30, (S.played || 0) / 60), parts = [[60, 'played'], [Math.round(mins * 25), Math.round(mins) + ' min'], [(S.kills || 0) * 30, (S.kills || 0) + ' eliminations'], [(S.goals || 0) * 15, (S.goals || 0) + ' goals'], [won ? 100 : 0, 'win'], [S.top3 && !won ? 50 : 0, 'top 3']].filter(([x]) => x > 0);
-      this.addXp(parts.reduce((a, [x]) => a + x, 0), (won ? 'Match won: ' : 'Match played: ') + parts.slice(1).map(([, t]) => t).join(', '));
+      this.lastMatch = { parts: parts.map(([x, t]) => [x, t]), won, kind: m.mini ? m.mini.kind : 'hockey' }; this.addXp(parts.reduce((a, [x]) => a + x, 0), (won ? 'Match won: ' : 'Match played: ') + parts.slice(1).map(([, t]) => t).join(', '));
     }
   }
 };

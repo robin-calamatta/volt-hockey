@@ -375,7 +375,16 @@ const GOLF_HOLES = [
   { name: 'The Dogleg', tee: [3, 3], cup: [25, 12], blocks: [[9, 0, 10, 10.5], [18, 4.5, 19, 15]], via: [[9.5, 12.8], [18.5, 2.2]] },
   { name: 'The Fortress', tee: [3, 7.5], cup: [20, 7.5], blocks: [[17.2, 4, 17.9, 6.6], [17.2, 8.4, 17.9, 11], [17.2, 4, 23, 4.7], [17.2, 10.3, 23, 11], [22.3, 4, 23, 11]], via: [[15.5, 7.5]] },
   { name: 'Pinball', tee: [25, 7.5], cup: [3, 7.5], blocks: [[13.4, 3.2, 14.6, 4.4], [13.4, 10.6, 14.6, 11.8], [8.4, 6.9, 9.6, 8.1], [18.4, 6.9, 19.6, 8.1], [5.5, 4.5, 6.2, 10.5]], via: [[14, 7.5], [9, 3.5], [9, 11.5], [4, 2.5], [4, 12.5]] },
-  { name: 'The Snake', tee: [2.5, 2.5], cup: [25.5, 2.5], blocks: [[6.5, 0, 7.3, 11], [13.6, 4, 14.4, 15], [20.7, 0, 21.5, 11]], via: [[6.9, 13], [14, 2], [21.1, 13]] }
+  { name: 'The Snake', tee: [2.5, 2.5], cup: [25.5, 2.5], blocks: [[6.5, 0, 7.3, 11], [13.6, 4, 14.4, 15], [20.7, 0, 21.5, 11]], via: [[6.9, 13], [14, 2], [21.1, 13]] },
+  /* v14.1.4: eight more holes */
+  { name: 'The Island', tee: [3, 7.5], cup: [21, 7.5], blocks: [[18, 4.5, 24, 5.1], [18, 9.9, 24, 10.5], [23.4, 5.1, 24, 9.9], [18, 5.1, 18.6, 6.5], [18, 8.5, 18.6, 9.9]], via: [[16, 7.5]] },
+  { name: 'Zig Zag', tee: [2.5, 12.5], cup: [25.5, 2.5], blocks: [[7, 4, 7.8, 15], [13.5, 0, 14.3, 11], [20, 4, 20.8, 15]], via: [[7.4, 2], [13.9, 13], [20.4, 2]] },
+  { name: 'The Gauntlet', tee: [3, 7.5], cup: [25, 7.5], blocks: [[8, 5, 9, 6], [8, 9, 9, 10], [12, 7, 13, 8], [16, 4, 17, 5], [16, 10, 17, 11], [20, 7, 21, 8]], via: [[10.5, 7.5], [14.5, 5.8], [18.5, 7.5]] },
+  { name: 'Hairpin', tee: [3, 3.5], cup: [3, 11.5], blocks: [[0, 7.2, 22, 7.8]], via: [[25, 7.5]] },
+  { name: 'Corner Pocket', tee: [12, 7.5], cup: [25, 12.5], blocks: [[19, 9.2, 28, 9.8], [19, 9.8, 19.6, 12.6]], via: [[17, 13.5]] },
+  { name: 'The Funnel', tee: [3, 7.5], cup: [25, 7.5], blocks: [[12, 0, 13, 6.2], [12, 8.8, 13, 15], [18, 2, 18.6, 6.8], [18, 8.2, 18.6, 13]], via: [[12.5, 7.5], [18.3, 7.5]] },
+  { name: 'Bank Shot', tee: [4, 12], cup: [10, 2.8], blocks: [[5, 5, 15, 5.6], [5, 0, 5.6, 5]], via: [[16.5, 8], [16.5, 2.8]] },
+  { name: 'The Maze', tee: [2, 2], cup: [26, 13], blocks: [[5, 0, 5.6, 10], [10, 5, 10.6, 15], [15, 0, 15.6, 10], [20, 5, 20.6, 15]], via: [[5.3, 12.5], [10.3, 2.5], [15.3, 12.5], [20.3, 2.5]] }
 ];
 const GOLF = { r: 0.12, roll: 0.85, cup: 0.2, sink: 2.4, power: 1.55, base: 1.0, spin: 8, reach: 0.42, cool: 0.9 };
 MODES.golf = {
@@ -525,16 +534,22 @@ MODES.ctf = {
     if (a.side === b.side || d > 2 * R_CART() + 0.08) return;
     for (const [car, tagger] of [[a, b], [b, a]]) { const f = m.gs.flag.find(x => x.car === car.k); if (f) { f.car = -1; f.drop = 8; f.lock = m.simTime + 0.8; car.gs.noPick = m.simTime + 3; car.stunLeft = 1.2; m.sfx('foul'); MG.notice(m, `${MG.up(m.name(tagger))} KNOCKS THE FLAG LOOSE`, 1.4); } }
   },
-  cmd(c, cmd, m) { if (this.carrying(m, c)) c.speedMul *= 0.88; return cmd; },
+  cmd(c, cmd, m) { if (this.carrying(m, c)) c.speedMul *= 0.95; return cmd; },   // (v14.2: was 0.88: almost every carrier was caught before reaching home)
   end(m) { const sc = m.gs.score; m.finishGame(MG.teamTitle(m, sc), MG.rankRows(m, m.chairs, c => c.gs.caps, c => `${c.gs.caps} capture${c.gs.caps === 1 ? '' : 's'}`), sc[0] === sc[1] ? -1 : sc[0] > sc[1] ? 0 : 1, `${sc[0]} - ${sc[1]}`); },
   timeUp(m) { this.end(m); },
   ai(c, m) {
     const g = m.gs, mine = g.flag[c.side], theirs = g.flag[1 - c.side], mates = m.chairs.filter(k => k.side === c.side), attack = mates.indexOf(c) % 2 === 0 || mates.length === 1;
     const lane = (mates.indexOf(c) % 4 < 2 ? 1 : -1) * (c.side ? -1 : 1) * 4, via = (tx, ty) => Math.abs(c.x - tx) > 5 && Math.abs(c.y - (m.centerY + lane)) > 1.2 ? MH.to(c, c.x + (tx > c.x ? 2.5 : -2.5), m.centerY + lane, 1) : MH.to(c, tx, ty, 1);   // attackers keep to their own lane, so the two sides do not meet head-on
-    if (theirs.car === c.k) { const foe = MH.nearest(c, MG.live(m).filter(o => o.side !== c.side)); const v = via(g.base[c.side].x, g.base[c.side].y); if (foe && MH.dist(c, foe) < 2.5) { const f = MH.flee(c, m, [foe]); v.x += f.x * 0.6; v.y += f.y * 0.6; } return v; }
+    if (theirs.car === c.k) {                                           // carrying: head home, swerving round anyone who could tag us (a better driver sees them sooner and dodges harder)
+      const sk = (m.difficulty && m.difficulty.setup !== undefined) ? m.difficulty.setup : 0.5, foes = MG.live(m).filter(o => o.side !== c.side && MH.dist(c, o) < 2.5 + 3 * sk), v = MH.to(c, g.base[c.side].x, g.base[c.side].y, 1);
+      if (foes.length) { const f = MH.flee(c, m, foes), w = 0.6 + 0.9 * sk; v.x += f.x * w; v.y += f.y * w; const l = Math.hypot(v.x, v.y) || 1; v.x /= l; v.y /= l; } return v; }
     const enemyCarrier = mine.car >= 0 ? m.chairs[mine.car] : null;
     if (enemyCarrier && (!attack || MH.dist(c, enemyCarrier) < 6)) return MG.chase(c, enemyCarrier, 1);
     if (!mine.home && mine.car < 0 && (!attack || MH.dist(c, mine) < 6)) return MH.to(c, mine.x, mine.y, 1);
+    if (attack && theirs.car < 0) {                                      // v14.2: the attacker nearest their flag goes for it; the others body-block the defender nearest the flag
+      const atk = mates.filter((k, i) => i % 2 === 0 || mates.length === 1).filter(k => !k.out), lead = atk.reduce((a, k) => (MH.dist(k, theirs) < MH.dist(a, theirs) ? k : a), atk[0] || c);
+      if (lead !== c && MH.dist(lead, theirs) < 14) { const def = MH.nearest(theirs, MG.live(m).filter(o => o.side !== c.side)); if (def && MH.dist(def, theirs) < 8) return MG.chase(c, def, 1, 0.2); }
+    }
     if (attack) { if (theirs.car < 0) return via(theirs.x, theirs.y); const mate = m.chairs[theirs.car]; const foe = MH.nearest(mate, MG.live(m).filter(o => o.side !== c.side)); return foe ? MG.chase(c, foe, 1) : MH.to(c, mate.x, mate.y, 0.8); }
     const foe = MH.nearest(g.base[c.side], MG.live(m).filter(o => o.side !== c.side)); const b = g.base[c.side];
     return foe && MH.dist(foe, b) < 9 ? MG.chase(c, foe, 1) : MH.to(c, b.x + (c.side ? -2.5 : 2.5), b.y + (mates.indexOf(c) % 3 - 1) * 2, 0.6);
@@ -657,6 +672,7 @@ MODES.slalom = {
     const G = m.gs.gates, a = G[c.gs.g % G.length], b = G[(c.gs.g + 1) % G.length], d = MH.dist(c, a);
     const k = Math.min(0.5, d / 6), tx = a.x + (b.x - a.x) * 0.12 * (1 - k), ty = a.y + (b.y - a.y) * 0.12 * (1 - k);
     const turn = Math.abs(normalizeAngle(Math.atan2(b.y - a.y, b.x - a.x) - Math.atan2(a.y - c.y, a.x - c.x)));
+    if (d < 3 && a.a !== undefined) { const ux = Math.cos(a.a), uy = Math.sin(a.a), sd = (a.x - c.x) * ux + (a.y - c.y) * uy >= 0 ? 1 : -1; return MH.to(c, a.x + ux * sd * 1.6, a.y + uy * sd * 1.6, turn > 1.6 ? 0.75 : 1); }   // v14.2: close to a gate: drive straight through it (a precise driver used to circle the last gate forever)
     return MH.to(c, tx, ty, d < 2.5 && turn > 1.6 ? 0.7 : 1);
   },
   ghost(m) { const best = (Settings.ghosts || {})[m.ghostKey]; if (!best || !best.p || !best.p.length) return null; const i = Math.min(best.p.length - 1, Math.floor(m.simTime * 10)), f = m.simTime * 10 - i, p = best.p[i], q = best.p[Math.min(best.p.length - 1, i + 1)]; return { x: p[0] + (q[0] - p[0]) * f, y: p[1] + (q[1] - p[1]) * f, heading: p[2], t: best.t, name: best.name }; },
@@ -898,7 +914,7 @@ Object.assign(GAME_INFO, {
   golf: { name: 'Mini Golf', cat: 'ball', blurb: 'Everyone plays the same hole at once, each with their own ball.', noItems: true,
     goal: 'Finish every hole in the fewest strokes.',
     rules: ['Your golf ball is the one in your colour. Only your cart can hit it; carts drive through each other.', 'Drive into it to putt: aim with the way you face, and the faster you drive, the harder you hit. A spin is a big drive.', 'Every hit is a stroke. A ball going too fast skips over the cup.', 'Get it in the cup to finish the hole. Walls and blocks bounce it.', 'Not in when the hole\'s time runs out: +3 strokes.', 'Fewest strokes after all the holes wins.'],
-    controls: [CTRL.drive, CTRL.drift, 'Spin (a big hit): LB / RB  /  R Z  /  ] [  /  touch SPIN', CTRL.pause], opts: [{ key: 'holes', label: 'Holes', values: [2, 3, 4], def: 3 }, { key: 'holeTime', label: 'Time per hole', values: [45, 60, 90], def: 60, fmt: v => v + 's' }] },
+    controls: [CTRL.drive, CTRL.drift, 'Spin (a big hit): LB / RB  /  R Z  /  ] [  /  touch SPIN', CTRL.pause], opts: [{ key: 'holes', label: 'Holes', values: [3, 6, 9, 12], def: 6 }, { key: 'holeTime', label: 'Time per hole', values: [45, 60, 90], def: 60, fmt: v => v + 's' }] },
   imposter: { name: 'Imposter Carts', cat: 'sneaky', blurb: 'Every cart looks the same. Find the real players among the CPUs.', minutes: 3, noItems: true,
     goal: 'Collect the orbs while blending in, or unmask every other agent.',
     rules: ['All carts look alike. Most are harmless CPUs pottering about; a few are agents (every player is one).', 'Agents collect glowing orbs: sit on one for a second and a half (the ring fills up). Taking one makes you flash for a moment.', 'A: zap the cart in front of you. An agent is unmasked and out. A harmless cart: you are stunned and revealed.', 'First to collect enough orbs wins, or be the last agent left.'],

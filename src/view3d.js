@@ -437,7 +437,7 @@ class View3D {
     if (this.cartKey !== Settings.stickLength) this.buildCarts();
     for (const c of this.carts) {
       const ch = c.ch, vis = !ch.benched; c.group.visible = true;
-      const lvl = ch.player ? ch.player.speedLevel : 0; c.ring.visible = vis && !!lvl;
+      const lvl = 0; c.ring.visible = false;   // (v14.1.5: no speed modes, no speed ring)
       if (!vis) { const sl = this.binSlot(ch); c.group.position.set(sl.x, 0, sl.y); c.group.rotation.y = -sl.heading; c.lx = ch.x; c.ly = ch.y; continue; }   // serving time: sitting in the sin bin
       c.group.position.set(ch.x, 0, ch.y); c.group.rotation.y = -ch.heading;
       const dx = ch.x - c.lx, dy = ch.y - c.ly, fwd = dx * Math.cos(ch.heading) + dy * Math.sin(ch.heading); c.lx = ch.x; c.ly = ch.y;

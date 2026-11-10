@@ -59,7 +59,7 @@ const CONFIG = {
          passThreshold: 0.3, dribbleStand: 3.4, aimTolerance: 0.07, planHold: 0.35, aimCommit: 1.5, pressureDist: 1.4, phaseHold: 0.5, useGoalie: true, goalieStand: 0.85, goalieShade: 0.4, goalieAdvance: 1.0, goalieAdvanceRange: 9, goalieXDead: 0.3, goalieXMax: 0.2, goalieEdge: 0.15, goalieReact: 1.5, goalieBrake: 0.6, goalieHome: 0.6, goalieXPull: 0.6, goalieAlign: 0.45, goalieTurnSpeed: 0.8, goalieClearRange: 2.6, goalieClearSpeed: 2.0, goalieClearFoe: 2.2, goalieNoise: 5, goalieNoiseEvery: 0.5,   // the goalie: where it stands, how it shades and tracks, when it steps out to clear
         carryMinX: 0.3, carryMaxX: 1.2, carryHalf: 0.65, carryRelSpeed: 3.5,   // carry*: the ball counts as ours while it is this close in front of the cup   // shotSpeed = typical spin-shot ball speed
         crashDepth: 3.3, creasePad: 0.9, crashClear: 0.4, guardCut: 0.7, markLane: 1.1, tackleMin: 0.75, tackleRange: 3.2, wingWide: 4.2, wingBack: 0.8, rushClear: 3.2, rushSpeed: 1.0, brakeShare: 0.6, brakeMargin: 0.3, creaseStand: 0.35, oneTimerMin: 0.16, oneTimerTurnSpeed: 0.5, oneTimerSquare: 4.5, oneTimerMinBall: 1.5, oneTimerFaceTol: 0.7, oneTimerRange: 0.55, oneTimerSeconds: 1.2, oneTimerAlign: 0.3,   // creasePad: AI keeps this far outside the crease it must not enter
-         crashSpread: 1.7, screenRange: 5.5, screenDist: 1.7, pressDist: 1.6, markDist: 1.3, guardStandoff: 1.3, guardReach: 1.7, roleStick: 1.0,
+         crashSpread: 1.7, screenRange: 5.5, screenDist: 1.7, screenGap: 0.2, v2: 1, goalieRead: 0.45, pressDist: 1.6, markDist: 1.3, guardStandoff: 1.3, guardReach: 1.7, roleStick: 1.0,
         outletMin: 3.5, outletMax: 6, chaseBehind: 1.1, swingRange: 2.5, dribbleSpeed: 0.6, cupOffset: 0.15, cupApproachMin: 0.55, cupApproachRamp: 4,
         // swingRange: nearer than this, approach the ball directly instead of swinging round behind it. cupOffset: aim this far to one side of the ball so it lands beside the stem.
         // Scooping a ball off the boards: line up on a lane about scoopAngle to the board, then drive the cup through the ball.
@@ -98,7 +98,7 @@ const CONFIG = {
 
   audio:   { musicHeadroom: 0.5, realMusicGain: 1 },   // headroom scales the 8-bit tunes, realMusicGain your own music files
 
-  // Five speed modes, as a fraction of chair.maxSpeed. RB steps up, LB steps down.
+  // (v14.1.5: speed modes are gone; carts always use the top one. Kept so old code paths still read a number.)
   speedLevels: [0.2, 0.4, 0.6, 0.8, 1],
   // Faux-3D look: a light from the upper left throws shadows to the lower right. All in metres on the court.
   look:    { shadowDx: 0.16, shadowDy: 0.2, shadowAlpha: 0.35, ballShadowDx: 0.05, ballShadowDy: 0.07, bodyLift: 0.09, sideShade: 0x0b0f12, boardRim: 0xa07a4a, boardRimWidth: 0.12, innerShadowSteps: 6, innerShadowWidth: 0.7, innerShadowAlpha: 0.07, ballHighlight: 0.35 },

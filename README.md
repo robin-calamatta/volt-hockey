@@ -3,6 +3,131 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.2: smarter, self-trained CPUs whose levels really show
+**Volt Hockey**
+- **Loose-ball fix:** a ball resting just behind a net was off-limits to every CPU, because their keep-out box around the crease ran 0.8 m behind the net. In some games the ball sat there for minutes. The box now stops at the goal mouth. In test games, time with a dead ball nobody could reach dropped from about half the game to 1-3%.
+- **Goalies:**
+  - They stand on the shooter's angle (the line from the shooter to the middle of the net) and lean to where the shooter's cup is pointing.
+  - They sweep a slow ball out of the crease or off a post towards the boards.
+  - With the ball, they pass it out or clear it up the boards at once, and they never wander more than a few metres from the net.
+  - How fast a goalie reacts follows its level: an Easy goalie reacts about a third of a second late, a Legend almost instantly.
+- **Screens:**
+  - When a team-mate carries the ball under pressure, another cart parks in the path of the defender who would reach the carrier first, a real pick.
+  - When a shot is coming, the cart in front of the net stands beside the goalie on the far side so it can't slide across, and the shooter aims for that side.
+- **No retreat:** a carrier under pressure in its own end bumps the ball up the boards or passes instead of driving back at its own net.
+- **Self-play training:**
+  - The tactics numbers were re-tuned over 14 generations of headless CPU-vs-CPU games (`tools/tune.js`, now with the goalie, screen and crease knobs).
+  - The finishing network was retrained in attack drills (`tools/train_brain.js`): goals in the drills doubled (3 of 32 to 6 of 32).
+  - In 20 games at Hard, the new AI beat the old one 8 wins to 4.
+- **Levels** (3-on-3, 3-minute CPU games, `node tools/eval_hockey.js A B games minutes`):
+  - Normal beat Easy 8-0 (2 draws); Legend beat Easy 7-0 and Superstar 4-0.
+  - Legend vs Normal: 11-8 over 34 games, with more goals for Legend.
+  - Hard, Pro and Superstar are close to each other. The higher one has the edge in reactions and shooting, but games between them are tight.
+
+**Volt Royale**
+- **Storm:**
+  - CPUs work out how long they need to reach the next safe circle and leave in time.
+  - Caught in the storm, they stop fighting, don't stop to heal or start a revive, and drive out (shooting only at what's straight ahead).
+  - They never regroup or go to help somewhere the storm is about to reach.
+- **Teamwork:** squads stay together, come to help a team-mate under fire, focus the enemy the team is already shooting, and ping what they see.
+- **Aim and reactions** follow the level.
+- **Results:** in 8 test games each, storm damage per game more than halved (585 to 270), storm eliminations fell from 3.3 to 2.1 per game, and squad-mates stayed about 17 m apart instead of 37 m.
+
+**Minigames**
+- Every level now has its own top speed, steering wobble and reaction time. Before, most minigame CPUs drove flat out whatever the level.
+- Legend vs Easy, CPUs only: Legend won every test game of Race, Slalom, Stunt, Bowling, Paintball, Imposter and Multiball, and most of Bomb, Hill, Sumo, Lava, Giant, Light Trails and Delivery.
+- **Slalom:** a precise CPU used to circle the last gate forever. It now drives straight through each gate.
+- **Balloon Bash:** better drivers spot a cart coming for their balloons sooner.
+- **Capture the Flag:**
+  - The attacker nearest the enemy flag goes for it while the others block the defenders.
+  - The carrier swerves round taggers.
+  - Carrying the flag now slows you by 5% (was 12%). Before, almost every carrier was caught, so CPU games ended 0-0.
+- Infection Night, Manhunt and Balloon Bash are still close between levels.
+
+## v14.1.9: Light Trails replaces mini golf
+- **Mini golf is gone** from every menu: the games list, the lobby's games menu, the online room and the party picker. If it was your selected game, you get Light Trails instead.
+- **New minigame: Light Trails** (party, free for all, 2-8 carts):
+  - Every cart lays a glowing wall of light in its own colour. Touch any trail, even your own older one, and you crash out of the round.
+  - You can't stop: let go of the stick and you keep rolling straight on.
+  - Every few seconds each trail has a short gap you can squeeze through. Spin to snap round a tight corner, and cut across people to trap them.
+  - Trails fade after a while; options: Short, Medium, Long or Endless.
+  - **Sudden death:** after 40 seconds the trails stop fading. If two or more carts are still going 45 seconds after that, nobody wins the round.
+  - Last cart driving wins the round, and the most rounds wins (3, 5 or 7). Ties are broken by how many people you trapped.
+  - The CPU drivers look ahead for open space and try to cut you off.
+  - Works in 3D and 2D, and online (the host decides who crashed).
+
+## v14.1.8: ammo that looks like its ammo, no flickering roofs
+- **Volt Royale ammo pickups now look like the rounds they hold:**
+  - **Light ammo** (pistol, SMG): an open box of short round-nosed rounds.
+  - **Shells** (shotgun): red shotgun shells with brass heads.
+  - **Medium ammo** (rifle): pointed rifle rounds in a stripper clip.
+  - **Heavy ammo** (sniper): three big, long black-tipped rounds on an ammo can.
+  - **Rockets** are unchanged.
+- The bag screen shows a matching picture above each ammo count instead of a coloured dot.
+- **No more flickering roofs.** Driving over a roof, the colours used to flicker back and forth. That happened where the top of a wall was level with the roof, and where two roof decks overlapped on the same level. Wall tops now stop just under the roof, and overlapping decks sit a hair apart.
+
+## v14.1.7: legal agreements, seizure and content warnings
+- **First-run agreement.** Before anyone can play, a "Before you play" screen shows the photosensitive seizure warning, a cartoon-violence and online-interactions notice, the real-age rule and a copyright note. Players open and read the full documents from there, tick two boxes (agree to the EULA, Terms and Privacy Notice; read the health and content warnings) and press Agree and continue. There's no way past it without agreeing. It works with mouse, touch, keyboard and controller. When `LEGAL.version` changes, everyone is asked again.
+- **Documents** (`src/legal.js`): End User Licence Agreement and Terms of Use (licence, accounts, false-age misrepresentation, conduct, user content, health, content, ownership and your own music files, virtual items, warranty disclaimer, limitation of liability, indemnity, termination, Ontario governing law), Privacy Notice, Health and Safety Warning, Content Notice, Copyright and Trademark Notice (with how to report infringement).
+- **Sign-up** needs one more tick: "the age above is my real age, and I agree to the EULA and Privacy Notice". The server refuses a sign-up without it and stores the version and time on the account.
+- **Settings ▸ Legal and agreements**: read any document again, see which version you agreed to and when, or go through the agreement again.
+- **Title screen:** a warning line at the top (seizures, cartoon violence, online interactions not rated) and a copyright and no-affiliation line at the bottom.
+- **Before going public:** set `LEGAL.owner` (your legal name or company) and `LEGAL.contact` (an email for legal, privacy and copyright notices) at the top of `src/legal.js`, and have a lawyer review the text.
+
+## v14.1.5 + v14.1.6: real emote sounds, no speed modes, no bleeding while you're being picked up, controller friends sidebar, the jet leaves
+- **Emote sounds:** every emote now has its own sound that matches what it does, and no two are the same. They're played on synthesised instruments (plucked and distorted guitar, piano, electric piano, brass, strings, flute, marimba, bells, organ, accordion, drums) and sound effects (claps, applause, crowds, splashes, whooshes, whistles, zaps), with a little room reverb. For example: Clap claps, Drum Roll rolls into a cymbal, Salute plays a bugle call, Time Out blows a referee's whistle, Swim splashes, Air Bike rings its bell, Robot Arms whirr and beep, Take a Bow gets applause, Air Guitar is a rock riff. Every tune is original. These replace the 8-bit emote jingles.
+- **No more cart speed modes.** Every cart always runs at full speed. Gone: the D-pad ◀ ▶ / C V / ; ' speed buttons, the SPEED meter, the speed ring round your cart, the touch SPEED + / − buttons, "Starting cart speed" and the host's "Max cart speed" lock in every menu. Old saves can't turn it down. In Volt Royale, D-pad ◀ / C still pings.
+- **Volt Royale: no bleeding out while you're being revived** by team-mates, or while you're getting yourself back up in a rez garage. The storm, gunfire and anything else that hurts still hurts.
+- **Volt Royale: an enemy's rez card is invisible to you.** Only their team-mates see it (eliminated carts were already hidden).
+- **Volt Royale: the drop jet flies off and disappears** once everyone has jumped (it used to hang at the end of its route for the whole match).
+- **Friends sidebar with a controller:** ▲ ▼ now go row by row and ◀ ▶ along a row, so you can reach the party's ＋ invite slots, every friend's ＋ Party button and everything else. Pressing A on a lobby ＋INVITE slot opens the sidebar on the first online friend's ＋ Party button.
+
+## v14.1: the lobby runs everything, grind rails, the XP showcase, more music
+- **The lobby is the centre of every pre-game menu.**
+  - The live lobby (you and your party on the stage) stays visible behind minigame options, team picking, settings and the online room.
+  - Your selected game sits in the bottom left with how many of you are playing (solo, duos, trios, squads). PLAY is in the bottom right.
+  - **▼ slides the games menu up from the bottom**: the modes along the top row and every minigame along the second. Pick a minigame there and PLAY goes straight in. Team games show their team screen first. X opens the game's options.
+- **Ready up before the game loads.**
+  - In a party, the leader picks the game and everyone else presses A to ready up. Pick a different game and everyone readies up again.
+  - Ticks over everyone's heads show who's ready. When everyone is, the leader's PLAY goes straight in; pressing it twice goes without whoever isn't ready. The room fills with the party and starts by itself.
+  - In an online room, guests press A to ready up, and the host's START waits for everyone (press it again to go anyway). Changing the game resets everyone's ready.
+  - There's no more READY UP screen inside the game.
+- **Open spots on the stage:** every empty spot in your party shows a ＋ INVITE. Click it (or on a controller press ▲ past your party to highlight it, then A) and the **friends sidebar** slides in from the right.
+  - The sidebar shows your party's five spots (who's ready), every friend with their status and whether they're online, and invite, join, message and party buttons.
+- **XP showcase:** after every game, the XP you earned comes up line by line: played, time, eliminations, goals, the win, finished quests. Each number fizzes up in sparks, the total counts up, the level bar fills, and levelling up bursts. Any button or a tap skips it.
+- **Volt Royale:**
+  - Picking up a gun now fills an open slot first. You only swap when your bag is full.
+  - **The drop:** every game starts with everyone on the **Volt Jet**, flying across the map.
+    - Press A to jump out where you want to land. Your parachute opens and you steer it with the stick as you glide down.
+    - The parachute goes away when you land, and the landing never hurts.
+    - Your CPU team-mates jump with you. Anyone still on board at the far side gets thrown out, and the storm waits until the jet has gone.
+    - Your camera pulls back behind you while you're on the jet or under the parachute.
+  - **Pings:** d-pad ◀ (C on the keyboard) pings what you're facing: an enemy (red, follows them for a few seconds), loot (gold, says what it is) or a spot (blue, "go here").
+    - Ping twice quickly for **DANGER**.
+    - Click the map in your bag to ping a spot there.
+    - Pings show for your squad in the world, on screen (with who pinged and how far), on the minimap and on the bag map. They're see-through, fainter near your crosshair, and fade out after a few seconds.
+    - A ping makes a double blip; enemy and danger pings sound an alert.
+    - The minimap also shows the jet's flight path.
+    - There's no on-screen touch button for pinging yet.
+  - **Grind rails:** drive (or jump) onto a rail where it comes down low and you lock on and slide along it, up and down the hills. X hops off; at the end you're thrown forwards. Leaving a rail never hurts you.
+  - New huge maps:
+    - **Volt Zoo:** a safari with giraffes, elephants and zebras, a penguin cove, a monkey tree house, big cats, an aquarium, and the zoo train rail all the way round.
+    - **Volt Land:** a theme park with the Mega Coaster rail right round the park, the Wild Mouse, a giant Ferris wheel, a carousel, a castle, a drop tower, a haunted house maze and bumper cars.
+    - **Volt World:** the biggest map of all, 486 × 320 m.
+  - Up to **40 carts** a game.
+- **Mini Golf has 12 holes** (eight new: The Island, Zig Zag, The Gauntlet, Hairpin, Corner Pocket, The Funnel, Bank Shot and The Maze). Holes per game: 3, 6 (the default), 9 or 12.
+- **First person follows you into the air:** off any jump, kicker, stunt ramp or race jump, the first-person camera rises and falls with your cart and tips with its nose.
+- **Map preview:** in a game's options, highlighting the Map, Track or Course row shows a top-down plan of that map beside the menu (or all the choices side by side for Random), for minigames, races and Volt Royale. In the team games it sits next to the settings window.
+- **More minigame maps:** Hot Potato, Sumo, Floor Is Lava, Multiball, Giant Ball, Imposter, Infection Night, Stunt Arena, Slalom and Delivery each have three layouts (Classic plus two new ones) or Random, picked under Map in their options.
+- **Skins:**
+  - Good Boy is now **Rocky**: a white coat with light brown patches and a patch over one eye.
+  - **Lil Bro**: blonde rider and blonde kid. Home kit is a red Canada jersey, away kit a blue one, and the kid always wears the blue maple-leaf jersey.
+  - **Ophie** is the second Rocky colourway: black, longer ears, a white chest, a thin white blaze down to a nose that's white on its front third with black nostrils, and a white nape that wraps round to the chest.
+  - New cats: **Mew**, a classic grey, black and white tabby with a white neck and a ringed tail, and **Midnight**, a black cat.
+  - Every skin's legs and shoes (or paws) now match it instead of the old navy trousers, in emotes too.
+- **8-bit music:** 25 new chiptune songs in shuffled pools for the menus, Volt Hockey, Volt Royale, racing games and party minigames, plus the original two. A long session moves on to a new song every couple of minutes. They still only play when your music folders are empty.
+- **Emote jingles:** every emote plays a little 8-bit tune that fits it (replaced by real emote sounds in v14.1.5). Other players' emotes play quieter.
+
 ## v14: skins, Volt Royale, Victory Royale, jumps everywhere, reconnect
 - **Skins replace hats, hair and colours.** The Locker now has three slots: **PLAYER SKIN**, **CART SKIN** and **EMOTE WHEEL**. Player and cart skins are picked separately.
   - Player skins: Rookie and Hometown Hero (free), Lil Bro (a kid on your lap in a blue jersey with a white maple leaf), Biker, Rockstar, Software Engineer, Star Knight, Good Boy (a dog), Hockey Pro, Ace Pilot, Trucker (denim cutoff, VOLT FREIGHT hat), Astronaut, Lumberjack, DJ Volt and Captain Volt. Each pass skin also has a second colourway.
@@ -51,8 +176,8 @@ Phaser loads from a CDN; download `phaser.min.js` and change the first script ta
 
 ## v13.5.4: touch controls for every game
 - The on-screen controller now shows only the buttons a game uses, each named for what it does there:
-  - **Volt Hockey**: SPIN ↻ / ↺ on the two big buttons (they used to press the triggers, which no longer spin), PRESS, CART, DRIFT (hold), SPEED + / −, VIEW, EMOTE, A.
-  - **Minigames**: SPIN, DRIFT, SPEED, VIEW, EMOTE, and the X button as the game's action: USE (an item), FIRE (Paintball) or ZAP (Imposter). Games with no action hide it.
+  - **Volt Hockey**: SPIN ↻ / ↺ on the two big buttons (they used to press the triggers, which no longer spin), PRESS, CART, DRIFT (hold), VIEW, EMOTE, A.
+  - **Minigames**: SPIN, DRIFT, VIEW, EMOTE, and the X button as the game's action: USE (an item), FIRE (Paintball) or ZAP (Imposter). Games with no action hide it.
   - **Volt Royale**: FIRE, AIM, JUMP, GRAB, AWAY, DRIFT, MELEE, BAG, ◀ ITEM ▶, VIEW, and new **AIM UP / AIM DOWN** buttons (there was no way to tilt your gun on a phone). Volt Royale has its own starting spots so nothing sits on the hotbar.
 - A says READY on the ready screen. At the end of a game, A says AGAIN and B says LOBBY.
 - The left-hand buttons no longer overlap the stick or the 😀 button.
@@ -415,10 +540,10 @@ The match is now drawn in 3D: a real arena with a hardwood (or tile, concrete, i
 - `src/match.js`   rules and simulation (no drawing).  `chair.js` the cart, `ai.js` NPCs, `scenes.js` menus and 2D rendering, `view3d.js` + `scenes_3d.js` the 3D view
 
 ## Controls
-Gamepad: left stick drive, RT spin clockwise, LT spin counter-clockwise, Y switch to nearest free teammate, RB / LB cart speed up / down (5 modes, shown by the ring around your cart; top speed is `chair.maxSpeed`), Start pause, A/B select/back.
-Keyboard 1: WASD, E / Q spin, V / C speed up / down, F switch, Space select, Enter / Esc start.  Keyboard 2: arrows, . / , spin, / switch, ' / ; speed up / down, Right Shift select.
+Gamepad: left stick drive, RT spin clockwise, LT spin counter-clockwise, Y switch to nearest free teammate, Start pause, A/B select/back.
+Keyboard 1: WASD, E / Q spin, F switch, Space select, Enter / Esc start.  Keyboard 2: arrows, . / , spin, / switch, Right Shift select.
 
-Settings menu (also in the pause menu): volumes, cart turning speed, game clock speed, starting cart speed, ball bounce, ball grip, stick length, collisions on/off, penalties on/off, difficulty.
+Settings menu (also in the pause menu): volumes, cart turning speed, game clock speed, ball bounce, ball grip, stick length, collisions on/off, penalties on/off, difficulty.
 
 ## Your own music
 Drop mp3/ogg/wav/m4a/flac files into `assets/music/menu/` (the menus and the lobby), `assets/music/game/` (every game) and `assets/music/intro/` (the opening splash). Each folder shuffles on its own and carries on where it left off, so every song plays before any repeats. Volt Royale only plays game music if its **Music** option is On; it's Off by default. (The older `match/` folder still counts as game music. Songs loose in `assets/music/` play in both.)
@@ -440,7 +565,7 @@ Main menu -> Online -> Create room (you get a 5-letter code) or Join room (type 
 Five levels: Easy, Normal, Hard, Pro, Superstar (`CONFIG.difficulties`, behaviour in `CONFIG.ai`). CPUs play as a team (carry, pass, crash the net, screen for a human ball carrier), avoid nets, and scoop balls off the boards.
 
 ## Look and speed
-`CONFIG.look` controls shadows and depth. `CONFIG.chair.maxSpeed` and `CONFIG.speedLevels` set how fast the carts are and the five RB/LB speed modes (now 20% to 100%).
+`CONFIG.look` controls shadows and depth. `CONFIG.chair.maxSpeed` sets how fast the carts are (since v14.1.5 every cart always runs at full speed).
 
 ## Crease rule
 With Penalties on, a cart that enters the crease of the net it is attacking goes to the sin bin. The CPU stays out and shoots from the crease edge. Tune in `CONFIG.crease` and `CONFIG.ai` (creasePad, edgeRange).
