@@ -49,6 +49,7 @@
     for (let i = 0; i < 10; i++) { const x = 8 + (i % 5) * 9, y = 44 + Math.floor(i / 5) * 7; B.wall(x, y, x + 2.4, y + 2.4, 0, i % 3 ? 'crate' : 'container'); }
     for (const [x, y] of [[30, 50], [12, 52], [62, 52]]) B.loot(x, y, 0);
   });
+  globalThis.BR_POI = Object.assign(globalThis.BR_POI || {}, { stadium, castle, airfield, factory });   // (v14.2.1: the originals, for the two big maps)
   BR_MAPS.stadium = brBig('stadium', stadium, 22, 'suburbs', 501); BR_MAPS.castle = brBig('castle', castle, 22, 'jungle', 502);
   BR_MAPS.airfield = brBig('airfield', airfield, 20, 'suburbs', 503); BR_MAPS.factory = brBig('factory', factory, 20, 'port', 504);
   BR_MAPS.mega = brJoin('Mega Island', 'suburbs', { ground: 0x4f7a3a, sky: 0xa6d0f0, grass: 0x4f7a3a }, 'The giant one: nine places to land. Downtown, the Port, Volt Arena, Castle Hill, the Airfield, the Factory, the Jungle, the Canyon and the Suburbs.',

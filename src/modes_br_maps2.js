@@ -67,6 +67,7 @@
     for (const [x, y] of [[4, 4], [104, 4], [4, 80], [104, 80], [54, 30]]) B.loot(x, y, 0);
   });
 
+  globalThis.BR_POI = Object.assign(globalThis.BR_POI || {}, { city, peak, park });
   BR_MAPS.city = brBig('city', city, 22, 'port', 601); BR_MAPS.peak = brBig('peak', peak, 22, 'jungle', 602); BR_MAPS.park = brBig('park', park, 22, 'suburbs', 603);
   const S = BR_BASE, sides = (M, ...a) => [M, ...a];
   BR_MAPS.wild = brJoin('Wild Peaks', 'jungle', { ground: 0x5a7a3a, sky: 0xb4d0ec, grass: 0x5a7a3a }, 'Snow Peak, Thrill Park and Volt City, with forest between them. Jumps everywhere.', [sides(peak, 12, 14), sides(park, 128, 22), sides(city, 252, 18)], 372, 130, 6060);

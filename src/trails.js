@@ -1,6 +1,6 @@
 /* v14.1.9: Mini golf is gone. In its place: LIGHT TRAILS.
    Every cart lays a glowing wall of light behind it. Touch any trail (anyone's, even your own older one) and you're out for the round.
-   You can't stop: let go of the stick and the cart keeps rolling forward. Trails have a short gap now and then (squeeze through!) and fade
+   You can't stop: let go of the stick and the cart keeps rolling forward. Trails are solid (no gaps) and fade
    after a few seconds. Last cart driving wins the round; most rounds wins. Spin to snap round a corner. State lives in m.gs (online: it
    travels in the snapshot), so the host decides who crashed. */
 delete GAME_INFO.golf; delete MODES.golf;
@@ -9,14 +9,29 @@ if (typeof Settings !== 'undefined' && Settings.lobbyMini === 'golf') Settings.l
 { const M = (typeof LOBBY_MODES !== 'undefined' ? LOBBY_MODES : []).find(x => x.id === 'mini'); if (M && M.sub) M.sub = M.sub.replace('golf', 'light trails'); }
 if (typeof MINI_ICON !== 'undefined') MINI_ICON.trails = '〰️';
 
-const TRAIL = { every: 0.2, safe: 0.45, hitR: 0.36, gapEvery: 3.4, gapLen: 0.32, h: 0.75, sudden: 40 };
-GAME_INFO.trails = { name: 'Light Trails', cat: 'party', blurb: 'Every cart leaves a wall of light. Touch one and you crash. Last one driving wins.', noItems: true, court: { width: 40, height: 24 },
+const TRAIL = { every: 0.2, safe: 0.4, hitR: 0.44, h: 0.75, sudden: 40 };   // (v14.2.1: hitR = about the cart's own radius, and no more gaps: a trail is solid all the way)
+GAME_INFO.trails = { name: 'Light Trails', cat: 'party', blurb: 'Every cart leaves a wall of light. Touch one and you crash. Last one driving wins.', noItems: true, court: mini => (TRAIL_MAPS[mini && mini.map] || TRAIL_MAPS.classic).size,
   goal: 'Win the most rounds by being the last cart still driving.',
-  rules: ['Every cart lays a glowing wall of light behind it, in its own colour.', 'Touch ANY trail (someone else\'s, or your own older one) and you crash out of the round.', 'You can\'t stop: let go of the stick and you keep rolling straight on.', 'Every few seconds a trail has a short gap: thread through it!', 'Trails fade away after a while (you pick how long), and vanish when their cart crashes.', 'Spin to snap round a tight corner. Trap people by cutting across in front of them.', 'Bumping the rink walls or other carts is fine. Last cart driving wins the round.', 'After 40 seconds it\'s SUDDEN DEATH: the trails stop fading. If two or more are still going 45 seconds after that, nobody wins the round.'],
+  rules: ['Every cart lays a glowing wall of light behind it, in its own colour.', 'Touch ANY trail (someone else\'s, or your own older one) and you crash out of the round.', 'You can\'t stop: let go of the stick and you keep rolling straight on.', 'Trails fade away after a while (you pick how long), and vanish when their cart crashes.', 'Spin to snap round a tight corner. Trap people by cutting across in front of them.', 'Glowing pink barriers on some maps are deadly too. Bumping the rink walls or other carts is fine. Last cart driving wins the round.', 'After 40 seconds it\'s SUDDEN DEATH: the trails stop fading. If two or more are still going 45 seconds after that, nobody wins the round.'],
   controls: [CTRL.drive, CTRL.drift, 'Spin (snap round a corner): LB / RB  /  R Z  /  ] [  /  touch SPIN', CTRL.pause],
-  opts: [{ key: 'rounds', label: 'Rounds', values: [3, 5, 7], def: 5 }, { key: 'life', label: 'Trail length', values: [4, 7, 12, 60], names: ['Short', 'Medium', 'Long', 'Endless'], def: 7, fmt: v => ({ 4: 'Short', 7: 'Medium', 12: 'Long', 60: 'Endless' })[v] || v + ' s' }] };
+  opts: [{ key: 'map', label: 'Map', values: ['random', 'classic', 'pillars', 'cross', 'grand', 'islands', 'corridors', 'box', 'diamond'], names: ['Random (a different one each game)', 'The Grid (40 x 24 m)', 'Four Pillars', 'The Cross', 'Grand Grid (huge, 60 x 34 m)', 'Islands', 'Corridors', 'The Box', 'Diamond'], def: 'random', hint: 'Glowing barriers are deadly too.' }, { key: 'rounds', label: 'Rounds', values: [3, 5, 7], def: 5 }, { key: 'life', label: 'Trail length', values: [4, 7, 12, 60], names: ['Short', 'Medium', 'Long', 'Endless'], def: 7, fmt: v => ({ 4: 'Short', 7: 'Medium', 12: 'Long', 60: 'Endless' })[v] || v + ' s' }] };
 MINI.hints.trails = GAME_INFO.trails.blurb;
 
+
+/* v14.2.1: maps. Glowing barriers are deadly too (touch one and you crash). x0, y0, x1, y1 as fractions of the arena. */
+const TRAIL_MAPS = {
+  classic:  { name: 'The Grid', size: { width: 40, height: 24 }, blocks: [] },
+  pillars:  { name: 'Four Pillars', size: { width: 44, height: 28 }, blocks: [[0.27, 0.27, 0.33, 0.37], [0.67, 0.27, 0.73, 0.37], [0.27, 0.63, 0.33, 0.73], [0.67, 0.63, 0.73, 0.73]] },
+  cross:    { name: 'The Cross', size: { width: 44, height: 28 }, blocks: [[0.47, 0.32, 0.53, 0.68], [0.38, 0.47, 0.62, 0.53]] },
+  grand:    { name: 'Grand Grid (huge)', size: { width: 60, height: 34 }, blocks: [] },
+  islands:  { name: 'Islands', size: { width: 48, height: 30 }, blocks: [[0.2, 0.22, 0.26, 0.3], [0.48, 0.18, 0.54, 0.26], [0.75, 0.22, 0.81, 0.3], [0.2, 0.7, 0.26, 0.78], [0.48, 0.74, 0.54, 0.82], [0.75, 0.7, 0.81, 0.78]] },
+  corridors:{ name: 'Corridors', size: { width: 52, height: 28 }, blocks: [[0.15, 0.32, 0.42, 0.36], [0.58, 0.32, 0.85, 0.36], [0.15, 0.64, 0.42, 0.68], [0.58, 0.64, 0.85, 0.68]] },
+  box:      { name: 'The Box', size: { width: 46, height: 30 }, blocks: [[0.36, 0.3, 0.46, 0.33], [0.54, 0.3, 0.64, 0.33], [0.36, 0.67, 0.46, 0.7], [0.54, 0.67, 0.64, 0.7], [0.36, 0.33, 0.38, 0.42], [0.36, 0.58, 0.38, 0.67], [0.62, 0.33, 0.64, 0.42], [0.62, 0.58, 0.64, 0.67]] },
+  diamond:  { name: 'Diamond', size: { width: 46, height: 28 }, blocks: [[0.48, 0.15, 0.52, 0.25], [0.48, 0.75, 0.52, 0.85], [0.18, 0.47, 0.26, 0.53], [0.74, 0.47, 0.82, 0.53], [0.35, 0.33, 0.39, 0.39], [0.61, 0.33, 0.65, 0.39], [0.35, 0.61, 0.39, 0.67], [0.61, 0.61, 0.65, 0.67]] }
+};
+const TRAIL_KEYS = Object.keys(TRAIL_MAPS);
+const trailBlocks = m => { const M = TRAIL_MAPS[m.mini && m.mini.map] || TRAIL_MAPS.classic, y0 = m.centerY - m.height / 2; return M._abs && M._w === m.width ? M._abs : (M._w = m.width, M._abs = M.blocks.map(([a, b, c, d]) => ({ x0: a * m.width, y0: y0 + b * m.height, x1: c * m.width, y1: y0 + d * m.height }))); };
+const inBlock = (m, x, y, pad) => trailBlocks(m).some(b => x > b.x0 - pad && x < b.x1 + pad && y > b.y0 - pad && y < b.y1 + pad);
 const trailSegs = (m, skipC) => {                       // every live trail segment: [x0, y0, x1, y1, owner k, newest time]
   const g = m.gs, out = [];
   for (const c of m.chairs) { const P = g.tr && g.tr[c.k]; if (!P) continue;
@@ -32,15 +47,16 @@ MODES.trails = {
   kickoff(m) {
     const g = m.gs, n = m.chairs.length, R = Math.min(m.width, m.height) * 0.36; g.tr = {}; g.t = 0; g.rs = 0; g.sdOn = 0;
     m.chairs.forEach((c, i) => { const a = i / n * Math.PI * 2, x = m.width / 2 + Math.cos(a) * R * (m.width / m.height > 1.3 ? 1.5 : 1), y = m.centerY + Math.sin(a) * R, h = a;   // (facing out from the middle, away from each other)
-      Object.assign(c, { x, y, px: x, py: y, heading: h, ph: h, vx: 0, vy: 0 }); c.gs.lay = 0; c.gs.gap = TRAIL.gapEvery * (0.5 + (i % 3) * 0.25); g.tr[c.k] = []; });
+      let X = x, Y = y; for (let k = 0; k < 30 && (inBlock(m, X, Y, 1.4) || inBlock(m, X + Math.cos(h) * 3, Y + Math.sin(h) * 3, 1)); k++) { X = m.width / 2 + (x - m.width / 2) * (0.92 - k * 0.03); Y = m.centerY + (y - m.centerY) * (0.92 - k * 0.03); }   // (start clear of the barriers)
+      Object.assign(c, { x: X, y: Y, px: X, py: Y, heading: h, ph: h, vx: 0, vy: 0 }); c.gs.lay = 0; g.tr[c.k] = []; });
   },
   step(m, h) {
     const g = m.gs; for (const o of MG.all(m, 'boom')) { o.life -= h; if (o.life <= 0) MG.remove(m, o); }
     if (g.pause > 0) { g.pause -= h; if (g.pause <= 0) { g.round++; for (const c of m.chairs) MG.unout(c); m.order = []; m.kickoff(); } return; }
-    g.t = MG.r2(g.t + h); g.rs = (g.rs || 0) + h; const sd = g.rs > TRAIL.sudden, life = sd ? 999 : m.mini.life || 7;   // sudden death: after a while the trails stop fading
+    g.t = g.t + h;   /* (v14.2.1: unrounded: steps are so short that rounding kept the clock at 0, so your own trail never counted and trails never faded) */ g.rs = (g.rs || 0) + h; const sd = g.rs > TRAIL.sudden, life = sd ? 999 : m.mini.life || 7;   // sudden death: after a while the trails stop fading
     if (sd && !g.sdOn) { g.sdOn = 1; MG.notice(m, 'SUDDEN DEATH: THE TRAILS STAY!', 2.2); m.sfx('whistle'); }
     for (const c of m.chairs) { const P = g.tr[c.k] || (g.tr[c.k] = []); if (c.out) continue; const G = c.gs;
-      G.gap -= h; const on = G.gap > 0 ? 1 : 0; if (G.gap < -TRAIL.gapLen) G.gap = TRAIL.gapEvery * (0.8 + Math.random() * 0.4);
+      const on = 1;
       G.lay -= h; if (g.rs > 0.35 && G.lay <= 0) { G.lay = TRAIL.every; P.push(Math.round(c.x * 10) / 10, Math.round(c.y * 10) / 10, Math.round(g.t * 10) / 10, P.length ? on : 0);   /* (one decimal: keeps the online snapshot small) */ }
       while (P.length > 8 && g.t - P[2] > life) P.splice(0, 4);           // old light fades away
       if (P.length >= 4 && g.t - P[2] > life) P[3] = 0;
@@ -48,8 +64,9 @@ MODES.trails = {
     if (g.rs < 0.6) return;
     const segs = trailSegs(m);
     for (const c of MG.live(m)) {
-      const hit = segs.find(s => !(s[4] === c.k && g.t - s[5] < TRAIL.safe) && segDist(c.x, c.y, s) < TRAIL.hitR);
+      const wall = inBlock(m, c.x, c.y, R_CART() * 0.85), hit = wall ? [0, 0, 0, 0, -1, 0] : segs.find(s => !(s[4] === c.k && g.t - s[5] < TRAIL.safe) && segDist(c.x, c.y, s) < TRAIL.hitR);
       if (!hit) continue;
+      if (wall) { MH.out(m, c); g.tr[c.k] = []; MG.add(m, { t: 'boom', x: MG.r2(c.x), y: MG.r2(c.y), life: 0.6 }); m.sfx('foul'); MG.notice(m, `${MG.up(m.name(c))} HIT A BARRIER`, 1.5); continue; }
       MH.out(m, c); g.tr[c.k] = []; MG.add(m, { t: 'boom', x: MG.r2(c.x), y: MG.r2(c.y), life: 0.6 }); m.sfx('foul');
       const by = hit[4] === c.k ? null : m.chairs[hit[4]]; MG.notice(m, by ? `${MG.up(m.name(c))} HIT ${MG.up(m.name(by))}'S TRAIL` : `${MG.up(m.name(c))} CRASHED INTO THEIR OWN TRAIL`, 1.5);
       if (by && !by.out) by.gs.kos = (by.gs.kos || 0) + 1;
@@ -67,7 +84,7 @@ MODES.trails = {
   },
   ai(c, m) {
     const g = m.gs, segs = m._tsAt === m.simTime ? m._ts : (m._tsAt = m.simTime, m._ts = trailSegs(m)), free = a => { const ca = Math.cos(a), sa = Math.sin(a); let d = 0;
-      for (; d < 8; d += 0.45) { const x = c.x + ca * (d + 0.5), y = c.y + sa * (d + 0.5); if (x < 0.7 || y < 0.7 || x > m.width - 0.7 || y > m.height - 0.7) break; if (segs.some(s => !(s[4] === c.k && g.t - s[5] < TRAIL.safe + 0.3) && segDist(x, y, s) < 0.62)) break; }
+      for (; d < 8; d += 0.45) { const x = c.x + ca * (d + 0.5), y = c.y + sa * (d + 0.5); if (x < 0.7 || y < 0.7 || x > m.width - 0.7 || y > m.height - 0.7 || inBlock(m, x, y, 0.75)) break; if (segs.some(s => !(s[4] === c.k && g.t - s[5] < TRAIL.safe + 0.3) && segDist(x, y, s) < 0.62)) break; }
       return d; };
     const foe = MH.nearest(c, MG.live(m)); let best = c.heading, bs = -1;
     for (let i = -6; i <= 6; i++) { const a = c.heading + i * 0.38, f = free(a); let sc = f * 1.0 - Math.abs(i) * 0.08 + Math.random() * 0.25;
@@ -87,7 +104,10 @@ const trailCol = c => MINI.palette[c.k % MINI.palette.length];
   P.updateMode = function (dt) {
     const r = um.call(this, dt), m = this.m;
     if (!m || m.kind !== 'trails') { if (this.trailG) { this.scene.remove(this.trailG); this.trailG = null; } return r; }
-    if (!this.trailG) { this.trailG = new THREE.Group(); this.scene.add(this.trailG); this.trailM = new Map(); }
+    if (this.trailG && this.trailG.parent !== this.scene) { this.trailG = null; }   // (a new scene: build again)
+    if (!this.trailG) { this.trailG = new THREE.Group(); this.scene.add(this.trailG); this.trailM = new Map();
+      for (const b of trailBlocks(m)) { const w = b.x1 - b.x0, d = b.y1 - b.y0, box = new THREE.Mesh(new THREE.BoxGeometry(w, 1.0, d), new THREE.MeshBasicMaterial({ color: 0xff2a6d, transparent: true, opacity: 0.55, fog: false })); box.position.set((b.x0 + b.x1) / 2, 0.5, (b.y0 + b.y1) / 2);
+        const edge = new THREE.LineSegments(new THREE.EdgesGeometry(box.geometry), new THREE.LineBasicMaterial({ color: 0xffd0e0, fog: false })); edge.position.copy(box.position); this.trailG.add(box, edge); } }
     const g = m.gs || {}, life = (m.mini && m.mini.life) || 7, tNow = g.t || 0, pulse = 0.85 + 0.15 * Math.sin(performance.now() / 90);
     for (const c of m.chairs) {
       let T = this.trailM.get(c.k);
@@ -113,9 +133,11 @@ const trailCol = c => MINI.palette[c.k % MINI.palette.length];
 { const P = GameScene.prototype, d2 = P.drawMode2D;
   P.drawMode2D = function (g, floor) {
     const r = d2.call(this, g, floor), m = this.match; if (!floor || !m || m.kind !== 'trails') return r; const s = m.gs || {}, life = (m.mini && m.mini.life) || 7;
+    for (const B of trailBlocks(m)) g.fillStyle(0xff2a6d, 0.8).fillRect(B.x0, B.y0, B.x1 - B.x0, B.y1 - B.y0);
     for (const c of m.chairs) { const P2 = (s.tr && s.tr[c.k]) || [], col = trailCol(c);
       for (let i = 4; i < P2.length; i += 4) if (P2[i + 3]) g.lineStyle(0.22, col, Math.max(0.25, 1 - ((s.t || 0) - P2[i + 2]) / life)).lineBetween(P2[i - 4], P2[i - 3], P2[i], P2[i + 1]);
       if (!c.out && P2.length && P2[P2.length - 1]) g.lineStyle(0.22, col, 1).lineBetween(P2[P2.length - 4], P2[P2.length - 3], c.x, c.y); }
     return r;
   };
 }
+{ const mc = miniCfg; miniCfg = function (kind, ...a) { const c = mc(kind, ...a); if (kind === 'trails' && c && (!c.map || c.map === 'random' || !TRAIL_MAPS[c.map])) c.map = TRAIL_KEYS[Math.floor(Math.random() * TRAIL_KEYS.length)]; return c; }; }   // (Random: a different map each game)

@@ -3,6 +3,28 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.2.1: Light Trails fixed, more maps, two huge Volt Royale maps
+- **Light Trails:**
+  - Hitting your own trail now crashes you. The game clock was rounded to 0 on every step, so your own trail never counted and trails never faded.
+  - Trails no longer have gaps (those were the bits that "didn't draw").
+  - You crash a little sooner: the hit distance is now about the cart's own size.
+- **Light Trails maps:** The Grid, Four Pillars, The Cross, Grand Grid (huge, 60 x 34 m), Islands, Corridors, The Box and Diamond, or Random. On these maps the glowing pink barriers are deadly too.
+- **Manhunt maps:** eight arenas plus the open rink, or Random:
+  - The Hedge Maze, The Warehouse (with a sliding door), Pillar Park, The Ring Road, Twin Rooms, Zigzag Alley, Spinner City and The Fort.
+  - Carts bump off the walls, the CPU finds its way round them, and nobody starts inside a wall.
+- **Volt Royale is now two huge maps** (440 x 330 m each; the older maps are still in the code but not in the menu):
+  - **Volt Valley:** Volt City, Downtown, the Port, the Suburbs, Volt Arena, the Factory, the Airfield, the Canyon and Castle Hill, plus three new places:
+    - **The Mines:** a mountain full of tunnels and caverns, with a summit on top.
+    - **The Volcano:** three tiers up to a crater rim, with a lava tube underneath.
+    - **Bunker Hill:** a bunker of rooms under a hill, with a pillbox on top.
+  - **Frostfall Wilds:** Snow Peak, Thrill Park, the Jungle, the Canyon, Castle Hill, the Port, the Suburbs and Downtown, plus four new places:
+    - **The Crystal Caves:** a cave maze under a two-tier mountain.
+    - **The Sky Mesas:** mesas at four heights joined by bridges, with kickers.
+    - **The Hidden Lab:** an underground lab with a helipad on top.
+    - **The Lumber Camp.**
+  - **Underground:** tunnels and rooms are carved out of the rock under a hill, with packed-dirt floors and lamps.
+- **Volt Royale loot:** chests and items now sit mostly indoors and underground (anywhere with a roof over it). The open ground gets only a light sprinkle (about 8% of what it had).
+
 ## v14.2: smarter, self-trained CPUs whose levels really show
 **Volt Hockey**
 - **Loose-ball fix:** a ball resting just behind a net was off-limits to every CPU, because their keep-out box around the crease ran 0.8 m behind the net. In some games the ball sat there for minutes. The box now stops at the goal mouth. In test games, time with a dead ball nobody could reach dropped from about half the game to 1-3%.
