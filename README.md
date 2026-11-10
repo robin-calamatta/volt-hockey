@@ -3,6 +3,18 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.2.12: fixes for crashes in the online room and the lobby, party ready-up, controller focus
+
+- **Fixed: "Something broke in RoomScene.update ... Cannot read properties of null (reading 'cut')"**, which booted players when the host started a game.
+  - The online room keeps its HOST / READY / NOT READY labels between visits. The second time you were in a room, it tried to change labels that had already been destroyed with the last visit, and the room crashed.
+  - It now makes fresh labels when the old ones are gone.
+  - The same fix applies to the ready markers on the party in the lobby. That was the second error: "Something broke in LobbyHomeScene.update ... reading 'glTexture'", hundreds of times, back in the lobby after a game.
+- **Party members no longer get "your party leader picks the game" over and over.**
+  - The leader repeats its pick every few seconds, so a member always knows the game and can ready up. Hearing the same pick again keeps your READY.
+  - The message itself has no buttons any more. Its Leave party / OK buttons could take the controller's focus away from READY UP.
+  - A message that's already on screen isn't shown again, and the same goes for every pop-up message.
+- **A pop-up left behind no longer freezes the controller.** If a pop-up vanished without closing (for example after an error), every button on the screen under it stayed blocked until you changed screens. Pop-ups that are gone, or hidden for a second, are now dropped.
+
 ## v14.2.11: your place when you lose, a cheeky kill feed, gentler snipers, one item per press, no random lobby emotes
 
 - **Losing in Volt Royale shows your place, not VICTORY.** While the winners party, your screen says **YOU PLACED #N** (your team's finishing place), with "<WINNER> WINS THIS ONE. Better luck next drop!" underneath.

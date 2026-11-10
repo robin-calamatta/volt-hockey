@@ -60,10 +60,11 @@ Object.assign(Party, {
     fm.call(this, key, conn, msg); if (msg && msg.t === 'hello' && this.game) { try { conn.send({ t: 'game', game: this.game }); } catch (e) { /* gone */ } }
   };
   Party.fromLeader = function (msg) {
-    if (msg && msg.t === 'game' && msg.game && typeof msg.game === 'object') { const g = msg.game; this.game = { id: cleanText(g.id, 12), kind: cleanText(g.kind, 16), name: cleanText(g.name, 40), sub: cleanText(g.sub, 120), icon: cleanText(g.icon, 4), col: +g.col || 0x2f6fed, v: g.v | 0 }; this.myReady = 0; this.emit(); if (typeof voltGame !== 'undefined' && voltGame.scene.isActive('Main')) Sound.play('blip'); return; }
+    if (msg && msg.t === 'game' && msg.game && typeof msg.game === 'object') { const g = msg.game; this.game = { id: cleanText(g.id, 12), kind: cleanText(g.kind, 16), name: cleanText(g.name, 40), sub: cleanText(g.sub, 120), icon: cleanText(g.icon, 4), col: +g.col || 0x2f6fed, v: g.v | 0 }; const same = this._gv === (g.v | 0); this._gv = g.v | 0; if (same) return;   /* (v14.2.12: the leader says it again every few seconds: same game, keep your ready) */
+      this.myReady = 0; this.emit(); if (typeof voltGame !== 'undefined' && voltGame.scene.isActive('Main')) Sound.play('blip'); return; }
     return fl.call(this, msg);
   };
-  Party.reset = function () { this.game = null; this.myReady = 0; return rs.call(this); };
+  Party.reset = function () { this.game = null; this.myReady = 0; this._gv = undefined; return rs.call(this); };
 }
 /* the party's game goes through the room, which starts by itself once everyone is in it */
 { const pg = partyGame; partyGame = function (scene, preset) { return pg(scene, { ...preset, autoStart: Party.members.length }); }; }
@@ -108,7 +109,7 @@ Object.assign(Party, {
   };
   P.draw = function (...a) {
     const r = dr.apply(this, a), S = this.session; if (!S || !this.lab) return r;
-    this.rdyT = this.rdyT || []; let i = 0;
+    this.rdyT = (this.rdyT || []).filter(t => t && t.active && t.scene === this); let i = 0;   // (v14.2.12: labels from the last time this screen was open are gone: make new ones. Using an old one crashed the room when a game started)
     for (const row of S.roster) { const P0 = this.pos && this.pos.get(row.id); if (!P0) continue; const t = this.rdyT[i] || (this.rdyT[i] = this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '15px', fontStyle: 'bold', padding: { x: 6, y: 2 } }).setOrigin(1, 0.5).setDepth(7)); i++;
       t.setVisible(true).setPosition(P0.x + 160, P0.y).setText(row.host ? 'HOST' : row.rdy ? '✓ READY' : 'NOT READY').setColor(row.host ? '#ffe27a' : row.rdy ? '#0b1a10' : '#ffffff').setBackgroundColor(row.host ? '#3a2f0a' : row.rdy ? '#7dff6a' : '#55626c'); }
     for (; i < this.rdyT.length; i++) this.rdyT[i].setVisible(false);
@@ -167,7 +168,7 @@ Object.assign(Party, {
   };
   P.play = function () {
     Sound.play('select');
-    if (Party.role === 'member') { if (!Party.game) { Toasts.show('Your party leader picks the game.', [], 3000); return; } Party.setReady(!Party.amReady()); this.redraw(); return; }
+    if (Party.role === 'member') { if (!Party.game) { Toasts.show('Waiting for your party leader to pick the game...', [], 2500); return; } Party.setReady(!Party.amReady()); this.redraw(); return; }
     if (Party.role === 'leader') { const wait = Party.notReady(); if (wait.length && this.time.now - this.playArmed > 4000) { this.playArmed = this.time.now; Toasts.show(`Waiting for <b>${wait.map(m => esc(m.name)).join(', ')}</b> to ready up. Press PLAY again to go without waiting.`, [], 4000); Sound.play('back'); return; } }
     this.playArmed = 0; this.mode().go(this);
   };
@@ -205,13 +206,14 @@ Object.assign(Party, {
   P.pickMode = P.pickRow0;
   P.update = function (time, delta) {
     const dt = Math.min(0.05, delta / 1000);
-    if (Party.role === 'leader') { const d = LobbyPick.desc(), g = Party.game; if (!g || g.id !== d.id || g.kind !== d.kind) Party.pickGame(d); }
+    if (Party.role === 'leader') { const d = LobbyPick.desc(), g = Party.game; if (!g || g.id !== d.id || g.kind !== d.kind) Party.pickGame(d);
+      else if (time - (this.gameSentAt || 0) > 4000) { this.gameSentAt = time; for (const c of Party.conns.values()) { try { c.send({ t: 'game', game: Party.game }); } catch (e) { /* gone */ } } } }   // (v14.2.12: said again every few seconds, so a member never waits on "the leader picks the game")
     if (this.overlay === 'modes') {                                         // the games menu has the controls
       Controls.update(this.game.loop.frame); const e = Controls.menu(); if (Controls.escPressed) e.b = true;
       if (this.modeClosing) { this.modeSlide = Math.max(0, this.modeSlide - dt * 5); if (this.modeSlide <= 0) { this.overlay = null; this.modeClosing = false; this.redraw(); } }
       else this.modeSlide = Math.min(1, this.modeSlide + dt * 4.2);
       if (this.modesC && this.modesC.active) { const V = CONFIG.view, e3 = 1 - Math.pow(1 - this.modeSlide, 3); this.modesC.y = (1 - e3) * (V.height - 300 + 40); }
-      if (!this.modeClosing && !(typeof PadNav !== 'undefined' && PadNav.stack.some(x => x.modal))) {
+      if (!this.modeClosing && !(typeof PadNav !== 'undefined' && PadNav.prune().some(x => x.modal))) {
         const ks = this.miniKinds();
         if (this.gameRow === 0) { const n = LOBBY_MODES.length; if (e.left) { this.mcur = (this.mcur + n - 1) % n; this.redrawSoon(); } if (e.right) { this.mcur = (this.mcur + 1) % n; this.redrawSoon(); } if (e.down) { this.gameRow = 1; this.redrawSoon(); } if (e.a) this.pickRow0(); }
         else { const n = ks.length; if (e.left) { this.mmCur = (this.mmCur + n - 1) % n; this.redrawSoon(); } if (e.right) { this.mmCur = (this.mmCur + 1) % n; this.redrawSoon(); } if (e.up) { this.gameRow = 0; this.redrawSoon(); } if (e.a) this.pickRow1(); }
@@ -223,7 +225,7 @@ Object.assign(Party, {
     const playTab = LOBBY_TABS[this.tab] === 'PLAY' && !this.overlay; if (this.stage) this.stage.slotsOn = playTab && !this.emoPick;
     /* the controller reaches the open spots too: ▲ goes through your party, then on to the ＋ INVITE spots; A opens the friends sidebar */
     const slots = this.stage && this.stage.ghosts ? this.stage.ghosts.filter(g => g.visible).length : 0, mates = this.mateList ? this.mateList().length : 0, P0 = (Controls.combined && Controls.combined.pressed) || {};
-    const freeNav = playTab && !this.emoPick && !this.capT && !this.pPop && !(typeof PadNav !== 'undefined' && PadNav.stack.some(x => x.modal)) && !(typeof FriendsBar !== 'undefined' && FriendsBar.open);
+    const freeNav = playTab && !this.emoPick && !this.capT && !this.pPop && !(typeof PadNav !== 'undefined' && PadNav.prune().some(x => x.modal)) && !(typeof FriendsBar !== 'undefined' && FriendsBar.open);
     if (this.slotFocus >= slots) this.slotFocus = -1;
     if (freeNav && slots) {
       const eat = b => { for (const s of [Controls.combined, Controls.mine, ...Controls.list()]) if (s && s.pressed) s.pressed[b] = false; };
@@ -241,7 +243,7 @@ Object.assign(Party, {
     for (; i < this.slotT.length; i++) this.slotT[i].setVisible(false);
     if (this.localHint && this.localHint.visible && i && !/▲/.test(this.localHint.text)) this.localHint.setText(this.localHint.text + '     ▲: invite friends');
     /* ready marks over your party */
-    this.rdyMk = this.rdyMk || []; let j = 0;
+    this.rdyMk = (this.rdyMk || []).filter(t => t && t.active && t.scene === this); let j = 0;   // (v14.2.12: not the destroyed labels from the last visit)
     if (playTab && Party.active && Party.game && this.stage.mates) for (const [key, M] of this.stage.mates) { if (key.startsWith('local-')) continue; const mb = Party.members.find(x => x.key === key); if (!mb) continue; const q = this.stage.screenOf(M.cart, 1.45); if (!q) continue;
       const ok = mb.leader || mb.ready === Party.game.v, t = this.rdyMk[j] || (this.rdyMk[j] = this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '14px', fontStyle: 'bold', padding: { x: 6, y: 2 } }).setOrigin(0.5).setDepth(8)); j++;
       t.setVisible(true).setPosition(q.x, q.y + 22).setText(mb.leader ? '★ LEADER' : ok ? '✓ READY' : 'NOT READY').setColor(mb.leader ? '#ffe27a' : ok ? '#0b1a10' : '#ffffff').setBackgroundColor(mb.leader ? '#3a2f0acc' : ok ? '#7dff6a' : '#55626ccc'); }

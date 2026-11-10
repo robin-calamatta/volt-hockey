@@ -31,10 +31,12 @@ const Toasts = {
   },
   /* show('<b>Sam</b> invited you', [{ label: 'Join', go: true, fn }], ms) */
   show(html, actions = [], ms = 9000) {
+    /* v14.2.12: the same message again while it's still up just stays up (no pile of copies) */
+    const live = this.recent || (this.recent = new Map()), was = live.get(html); if (was && was.box.isConnected) { clearTimeout(was.tm); if (ms) was.tm = setTimeout(was.close, ms); return was.close; }
     const box = document.createElement('div'); box.className = 't'; box.innerHTML = html;
     const close = () => box.remove();
     if (actions.length) { const row = document.createElement('div'); row.className = 'row'; for (const a of actions) { const b = document.createElement('button'); b.textContent = a.label; if (a.go) b.className = 'go'; b.onclick = e => { e.stopPropagation(); close(); a.fn && a.fn(); }; row.append(b); } box.append(row); }
-    this.ensure().append(box); if (ms) setTimeout(close, ms); Sound.play('blip'); return close;
+    this.ensure().append(box); const rec = { box, close, tm: ms ? setTimeout(close, ms) : 0 }; live.set(html, rec); Sound.play('blip'); return close;
   }
 };
 const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

@@ -24,7 +24,10 @@ const PadNav = {
     this.loop();
   },
   close(el) { const was = this.stack.length; this.stack = this.stack.filter(s => s.el !== el); if (was !== this.stack.length && !this.stack.some(s => s.modal)) this.blockGame(false); },
-  active() { return this.stack.length > 0; },
+  /* v14.2.12: drop pop-ups that are gone (removed, or hidden without being closed, e.g. after an error): one left behind held back every
+     button on the screen under it until you changed screens */
+  prune() { const was = this.stack.length, now = performance.now(); this.stack = this.stack.filter(s => { if (!s.el || !s.el.isConnected) return false; const hid = s.el.offsetParent === null && getComputedStyle(s.el).position !== 'fixed' || getComputedStyle(s.el).display === 'none' || getComputedStyle(s.el).visibility === 'hidden'; if (!hid) { s.hidAt = 0; return true; } s.hidAt = s.hidAt || now; return now - s.hidAt < 1000; });   /* (hidden for a second: gone) */ if (was !== this.stack.length && !this.stack.some(s => s.modal)) this.blockGame(false); return this.stack; },
+  active() { return this.stack.length > 0 && this.prune().length > 0; },
   top() { return this.stack[this.stack.length - 1]; },
   guard(el) {                                                  // clicks and touches on a pop-up stay on the pop-up
     if (el._guarded) return; el._guarded = true;

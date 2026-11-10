@@ -148,7 +148,7 @@ class LobbyHomeScene extends Phaser.Scene {
   update(time, delta) {
     Controls.update(this.game.loop.frame); const dt = Math.min(0.05, delta / 1000), tab = LOBBY_TABS[this.tab];
     if (this.stage.ok) { const pad = Controls.combined; if (Math.abs(pad.rx || 0) > 0.2) this.stage.spinV = (pad.rx || 0) * 3; this.stage.setLook(this.previewLook()); this.stage.render(dt, { PLAY: { x: 0.47, zoom: 1 }, LOCKER: { x: 0.5, zoom: 1.12 }, PASS: { x: 0.72, zoom: 1.05 }, QUESTS: { x: 0.17, zoom: 0.95 }, CAREER: { x: 0.33, zoom: 1 } }[tab]); }
-    if (typeof PadNav !== 'undefined' && PadNav.stack.some(x => x.modal)) return;
+    if (typeof PadNav !== 'undefined' && PadNav.prune().some(x => x.modal)) return;
     const e = Controls.menu(); if (Controls.escPressed) e.start = true;
     if (this.overlay === 'modes') { const n = LOBBY_MODES.length; if (e.left) { this.mcur = (this.mcur + n - 1) % n; this.redrawSoon(); } if (e.right) { this.mcur = (this.mcur + 1) % n; this.redrawSoon(); } if (e.down && this.mcur + 3 < n) { this.mcur += 3; this.redrawSoon(); } if (e.up) { if (this.mcur >= 3) { this.mcur -= 3; this.redrawSoon(); } else { this.overlay = null; this.redrawSoon(); } }
       if (e.a) this.pickMode(); else if (e.b || e.start) { Sound.play('back'); this.overlay = null; this.redraw(); } return; }

@@ -227,6 +227,6 @@ function partyGame(scene, preset) {
 const leaderPicks = () => Party.role === 'member' ? '   (your party leader picks)' : '';
 function memberWaits() {
   if (Party.role !== 'member') return false;
-  Toasts.show('Your party leader picks the game and will bring you in. Leave the party to play on your own.', [{ label: 'Leave party', fn: () => Party.leave() }, { label: 'OK' }], 6000);
+  Toasts.show('Your party leader picks the game and will bring you in. Press A to ready up. (To play on your own, leave the party under Friends and party in the menu.)', [], 4000);   // (v14.2.12: no buttons: they took the controller's focus away from READY UP)
   return true;
 }
