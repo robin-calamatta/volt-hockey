@@ -73,6 +73,7 @@ Object.assign(Party, {
     const S = this.session, pre = this.preset;
     if (this.role === 'host' && pre && pre.autoStart && !this.autoDone && S && !this.opening && S.code) {
       this.autoAt = this.autoAt || this.time.now; const inRoom = S.roster.filter(r => !r.guest).length;
+      if (S.setReady) for (const r of S.roster) if (!r.host && !r.rdy) S.setReady(r.id, true);   // (v14.2.13: they readied up in the lobby: no second ready-up in the room)
       if (inRoom >= pre.autoStart || this.time.now - this.autoAt > 25000) { this.autoDone = true; pre.autoStart = 0; return this.startHost(); }
       if (this.statusText && this.statusText.active) this.statusText.setText(`Bringing your party in: ${inRoom} / ${pre.autoStart} here. It starts by itself.`);
     }

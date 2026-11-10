@@ -3,6 +3,22 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.2.13: online Volt Royale no longer drops everyone, no second ready-up, hand over the party, usernames locked, team rings
+
+- **Fixed: friends were booted the moment an online Volt Royale started.**
+  - **The cause:** on the huge maps the loot list (about 1,400 items, 50 KB) went out whole in one message. The connection refuses messages over roughly 16 KB ("message-too-big") and closed, dropping every guest. Snapshots with a lot of carts got close to that limit too.
+  - **Messages are split up:** any message over 12 KB now goes in pieces and is put back together at the other end (src/net.js). Both sides need this version.
+  - **The loot goes a bit at a time** (src/brnet.js):
+    - each snapshot carries 80 items, and the whole list comes round about every 18 snapshots;
+    - anything new or changed (drops, opened chests) goes at once;
+    - every 4th snapshot carries which items still exist.
+  - **Tested:** two players on the 760 x 520 map stayed in the game, and the guest saw all the host's loot.
+  - The connection now logs why it closed (`[net] connection error: ...`) in the console.
+- **No second ready-up.** Party members who readied up in the lobby are marked ready in the room automatically.
+- **Hand the party to someone else.** As party leader, pick a member in the lobby (their profile: **Make them party leader**) or in the friends window (**Make leader**). They open a new party, everyone else moves into it automatically, and you join it as a member.
+- **Logged-in players can't change their name.** It's always your username: in the lobby, Settings, the team pick screens and online rooms. The host can't rename a logged-in player either. Players who aren't logged in (and local guests) can still pick a name.
+- **You can see who's on your team in Volt Hockey.** A ring in your team's colour sits on the floor under each team-mate, with a yellow one under you, in 3D and in the top-down view. Opponents have none.
+
 ## v14.2.12: fixes for crashes in the online room and the lobby, party ready-up, controller focus
 
 - **Fixed: "Something broke in RoomScene.update ... Cannot read properties of null (reading 'cut')"**, which booted players when the host started a game.

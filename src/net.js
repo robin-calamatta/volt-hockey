@@ -21,8 +21,15 @@ class PeerTransport {
   static available() { return typeof Peer === 'function'; }
   options() { return { ...CONFIG.online.peerServer, config: { iceServers: CONFIG.online.iceServers }, debug: 0 }; }
   wrap(conn, peer) {
-    const w = { onMessage: null, onClose: null, send: o => { try { conn.send(o); } catch (e) { /* closed */ } }, close: () => { try { conn.close(); } catch (e) {} if (peer) peer.destroy(); } };
-    conn.on('data', d => w.onMessage && w.onMessage(d)); conn.on('close', () => w.onClose && w.onClose()); conn.on('error', () => w.onClose && w.onClose());
+    /* v14.2.13: a message over about 12 KB goes in pieces and is put back together at the other end. The data channel refuses anything much
+       bigger ("message-too-big") and drops the connection: on the huge Volt Royale maps that dropped every guest as the game began */
+    const CK = 12000; let ckN = 0; const parts = new Map();
+    const w = { onMessage: null, onClose: null, send: o => { try { let str = null; try { str = JSON.stringify(o); } catch (e) { return; } if (str.length <= CK) { conn.send(o); return; }
+        const k = ++ckN, n = Math.ceil(str.length / CK); for (let i = 0; i < n; i++) conn.send({ t: '_ck', k, i, n, d: str.slice(i * CK, (i + 1) * CK) }); } catch (e) { /* closed */ } },
+      close: () => { try { conn.close(); } catch (e) {} if (peer) peer.destroy(); } };
+    conn.on('data', d => { if (d && d.t === '_ck') { let P = parts.get(d.k); if (!P) { P = { got: 0, a: new Array(d.n | 0) }; parts.set(d.k, P); if (parts.size > 20) parts.delete(parts.keys().next().value); }
+        if (P.a[d.i] === undefined && typeof d.d === 'string') { P.a[d.i] = d.d; P.got++; } if (P.got === P.a.length) { parts.delete(d.k); let o = null; try { o = JSON.parse(P.a.join('')); } catch (e) { return; } if (w.onMessage) w.onMessage(o); } return; }
+      if (w.onMessage) w.onMessage(d); }); conn.on('close', () => w.onClose && w.onClose()); conn.on('error', e => { console.warn('[net] connection error:', e && (e.type || e.message) || e); w.onClose && w.onClose(); });
     return w;
   }
   host(code) {                                    // resolves to { onConnection, onError, close }
@@ -188,7 +195,7 @@ class HostSession {
     return this.code;
   }
   uniqueName(name, id) { let n = name, k = 2; while (this.roster.some(r => r.id !== id && r.name === n)) n = name.slice(0, CONFIG.nameMax - 2) + ' ' + k++; return n; }
-  setName(id, name) { const p = this.roster.find(r => r.id === id), clean = Settings.cleanName(name); if (!p || !clean) return; p.name = this.uniqueName(clean, id); this.sendRoster(); }
+  setName(id, name) { const p = this.roster.find(r => r.id === id), clean = Settings.cleanName(name); if (!p || !clean) return; if (p.acct || (p.id === this.myId && Settings.nameLocked())) return;   /* (v14.2.13: logged in: always your username) */ p.name = this.uniqueName(clean, id); this.sendRoster(); }
   count(side) { return this.roster.filter(p => p.side === side).length; }
   guestName(taken) { return CONFIG.playerNames.find(n => !taken.includes(n)) || 'Guest'; }
   openSide() { if (this.cfg.season) return this.count(this.cfg.season.side) < this.cfg.sizes[this.cfg.season.side] ? this.cfg.season.side : undefined; return [0, 1].filter(s => this.count(s) < this.cfg.sizes[s]).sort((a, b) => this.count(a) - this.count(b))[0]; }   // a season game: everyone plays for the leader's team

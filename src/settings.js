@@ -55,8 +55,10 @@ const Settings = {
     for (const s of sides) { k.goals += match.score[s]; k.shots += (match.shots || [0, 0])[s]; if (match.score[s] > match.score[1 - s]) k.wins++; }
     this.save();
   },
-  myName() { const on = typeof Account !== 'undefined' && Account.loggedIn; return (on && this.cleanName(this.displayName)) || (on ? Account.name : '') || this.cleanName(this.playerName); },   // logged in: your username, unless you've picked another name to play under (v13.6.1)
-  setMyName(n) { const c = this.cleanName(n); if (!c) return; if (typeof Account !== 'undefined' && Account.loggedIn) this.displayName = c === Account.name ? '' : c; else this.playerName = c; this.save(); },
+  myName() { const on = typeof Account !== 'undefined' && Account.loggedIn; return (on && Account.name) || this.cleanName(this.playerName); },   // v14.2.13: logged in, your name is always your username
+  nameLocked() { return typeof Account !== 'undefined' && Account.loggedIn && !!Account.name; },
+  lockedNameNote() { if (typeof Toasts !== 'undefined') Toasts.show('You are logged in, so your name is your username: <b>' + esc(Account.name) + '</b>.', [], 3000); },   // logged in: your username, unless you've picked another name to play under (v13.6.1)
+  setMyName(n) { const c = this.cleanName(n); if (!c) return; if (this.nameLocked()) { this.displayName = ''; return; } this.playerName = c; this.save(); },
   toggle(key) { this[key] = !this[key]; this.save(); },
   // key is 'teamA' or 'teamB'; skips the team the other side already uses.
   cycleTeam(key, dir) {

@@ -23,9 +23,9 @@ const teamColorHex = i => '#' + TEAMS[i].color.toString(16).padStart(6, '0');
 /* Settings are split into pages so no screen is crowded. Each page is a list of menu items; SettingsScene shows the page list. */
 /* Your name: left / right steps through the presets, select types your own. onChange lets the online room tell everyone. */
 const nameItem = onChange => ({
-  label: () => `Your name   ◀ ${Settings.myName() || 'Player'} ▶`,
-  change: d => { Settings.setMyName(Settings.nextName(Settings.myName() || CONFIG.playerNames[0], d)); if (onChange) onChange(Settings.myName()); },
-  select: () => Settings.askName(Settings.myName(), t => { Settings.setMyName(t); if (onChange) onChange(t); })
+  label: () => Settings.nameLocked() ? `Your name: ${Settings.myName()}   (your username)` : `Your name   ◀ ${Settings.myName() || 'Player'} ▶`,
+  change: d => { if (Settings.nameLocked()) return Settings.lockedNameNote(); Settings.setMyName(Settings.nextName(Settings.myName() || CONFIG.playerNames[0], d)); if (onChange) onChange(Settings.myName()); },
+  select: () => Settings.nameLocked() ? Settings.lockedNameNote() : Settings.askName(Settings.myName(), t => { Settings.setMyName(t); if (onChange) onChange(t); })
 });
 const slider = (name, key, fmt) => ({ rule: Settings.rulesKeys.includes(key), label: () => `${name}   ◀ ${fmt(Settings[key])} ▶`, change: d => Settings.adjust(key, d) });
 const solveHomography = (pts) => {            // pts: [[u, v, x, y] x4] -> the 8 numbers of the map (u, v) -> (x, y) in perspective
@@ -433,7 +433,7 @@ class LobbyScene extends Phaser.Scene {
     if (mine && !taken.includes(mine)) return mine;
     return Settings.nextName(CONFIG.playerNames[this.players.length % CONFIG.playerNames.length], 0, taken.concat(mine));
   }
-  rename(p, name) { if (name && !this.players.some(q => q !== p && q.name === name)) { p.name = name; if (this.players[0] === p) Settings.setMyName(name); } }
+  rename(p, name) { if (this.players[0] === p && Settings.nameLocked()) { if (name !== p.name) Settings.lockedNameNote(); p.name = Settings.myName(); return; } if (name && !this.players.some(q => q !== p && q.name === name)) { p.name = name; if (this.players[0] === p) Settings.setMyName(name); } }
   get br() { return this.mini && this.mini.kind === 'br' && (this.mini.squad || 1) > 1; }   // Volt Royale with squads: pick your squad, not a team
   squadCount() { return Math.max(1, Math.ceil((this.sizes[0] + this.sizes[1]) / (this.mini.squad || 1))); }
   openSquad(from = 0, d = 1) { const n = this.squadCount(); for (let i = 1; i <= n; i++) { const s = ((from - 1 + d * i) % n + n) % n + 1; if (this.players.filter(q => q.squad === s).length < (this.mini.squad || 1)) return s; } return from || 1; }
@@ -979,6 +979,7 @@ class GameScene extends Phaser.Scene {
       m.chairs.forEach((c, i) => {
         const tag = this.tags[i]; tag.setVisible(!c.benched);
         if (c.benched) return;
+        if (!myC.has(c) && !c.out && myC.size && !m.mini && [...myC.keys()].some(o => o.side === c.side)) g.lineStyle(0.1, TEAMS[m.teams[c.side]].color, 0.95).strokeCircle(c.x, c.y, 0.86);   // v14.2.13: a ring under each team-mate (Volt Hockey)
         if (myC.has(c) && !c.out) { const col = MY_RING[myC.get(c) % MY_RING.length], pu = 0.86 + 0.08 * Math.sin(this.time.now / 160); g.fillStyle(col, 0.2).fillCircle(c.x, c.y, pu).lineStyle(0.14, col, 1).strokeCircle(c.x, c.y, pu); }   // v14.2.5: a ring under your own cart, so you can tell which one is you
         this.drawChair(g, c, TEAMS[m.teams[c.side]].color, c.player ? c.player.speedLevel : 0);
         const sp = this.toScreen(c.x, c.y), k = sp.k || 1, z = this.tilted ? this.zoom * this.s0 * k : this.zoom; let label = m.mini ? this.miniTag(c) : c.player ? (c.player.name || c.player.tag) : (this.demo && c.side === 0 && c.index === 1 ? 'YOU' : ''); if (myC.has(c)) label = myLabel(c, label); tag.setText(label).setScale(Math.max(0.55, Math.min(1.2, k))).setPosition(sp.x, sp.y - 0.75 * z).setVisible(!!label && this.inView(sp, 10));

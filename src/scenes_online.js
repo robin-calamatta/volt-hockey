@@ -180,7 +180,7 @@ class RoomScene extends ListMenuScene {
       const i = GAMES.indexOf(cfg().mini ? cfg().mini.kind : null), k = GAMES[(i + d + GAMES.length) % GAMES.length];
       this.session.setConfig(k ? { mini: miniCfg(k), practice: true } : { mini: null, practice: false });
     };
-    const rename = n => { if (host) this.session.setName(this.session.myId, n); else this.session.setName(n); };
+    const rename = n => { if (Settings.nameLocked()) return; if (host) this.session.setName(this.session.myId, n); else this.session.setName(n); };
     const yourName = nameItem(rename);
     const yourSide = { label: () => `Your side   ◀ ${me() && me().side ? 'Right' : 'Left'} ▶`, change: flip, select: flip };
     const lockMe = () => { const on = !(me() && me().lock); if (host) this.session.setLock(this.session.myId, on); else this.session.setLock(on); };

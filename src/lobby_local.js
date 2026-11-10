@@ -122,7 +122,9 @@ const Locals = {
     if (who.member && who.member.leader) lines.unshift('👑 Party leader'); else if (who.member && who.member.acct) lines.unshift('Account: ' + who.member.acct);
     const btns = [];
     if (who.local) btns.push({ label: 'Remove from this screen', go: () => { Locals.remove(who.local.src); this.closePerson(); } });
-    else if (who.member && Party.role === 'leader' && !who.member.leader) btns.push({ label: 'Remove from the party', go: () => { Party.kick(key); Toasts.show(esc(who.name) + ' was removed from the party.', [], 3000); this.closePerson(); } });
+    else if (who.member && Party.role === 'leader' && !who.member.leader) {
+      btns.push({ label: 'Make them party leader', go: () => { Party.handOver(key); this.closePerson(); } });   // (v14.2.13)
+      btns.push({ label: 'Remove from the party', go: () => { Party.kick(key); Toasts.show(esc(who.name) + ' was removed from the party.', [], 3000); this.closePerson(); } }); }
     btns.push({ label: 'Close', go: () => { Sound.play('back'); this.closePerson(); } });
     const h = 150 + lines.length * 30 + btns.length * 56;
     g.fillStyle(0x05070f, 0.94).fillRoundedRect(x, y, w, h, 18).lineStyle(3, who.local ? 0x7dff6a : 0xffd23f, 1).strokeRoundedRect(x, y, w, h, 18);

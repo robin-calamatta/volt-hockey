@@ -75,7 +75,7 @@ const FriendsBar = {
       if (!Party.active) parts.push(`<div class="r"><span class="n">Not in a party<span class="s">Friends in your party follow you into every game you start, and talk on voice the whole time.</span></span>${B('pstart', 'Start a party', '', 'go')}</div>`);
       else {
         const vs = { connected: '🔊 voice on', connecting: '… voice connecting', failed: "⚠ voice can't connect", blocked: '🔇 no voice (age rule or muted)', off: '🔇 voice off' };
-        for (const m of Party.members) parts.push(`<div class="r"><span class="n">${m.leader ? '★ ' : ''}${esc(m.name)}${m.key === Party.myKey ? ' (you)' : ''}<span class="s">${m.leader ? 'leader' : 'member'}${m.key === Party.myKey ? '' : ' · ' + vs[Voice.statusOf(m.acct, m.vid)]}</span></span>${Party.role === 'leader' && !m.leader ? B('kick', 'Remove', m.key, 'warn') : ''}</div>`);
+        for (const m of Party.members) parts.push(`<div class="r"><span class="n">${m.leader ? '★ ' : ''}${esc(m.name)}${m.key === Party.myKey ? ' (you)' : ''}<span class="s">${m.leader ? 'leader' : 'member'}${m.key === Party.myKey ? '' : ' · ' + vs[Voice.statusOf(m.acct, m.vid)]}</span></span>${Party.role === 'leader' && !m.leader ? B('lead', 'Make leader', m.key) + B('kick', 'Remove', m.key, 'warn') : ''}</div>`);
         parts.push(`<div class="r">${Party.role === 'leader' ? B('pinvite', '＋ Invite friends') : ''}${B('pchat', '💬 Party chat')}${B('pleave', Party.role === 'leader' ? 'End party' : 'Leave party', '', 'warn')}</div>`);
         parts.push(`<div class="r"><span class="s">${Party.role === 'leader' ? 'You pick the games: start Play, Practice, a Season game or an Online room and your party comes with you.' : 'Your leader picks the games and brings you in.'}</span></div>`);
       }
@@ -107,7 +107,7 @@ const FriendsBar = {
     const go = { close, email: () => { close(); Forms.email(); }, add: () => { close(); Forms.findFriend(); }, logout: async () => { await Account.logout(); Party.reset(); close(); },
       board: () => { close(); const g = voltGame; if (g.scene.isActive('Game') || g.scene.isPaused('Game')) return Toasts.show('Open the leaderboard from the main menu after your match.', [], 4000); g.scene.getScenes(true).forEach(s => g.scene.stop(s.sys.settings.key)); g.scene.start('Leaderboard'); },
       pstart: async () => { try { await Party.create(); close(); Forms.invite('party', Party.id); } catch (e) { /* shown */ } }, pinvite: () => { close(); Forms.invite('party', Party.id); },
-      pchat: () => { close(); Chat.openChat('party'); }, pleave: () => Party.leave(), kick: () => Party.kick(who),
+      pchat: () => { close(); Chat.openChat('party'); }, pleave: () => Party.leave(), kick: () => Party.kick(who), lead: () => Party.handOver(who),
       rchat: () => { close(); Chat.openChat('room'); }, rinvite: () => { close(); Forms.invite('room', Online.current.code); },
       ijoin: () => { const i = Social.data.invites.find(x => x.id === who); if (i) { close(); Social.acceptInvite(i); } }, ino: () => Social.dismiss(who),
       accept: () => Social.accept(who), decline: () => Social.remove(who), msg: () => { close(); Chat.openDm(who); },

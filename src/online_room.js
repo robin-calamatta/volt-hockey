@@ -81,7 +81,7 @@ const teamsMatter = cfg => !!cfg && (!cfg.mini || cfg.mini.mode === 'teams');
   };
   P.step = function (r, d) { const pos = r.mid ? 1 : r.side * 2, np = clamp(pos + d, 0, 2); if (np !== pos) this.moveTo(r, np); else Sound.play('back'); };
   P.toggleLock = function (r = this.meRow()) { if (!r) return; const S = this.session, on = !r.lock; if (this.role === 'host') S.setLock(r.id, on); else S.setLock(on, r.id === S.myId ? undefined : r.id); Sound.play('blip'); };
-  P.renameRow = function (r, d) { const S = this.session, n = Settings.nextName(r.name, d, S.roster.filter(q => q !== r).map(q => q.name)); if (this.role === 'host') S.setName(r.id, n); else S.setName(n, r.id === S.myId ? undefined : r.id); Sound.play('blip'); };
+  P.renameRow = function (r, d) { if (r && r.acct) { if (r.id === this.session.myId) Settings.lockedNameNote(); return; }   /* (v14.2.13: a logged-in player's name is their username) */ const S = this.session, n = Settings.nextName(r.name, d, S.roster.filter(q => q !== r).map(q => q.name)); if (this.role === 'host') S.setName(r.id, n); else S.setName(n, r.id === S.myId ? undefined : r.id); Sound.play('blip'); };
   P.tryStart = function () {
     if (this.role !== 'host' || this.opening) return; const S = this.session, waiting = teamsMatter(S.cfg) ? S.roster.filter(r => r.mid) : [];
     if (waiting.length && this.time.now - this.startArmed > 3000) { this.startArmed = this.time.now; this.flash = `${waiting.map(r => r.name).join(', ')} still in the middle. START again to put them on the side with room.`; this.flashUntil = this.time.now + 3000; Sound.play('back'); return; }

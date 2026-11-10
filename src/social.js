@@ -207,3 +207,36 @@ const Party = {
   gotEmote(key, id) { for (const fn of this.emoFns) { try { fn(key, id); } catch (e) { console.error(e); } } }
 };
 addEventListener('beforeunload', () => { try { if (Party.role) Party.leave(true); } catch (e) { /* closing */ } });
+
+/* v14.2.13: the party leader can hand the party to someone else. The new leader opens a fresh party, everyone else moves into it
+   (nobody has to do anything), and the old leader joins it as a member. */
+Object.assign(Party, {
+  handOver(key) {
+    if (this.role !== 'leader') return; const c = this.conns.get(key), m = this.members.find(x => x.key === key); if (!c || !m) return;
+    this.handing = key; c.send({ t: 'promote' }); Toasts.show(`Handing the party to <b>${esc(m.name)}</b>...`, [], 4000);
+    clearTimeout(this.handT); this.handT = setTimeout(() => { if (this.handing === key) { this.handing = null; Toasts.show('That didn\'t work: you are still the party leader.', [], 4000); } }, 15000);
+  },
+  /* member: you're the new leader. Open your own party, tell the old leader where it is, then let go of the old one */
+  async takeOver() {
+    const old = this.link, oldPeer = this.peer; this.role = null; this.link = null; this.peer = null;
+    try { const id = await this.create(); try { old && old.send({ t: 'moved', id }); } catch (e) { /* gone */ } Toasts.show('You are the party leader now.', [], 4000); }
+    catch (e) { Toasts.show('Could not take over the party.', [], 4000); }
+    setTimeout(() => { try { old && old.close(); } catch (e) { /* gone */ } try { oldPeer && oldPeer.destroy(); } catch (e) { /* gone */ } }, 1500);
+  },
+  /* the old leader: send everyone to the new party, then join it yourself (quietly: no "the party has ended") */
+  regroup(id) {
+    clearTimeout(this.handT); this.handing = null;
+    for (const [k, c] of this.conns) { try { c.send({ t: 'regroup', id }); } catch (e) { /* gone */ } }
+    const conns = [...this.conns.values()], peer = this.peer; this.role = null; this.conns = new Map();
+    setTimeout(() => { for (const c of conns) { try { c.close(); } catch (e) { /* gone */ } } try { peer && peer.destroy(); } catch (e) { /* gone */ } }, 1500);
+    setTimeout(() => this.join(id), 600);
+  }
+});
+{ const fm = Party.fromMember, fl = Party.fromLeader;
+  Party.fromMember = function (key, conn, msg) { if (msg && msg.t === 'moved' && this.handing === key && typeof msg.id === 'string') { this.regroup(cleanText(msg.id, 80)); return; } return fm.call(this, key, conn, msg); };
+  Party.fromLeader = function (msg) {
+    if (msg && msg.t === 'promote' && this.role === 'member') { this.takeOver(); return; }
+    if (msg && msg.t === 'regroup' && typeof msg.id === 'string' && this.role === 'member') { const id = cleanText(msg.id, 80); if (id !== this.id) { Toasts.show('The party has a new leader. Moving you over...', [], 3500); const old = this.link; this.link = null; this.role = null; setTimeout(() => { try { old && old.close(); } catch (e) { /* gone */ } }, 1500); this.join(id); } return; }
+    return fl.call(this, msg);
+  };
+}

@@ -142,7 +142,7 @@ class LobbyHomeScene extends Phaser.Scene {
     this.box(V.width - 420, 0, 420, V.height, 0x0c1424, 0.97, 0x2d5068, 31); this.T(V.width - 390, 40, 'MENU', 40, '#ffd23f', { depth: 32 });
     this.menuItems().forEach(([label, fn], i) => { const y = 104 + i * 62, on = i === this.mcur; this.box(V.width - 396, y, 372, 54, on ? 0x2a4a6b : 0x101a28, 1, on ? 0xffd23f : 0x2d5068, 32); this.T(V.width - 376, y + 27, label, 26, on ? '#ffd23f' : '#ffffff', { oy: 0.5, depth: 33 }); this.tap(V.width - 396, y, 372, 54, () => { Sound.play('select'); fn(); }, 34); });
   }
-  askName() { Settings.askName(Settings.myName(), name => { Settings.setMyName(name); this.redraw(); }); }
+  askName() { if (Settings.nameLocked()) return Settings.lockedNameNote(); Settings.askName(Settings.myName(), name => { Settings.setMyName(name); this.redraw(); }); }
   play() { const M = this.mode(); Sound.play('select'); if (typeof memberWaits === 'function' && memberWaits()) return; M.go(this); }
   /* ---------- every frame ---------- */
   update(time, delta) {
