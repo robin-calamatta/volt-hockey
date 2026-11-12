@@ -12,7 +12,7 @@ const STYLE = {
 };
 // The controls guide (Settings > Controls and screen > Controls guide). Edit freely: one block per device.
 const CONTROLS_GUIDE = [
-  ['GAMEPAD', ['Left stick   drive  (1st / 3rd person: up = go, ◀ ▶ = turn)', 'B (hold, while turning)   drift: let go for a boost (bigger when the bar is purple)', 'Right stick   look around (springs back)', 'L3 (hold)   push to talk      D-pad ▲   tap: quick chat, hold: emoji wheel', 'D-pad ▼   camera      Select (View)   friends and party', 'RB / LB   half spin', 'D-pad ◀   ping (Volt Royale)', 'X   full press on / off  (minigames: A or X uses a power-up)', 'Y   switch cart', 'Start   pause      A / B   select / back']],
+  ['GAMEPAD', ['Left stick   drive  (1st / 3rd person: up = go, ◀ ▶ = turn)', 'B (hold, while turning)   drift: let go for a boost (bigger when the bar is purple)', 'Right stick   look around (springs back)', 'L3 (hold)   push to talk      D-pad ▲   tap: quick chat, hold: emoji wheel', 'D-pad ▼   camera      Select (View)   friends and party', 'RT / LT   90-degree turn (Volt Hockey)', 'RB / LB   half turn (45 degrees)', 'D-pad ◀   ping (Volt Royale)', 'X   full press on / off  (minigames: A or X uses a power-up)', 'Y   switch cart', 'Start   pause      A / B   select / back']],
   ['KEYBOARD 1', ['WASD   drive', 'T   camera view', 'Tab chat   1-9 quick chat   G (hold) talk   ` friends   H (hold) emote wheel', 'R / Z   half spin', 'X   full press  (minigames: Space or X = power-up)', 'C   ping (Volt Royale)', 'F   switch cart', 'Esc   pause', 'Space / Backspace   select / back']],
   ['KEYBOARD 2', ['Arrows   drive', 'P   camera view', 'L (hold)   push to talk', '. / ,   spin', '] / [   half spin', '\\   full press  (minigames: Right Shift or \\ = power-up)', ";   ping (Volt Royale)", '/   switch cart', 'Right Shift / Right Ctrl   select / back']],
   ['TOUCH', ['Stick   drive', 'VIEW   camera view', '💬   chat      🎙   talk (hold) / mic on-off (tap)', 'Spin buttons   spin', 'Small spin buttons   half spin', 'PRESS   full press  (minigames: A = power-up)', 'Cart button   switch cart', 'II   pause', 'Settings > Touch and screen   move the buttons']]
@@ -552,7 +552,7 @@ class GameScene extends Phaser.Scene {
         else {
           if (me.chair) me.chair.driftHeld = !!(input.held && input.held.b);   /* B (hold): drift */
           if (input.pressed.halfCW) me.spinQueued = 0.5; if (input.pressed.halfCCW) me.spinQueued = -0.5;
-          /* (v13.4: the triggers no longer spin the cart) */
+          if (!m.mini && input.pressed.spinCW) me.spinQueued = 1; if (!m.mini && input.pressed.spinCCW) me.spinQueued = -1;   /* (v14.2.15: the triggers turn 90 degrees again in Volt Hockey) */
           if (m.mini && (input.pressed.spinCW || (MD && MD.holdFire && input.held && input.held.spinCW))) m.useBy(me); else if (!m.mini && input.pressed.x) m.togglePress(me.side);   /* (v14: minigame items and fire on RT only) */
           if (input.pressed.y) m.switchChair(me);
         }
@@ -811,7 +811,7 @@ class GameScene extends Phaser.Scene {
       else {
         if (p.chair) p.chair.driftHeld = !!(p.src.held && p.src.held.b);               // B (hold, while turning): drift
         if (p.src.pressed.halfCW) p.spinQueued = 0.5; if (p.src.pressed.halfCCW) p.spinQueued = -0.5;
-        /* (v13.4: the triggers no longer spin the cart) */
+        if (!m.mini && p.src.pressed.spinCW) p.spinQueued = 1; if (!m.mini && p.src.pressed.spinCCW) p.spinQueued = -1;   // (v14.2.15: RT / LT: a 90-degree turn in Volt Hockey, normal and season matches)
         if (m.mini && (p.src.pressed.spinCW || (MD && MD.holdFire && p.src.held && p.src.held.spinCW))) m.useBy(p); else if (!m.mini && p.src.pressed.x) m.togglePress(p.side);   // X: use / fire (some games: hold to keep firing)
         if (p.src.pressed.y) m.switchChair(p);
       }

@@ -10,6 +10,8 @@
     const s = snap.call(this); if (this.kind !== 'br' || !s || !s.gs || !Array.isArray(this.gs.L)) return s;
     const L = this.gs.L, n = (this._lpN = (this._lpN || 0) + 1), seen = this._lpSig || (this._lpSig = new Map());
     s.gs = { ...s.gs }; delete s.gs.L;
+    /* v14.2.14: the doors (three lists of 400+ numbers) only when one changed, and every 10th snapshot anyway */
+    const ds = (this.gs.dr || []).join('') + '|' + (this.gs.dh || []).join(','); if (ds === this._lpDoor && n % 10) { delete s.gs.dr; delete s.gs.dh; delete s.gs.db; } else this._lpDoor = ds;
     const o = (this._lpO || 0) % Math.max(1, L.length); this._lpO = o + PAGE;
     const page = L.slice(o, o + PAGE), fresh = [];
     if (n % 2 === 0) for (const it of L) { const k = sig(it); if (seen.get(it[0]) !== k) { seen.set(it[0], k); fresh.push(it); } }   // (new or changed: sent straight away; checked every other snapshot)

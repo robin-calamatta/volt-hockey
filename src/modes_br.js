@@ -152,7 +152,7 @@ const BR_MAPS = {
 
 /* ----- the game ----- */
 MODES.br = {
-  outdoor: true, holdFire: true, noUnstick: false, slowKeys: ['L'],
+  outdoor: true, holdFire: true, noUnstick: false, slowKeys: ['L'], snapHz: 30,
   map: m => BR_MAPS[m.mini.map] || BR_MAPS.downtown,
   init(m) {
     const g = m.gs, M = this.map(m), sq = m.mini.squad || 1; g.map = m.mini.map; g.t = 0; g.L = []; g.lid = 0; g.dead = [];

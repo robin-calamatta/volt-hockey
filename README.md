@@ -3,6 +3,27 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.2.16: menu buttons for phones and tablets
+
+- **Every menu now has controller buttons on touch screens.** A small D-pad sits bottom left, and A (OK), B (BACK), X, Y and START sit bottom right. Before, on a phone there was no way to join, choose a side or start the game on the team and controller screens.
+  - They work exactly like a controller's buttons: A joins on the Controllers screen, ◀ ▶ moves you to a team, START starts the game. They also work in the game settings, the minigame and Volt Royale setup, the pause menu, online rooms and so on.
+  - They show whenever the touch controls are on and you're not in a match. In a match, the full on-screen controller takes over as before.
+  - They're hidden on the home screen and the title screen, which are already made for tapping.
+- Tested on a phone-sized screen: picked both teams, joined, moved to a side and started a match using only these buttons.
+
+## v14.2.15: 90-degree turns on the triggers in Volt Hockey
+
+- **RT and LT turn your cart 90 degrees again** (clockwise and counter-clockwise) in normal and season matches of Volt Hockey, the quick slap-shot turn. This works online too. RB and LB still do the half turn (45 degrees).
+- The triggers in the minigames and Volt Royale are unchanged (use / fire, aim). On a keyboard the turns are E and Q.
+- The help page lists both.
+
+## v14.2.14: smoother online Volt Royale for guests
+
+- **About a third of the data per guest.** In Volt Royale the host now sends 30 updates a second instead of 60. The guest's game already smooths between updates (it shows the game 100 ms behind and blends between updates), so movement stays smooth. The door lists (three lists of 400+ numbers) are only sent when a door changes, and every 10th update anyway. Per guest this is roughly 2.5 Mbit/s instead of about 8. Volt Hockey and the other modes still send 60 a second, unchanged.
+- **A slow connection no longer snowballs.** Updates are sent in order and can't be dropped, so when a guest's connection couldn't keep up they queued behind each other. The guest's game fell further and further behind (stutter, an inventory that didn't match what they really had) until the connection gave up and dropped them. Now, when a guest still has more than 64 KB waiting to go out, that update is skipped for them, and its sounds and calls are added to their next one.
+- **No more drops at kick-off.** The "we haven't heard from you" timer now starts when the match starts, so time waiting in the room no longer counts. For the first 20 s of a match both sides wait 4 times as long (24 s) before deciding the other side is gone, because building a huge map can freeze a slower device for a few seconds.
+- Both sides need this version.
+
 ## v14.2.13: online Volt Royale no longer drops everyone, no second ready-up, hand over the party, usernames locked, team rings
 
 - **Fixed: friends were booted the moment an online Volt Royale started.**

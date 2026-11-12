@@ -26,6 +26,7 @@ class PeerTransport {
     const CK = 12000; let ckN = 0; const parts = new Map();
     const w = { onMessage: null, onClose: null, send: o => { try { let str = null; try { str = JSON.stringify(o); } catch (e) { return; } if (str.length <= CK) { conn.send(o); return; }
         const k = ++ckN, n = Math.ceil(str.length / CK); for (let i = 0; i < n; i++) conn.send({ t: '_ck', k, i, n, d: str.slice(i * CK, (i + 1) * CK) }); } catch (e) { /* closed */ } },
+      backlog: () => { try { return ((conn.dataChannel && conn.dataChannel.bufferedAmount) || 0) + (conn.bufferSize || 0) * 4000; } catch (e) { return 0; } },   // (bytes still waiting to go out)
       close: () => { try { conn.close(); } catch (e) {} if (peer) peer.destroy(); } };
     conn.on('data', d => { if (d && d.t === '_ck') { let P = parts.get(d.k); if (!P) { P = { got: 0, a: new Array(d.n | 0) }; parts.set(d.k, P); if (parts.size > 20) parts.delete(parts.keys().next().value); }
         if (P.a[d.i] === undefined && typeof d.d === 'string') { P.a[d.i] = d.d; P.got++; } if (P.got === P.a.length) { parts.delete(d.k); let o = null; try { o = JSON.parse(P.a.join('')); } catch (e) { return; } if (w.onMessage) w.onMessage(o); } return; }
@@ -345,12 +346,12 @@ class HostSession {
   }
   tick(dt) {                                                      // call every frame during a match
     if (this.state !== 'playing' || !this.match) return;
-    const now = performance.now(); if (this.matchFrom === undefined || this.matchOf !== this.match) { this.matchOf = this.match; this.matchFrom = now; }
-    const quiet = CONFIG.online.silenceTimeoutMs * (now - this.matchFrom < 15000 ? 3 : 1);     // the first seconds of a match: a slow device may still be building the 3D arena
+    const now = performance.now(); if (this.matchFrom === undefined || this.matchOf !== this.match) { this.matchOf = this.match; this.matchFrom = now; for (const e of this.entries.values()) e.lastSeen = Math.max(e.lastSeen || 0, now); }   // (v14.2.14: the quiet clock starts with the match: time waiting in the room no longer counts, which dropped guests the moment a game began)
+    const quiet = CONFIG.online.silenceTimeoutMs * (now - this.matchFrom < 20000 ? 4 : 1);     // the first seconds of a match: a slow device may still be building the 3D arena
     for (const e of [...this.entries.values()]) if (e.id && now - e.lastSeen > quiet) { e.conn.send({ t: 'bye', reason: 'lost' }); this.drop(e); }
     const ru = JSON.stringify(Settings.rules());                  // the host changed a rule in the pause menu: tell everyone straight away
     if (ru !== this.lastRules) { this.lastRules = ru; this.broadcast({ t: 'rules', rules: Settings.rules() }); }
-    this.snapAcc += dt; const every = 1 / CONFIG.online.snapshotHz;
+    this.snapAcc += dt; const MM = this.match && this.match.mini && typeof modeOf === 'function' ? modeOf(this.match) : null, every = 1 / ((MM && MM.snapHz) || CONFIG.online.snapshotHz);   // (v14.2.14: a mode can send fewer, bigger snapshots: Volt Royale 30 a second)
     if (this.snapAcc >= every) { this.snapAcc %= every; this.sendSnapshots(); }
   }
   snapshot() {
@@ -360,7 +361,14 @@ class HostSession {
       c: m.chairs.map(c => [r3(c.x), r3(c.y), r3(c.heading), r3(c.vx), r3(c.vy), r3(Math.max(0, c.binLeft)), c.player ? c.player.id : 0]),
       b: [r3(b.x), r3(b.y), r3(b.vx), r3(b.vy)], lv: m.players.map(p => [p.id, p.speedLevel]), sf: m.sfxQueue.splice(0), cm: m.callQueue.splice(0), em: m.emoQ && m.emoQ.length ? m.emoQ.splice(0) : undefined, mg: m.mini ? m.miniSnap() : undefined };
   }
-  sendSnapshots() { const snap = this.snapshot(); for (const e of this.entries.values()) if (e.id) e.conn.send({ ...snap, a: e.seq }); }
+  /* v14.2.14: a guest whose connection is still sending earlier snapshots is skipped this time (the sounds and calls in it are kept for
+     their next one). Before, snapshots queued up behind a slow connection: the guest's game fell further and further behind (stutter, an
+     inventory that didn't match) until the connection gave up and dropped them */
+  sendSnapshots() { const snap = this.snapshot();
+    for (const e of this.entries.values()) { if (!e.id) continue; const bl = e.conn.backlog ? e.conn.backlog() : 0;
+      if (bl > 64000) { e.skipped = (e.skipped || 0) + 1; const P = e.pend || (e.pend = { sf: [], cm: [], em: [] }); P.sf.push(...(snap.sf || [])); P.cm.push(...(snap.cm || [])); P.em.push(...(snap.em || [])); continue; }
+      let out = { ...snap, a: e.seq }; if (e.pend) { out.sf = e.pend.sf.concat(snap.sf || []).slice(-60); out.cm = e.pend.cm.concat(snap.cm || []).slice(-20); const em = e.pend.em.concat(snap.em || []); out.em = em.length ? em.slice(-20) : undefined; e.pend = null; }
+      e.conn.send(out); } }
   backToLobby() { this.state = 'lobby'; this.match = null; this.ghosts = new Map(); this.startMsg = null; for (const e of this.entries.values()) e.players = null; this.broadcast({ t: 'lobby' }); this.sendRoster(); }
   close(reason = 'host_left') {
     if (this.closed) return; this.closed = true; Online.clear(this);
@@ -417,7 +425,7 @@ class ClientSession {
     for (const id of [...this.guestSrc.keys()]) if (!this.roster.some(r => r.id === id)) this.guestSrc.delete(id);
   }
   sendInput(q, x, y, ev, g) { if (this.conn) this.conn.send({ t: 'in', q, x: r3(x), y: r3(y), ev, g: g && g.length ? g.map(r => [r[0], r3(r[1]), r3(r[2]), r[3]]) : undefined }); }
-  silent() { return performance.now() - this.lastHeard > CONFIG.online.silenceTimeoutMs; }   // the scene checks this and calls finish('lost')
+  silent() { const now = performance.now(); if (this.state !== this._sState) { this._sState = this.state; this._sAt = now; } return now - this.lastHeard > CONFIG.online.silenceTimeoutMs * (now - (this._sAt || 0) < 20000 ? 4 : 1); }   // (v14.2.14: more patience while a game is starting: a big map takes the host a moment to build)   // the scene checks this and calls finish('lost')
   finish(reason) { if (this.closed) return; this.closed = true; Online.clear(this); clearInterval(this.pinger); if (this.conn) { this.conn.onClose = null; this.conn.close(); } if (this.onClosed) this.onClosed(reason); }
   leave() { if (this.conn && !this.closed) this.conn.send({ t: 'bye' }); this.closed = true; Online.clear(this); clearInterval(this.pinger); if (this.conn) { this.conn.onClose = null; setTimeout(() => this.conn.close(), 150); } }
 }
@@ -471,7 +479,7 @@ class ClientSim {
       if (SP && L.me) { const ads = !L.me.invOpen && input.held && input.held.spinCCW ? 1 : 0; if (ads !== (L.me.brAds || 0)) L.pending.push('ads:' + ads); L.me.brAds = ads; }   // LT: aim (zoom, slower)
       if (SP) { if (!(L.me && L.me.invOpen) && (p.halfCW || p.halfCCW)) L.pending.push(p.halfCCW ? 'cyc:-1' : 'cyc:1'); }
       else { if (p.halfCW) { L.pending.push('hcw'); spin = 0.5; } if (p.halfCCW) { L.pending.push('hccw'); spin = -0.5; }
-      /* (v13.4: the triggers no longer spin the cart) */ }
+      if (!this.m.mini) { if (p.spinCW) { L.pending.push('cw'); spin = 1; } if (p.spinCCW) { L.pending.push('ccw'); spin = -1; } }   /* (v14.2.15: RT / LT turn 90 degrees again in Volt Hockey) */ }
       const MJ = this.m.mini && modeOf(this.m) && modeOf(this.m).jump;         // Volt Royale: X jumps; your gun's tilt goes to the host when it changes
       if (MJ && L.me && !L.me.invOpen) { brAimInput(L.me, input, dt); const ap = MG.r2(L.me.brAp || 0); if (Math.abs(ap - (L.sentAp || 0)) > 0.015 || (ap !== L.sentAp && this.clock - (L.apAt || 0) > 0.3)) { L.pending.push('ap:' + ap); L.sentAp = ap; L.apAt = this.clock; } }
       if (BRP) brPadEvents(L, input, dt, this.clock);
