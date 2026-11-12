@@ -189,7 +189,7 @@ const TeamSelect = {
     this.kick = kick;
     TS_UI.legend(this, V.height - 26, [['A', 'Join'], ['◀ ▶', 'Team'], ['X', 'Lock to one cart'], ['▲ ▼', 'Name'], ['Y', 'Type name'], ['START', 'Play', () => { Sound.play('select'); kick(); }], ['B', 'Leave / back', () => { if (this.players.length) this.players = []; else this.scene.start(this.season ? 'SeasonHub' : 'Setup', { practice: this.practice }); }]]);
     if (Settings.touch || navigator.maxTouchPoints > 0) tapButton(this, V.width / 2, 600, 300, 'Join (touch controls)', () => {
-      if (!Settings.touch) TouchPad.toggle(); if (!Controls.sources.touch) Controls.sources.touch = new Source('touch', 'Touch controls');
+      if (!Settings.touch) TouchPad.toggle(); if (!Controls.sources.touch) Controls.sources.touch = Controls.touchSrc || (Controls.touchSrc = new Source('touch', 'Touch controls'));
       const src = Controls.sources.touch; if (!src || this.playerOf(src)) return; this.players.push({ src, side: this.openSide(), chair: null, spinQueued: 0, speedLevel: Settings.speedLevel, name: this.firstName() });
     });
   };
@@ -200,6 +200,9 @@ const TeamSelect = {
     for (const src of Controls.list()) {
       const p = this.playerOf(src);
       if (!p) {
+        if (src.id === 'touch' && (src.pressed.a || (src.pressed.start && this.ready > 12))) {   // v14.2.17: the touch controller joins straight onto a team (◀ ▶ still moves you), and START with nobody in yet joins you and plays
+          const side = fits(this.openSide()) ? this.openSide() : null; this.players.push({ src, side, chair: null, spinQueued: 0, speedLevel: Settings.speedLevel, name: this.firstName(), squad: 0, x: this.colX[side === null ? 1 : side * 2] }); Sound.play('select');
+          if (src.pressed.start && side !== null) return this.kick(); continue; }
         if (src.pressed.a) { this.players.push({ src, side: null, chair: null, spinQueued: 0, speedLevel: Settings.speedLevel, name: this.firstName(), squad: 0, x: this.colX[1] }); Sound.play('select'); }   // you join in the middle, then pick a side
         else if (src.pressed.start && this.ready > 12 && this.players.length === 0) { Sound.play('select'); return this.kick(); }
         else if (src.pressed.b && this.players.length === 0) { Sound.play('back'); return this.scene.start(this.season ? 'SeasonHub' : 'Setup', { practice: this.practice }); }

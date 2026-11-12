@@ -45,6 +45,15 @@ function brDoors(M) {
   return M.doors;
 }
 /* doors that are open or broken are taken out of the world (moved to level -99): every wall check in the game then ignores them */
+/* v14.2.21: something you drop or swap out flies out of your cart in a little arc and bounces to the ground (like loot from a chest), landing
+   about 1.5 m away to one side and a little behind, on open ground (not in a wall) */
+function brToss(B, m, c, L) {
+  const M = B.map(m), lv = (c.gs && c.gs.lv) || 0, side = Math.random() < 0.5 ? 1 : -1;
+  let spot = null; for (const da of [0.9, 1.3, 0.5, 1.8, 2.4, 0]) for (const r of [1.5, 1.1, 2.0]) { if (spot) break; const a = c.heading + Math.PI - side * da, x = c.x + Math.cos(a) * r, y = c.y + Math.sin(a) * r;
+    if (x > 1 && y > 1 && x < m.width - 1 && y < m.height - 1 && !brWallAt(M, lv, x, y) && (lv === 0 || B.floorAt(M, lv, x, y))) spot = { x, y }; }
+  if (!spot) spot = { x: L[2], y: L[3] };
+  L[2] = MG.r2(spot.x); L[3] = MG.r2(spot.y); L[9] = MG.r2(m.gs.t); L[10] = MG.r2(c.x); L[11] = MG.r2(c.y); L[6] = Math.max(L[6] || 0, MG.r2(m.gs.t + 0.7));
+}
 function brDoorsNear(M, x, y) {   // (v14.2.6: doors in an 8 m grid)
   if (!M._dg || M._dgN !== (M.doors || []).length) { M._dg = new Map(); M._dgN = (M.doors || []).length; for (const d of M.doors || []) for (let i = Math.floor((d.cx - 3) / 8); i <= Math.floor((d.cx + 3) / 8); i++) for (let j = Math.floor((d.cy - 3) / 8); j <= Math.floor((d.cy + 3) / 8); j++) { const k = i * 4096 + j; let b = M._dg.get(k); if (!b) M._dg.set(k, b = []); b.push(d); } }
   return M._dg.get(Math.floor(x / 8) * 4096 + Math.floor(y / 8)) || [];
@@ -110,7 +119,7 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
       G.use = null; G.rl = 0; const A = brSlotItem(G, a);
       if (op === 'swap' && A && b >= 0 && b < BR.slots) { const B = brSlotItem(G, b); A.s = b; if (B) B.s = a; brSlots(G); }
       else if (op === 'sel' && A) { G.sel = G.inv.indexOf(A); G.hol = 0; }
-      else if (op === 'drop' && A) { const i = G.inv.indexOf(A), q = c.toWorld(-1.3, 0); G.inv.splice(i, 1); const L = this.drop(m, q.x, q.y, G.lv, A.k, A.a); L[6] = MG.r2(m.gs.t + 2.5); L[7] = c.k; G.sel = Math.max(0, Math.min(G.sel > i ? G.sel - 1 : G.sel, G.inv.length - 1)); m.sfx('back'); }
+      else if (op === 'drop' && A) { const i = G.inv.indexOf(A), q = c.toWorld(-1.3, 0); G.inv.splice(i, 1); const L = this.drop(m, q.x, q.y, G.lv, A.k, A.a); L[6] = MG.r2(m.gs.t + 2.5); L[7] = c.k; brToss(this, m, c, L); G.sel = Math.max(0, Math.min(G.sel > i ? G.sel - 1 : G.sel, G.inv.length - 1)); m.sfx('back'); }
     },
     /* world sounds (chests, doors, fights) only play when a person is near enough to hear them: a CPU opening a chest across the map makes no noise for you */
     sfxNear(m, name, x, y, r = 26) { if (m.chairs.some(o => o.player && (!o.out || true) && Math.hypot(o.x - x, o.y - y) < r)) m.sfx(name); },
@@ -133,7 +142,7 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
       this.reload(c, m);
     },
     swapFar(m, c, L) {                                                    // (the swap, from the pickup range rather than on top of it)
-      const G = c.gs, it = G.inv[G.sel]; m.gs.L = m.gs.L.filter(x => x !== L); G.inv[G.sel] = { k: L[1], a: L[5], s: it.s }; const d = this.drop(m, c.x, c.y, G.lv, it.k, it.a); d[6] = MG.r2(m.gs.t + 2.5); d[7] = c.k; G.swapL = 0; m.sfx('pickup'); if (c.player) this.say(m, c, (BR_GUNS[L[1]] || BR_ITEMS[L[1]]).name);
+      const G = c.gs, it = G.inv[G.sel]; m.gs.L = m.gs.L.filter(x => x !== L); G.inv[G.sel] = { k: L[1], a: L[5], s: it.s }; const d = this.drop(m, c.x, c.y, G.lv, it.k, it.a); d[6] = MG.r2(m.gs.t + 2.5); d[7] = c.k; brToss(this, m, c, d); G.swapL = 0; m.sfx('pickup'); if (c.player) this.say(m, c, (BR_GUNS[L[1]] || BR_ITEMS[L[1]]).name);
     },
     toggleDoor(m, c, d) {
       const g = m.gs, i = d.door; if (g.dr[i] === 2) return;

@@ -59,7 +59,7 @@
 }
 
 /* ---- the HUD ---- */
-const BR_TOUCH = { spinCW: ['🔫', 'FIRE'], spinCCW: ['🎯', 'AIM'], halfCW: ['▶', 'ITEM'], halfCCW: ['◀', 'ITEM'], a: ['⤒', 'JUMP'], x: ['✋', 'GRAB'], y: ['✊', 'AWAY'], b: ['💨', 'DRIFT'], speedUp: ['👊', 'MELEE'], quick: ['🎒', 'BAG'] };
+const BR_TOUCH = { spinCW: ['🔫', 'FIRE'], spinCCW: ['🎯', 'AIM'], halfCW: ['▶', 'ITEM'], halfCCW: ['◀', 'ITEM'], a: ['⤒', 'JUMP'], x: ['✋', 'GRAB'], y: ['✊', 'AWAY'], b: ['💨', 'DRIFT'], speedUp: ['👊', 'MELEE'], speedDown: ['📍', 'PING'], quick: ['🎒', 'BAG'] };
 Object.assign(GameScene.prototype, {
   brFaceKey(c) {                                                           // a little round face for the team panel (skin, hair, hat colour)
     const L = typeof Skins !== 'undefined' ? Skins.expand(Avatar.lookFor(c, this)) : (Avatar.lookFor(c, this) || LOOK0), key = 'brface-' + [L.skin, L.hair, L.hat, L.hatCol, L.face].join('-'); if (this.textures.exists(key)) return key;
@@ -100,7 +100,7 @@ Object.assign(GameScene.prototype, {
       else if (G.op > 0) txt = bar(G.op, 0xffd23f, (g.L || []).some(L => L[0] === G.opL && L[1] === 'ammo') ? 'OPENING THE AMMO CRATE' : 'OPENING THE CHEST');
       else if (G.foc > 0) { const L = (g.L || []).find(x => x[0] === G.foc), k = L && L[1], full = BR_GUNS[k] ? !!(!G.hol && G.inv[G.sel] && BR_GUNS[G.inv[G.sel].k]) || G.inv.length >= BR.slots : G.inv.length >= BR.slots && !G.inv.some(it => it.k === k);   /* (a gun swaps for the gun in your hands) */
         txt = !L ? '' : k === 'chest' ? 'HOLD X: open the chest' : k === 'ammo' ? 'HOLD X: open the ammo crate' : `X: ${full ? 'swap for' : 'pick up'} ${brName(k, L[12])}${BR_ITEMS[k] && L[5] > 1 ? ' x' + L[5] : ''}`; }
-      else if (G.foc < 0) { const i = -1 - G.foc; txt = g.dr && g.dr[i] === 1 ? 'X: shut the door' : 'X: open the door    R3: bash it'; }
+      else if (G.foc < 0) { const i = -1 - G.foc; txt = g.dr && g.dr[i] === 1 ? 'X: shut the door' : 'X: open the door';   /* (v14.2.21: no bash hint: the button depends on your layout) */ }
       else if (G.cards && G.cards.length) { const i = (M.map(m).rez || []).findIndex(q => c.x > q.x0 && c.x < q.x1 && c.y > q.y0 && c.y < q.y1); txt = i >= 0 && g.gar[i] > g.t ? `THIS REZ GARAGE IS RECHARGING: ${Math.ceil(g.gar[i] - g.t)} s` : `🎴 Take the rez card to a REZ GARAGE (green on the map)`; }
       else if (sw) txt = `BAG FULL   X: swap for ${(BR_GUNS[sw[1]] || BR_ITEMS[sw[1]] || { name: sw[1] }).name}`;
       else if (I && I.heal && mates.some(o => !o.gs.down && MH.dist(c, o) < BR.mateRange && M.helps(o, I))) txt = `RT: use ${I.name}    LT: use it on your team-mate`;

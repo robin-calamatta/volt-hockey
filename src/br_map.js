@@ -64,7 +64,7 @@ class BRMapScene extends Phaser.Scene {
     const r = up.call(this, time, delta), m = this.match; if (!m || m.kind !== 'br') return r;
     try {
       const V = CONFIG.view;
-      if (!this.brMapBtn) { this.brMapBtn = tapButton(this, V.width - 70, 286, 112, '🗺 MAP', () => this.brMapToggle()); this.brMapBtn.t.setFontSize(18); [this.brMapBtn.bg, this.brMapBtn.t, this.brMapBtn.hit].forEach(o => o.setDepth(60)); this.brMapBtn.bg.setAlpha(0.85);
+      if (!this.brMapBtn) { this.brMapBtn = tapButton(this, Settings.touch ? 70 : V.width - 70, Settings.touch ? 150 : 286, 112, '🗺 MAP', () => this.brMapToggle()); this.brMapBtn.t.setFontSize(18); [this.brMapBtn.bg, this.brMapBtn.t, this.brMapBtn.hit].forEach(o => o.setDepth(60)); this.brMapBtn.bg.setAlpha(0.85);
         this.kMap = this.input.keyboard && this.input.keyboard.addKey('M'); }
       if (this.kMap && Phaser.Input.Keyboard.JustDown(this.kMap) && !this.scene.isActive('BRMap')) this.brMapToggle();
       const back = !!BRMAP.padState()[8]; if (back && !this.brBackHeld && !this.scene.isActive('BRMap') && !this.scene.isActive('Pause') && !(typeof FriendsBar !== 'undefined' && FriendsBar.open)) this.brMapToggle(); this.brBackHeld = back;   // (v14.2.4: Select / View opens the map; friends and party are in the Start menu)

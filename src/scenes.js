@@ -414,7 +414,7 @@ class LobbyScene extends Phaser.Scene {
     tapButton(this, 150, 676, 220, 'Back', () => { if (this.players.length) this.players = []; else this.scene.start(this.season ? 'SeasonHub' : 'Setup', { practice: this.practice }); });
     if (Settings.touch || navigator.maxTouchPoints > 0) tapButton(this, CX, 676, 360, 'Join (touch controls)', () => {
       if (!Settings.touch) TouchPad.toggle();
-      if (!Controls.sources.touch) Controls.sources.touch = new Source('touch', 'Touch controls');
+      if (!Controls.sources.touch) Controls.sources.touch = Controls.touchSrc || (Controls.touchSrc = new Source('touch', 'Touch controls'));
       const src = Controls.sources.touch; if (!src || this.playerOf(src) || this.openSide() === null) return;
       this.players.push({ src, side: this.openSide(), chair: null, spinQueued: 0, speedLevel: Settings.speedLevel, name: this.firstName() });
     });
@@ -563,7 +563,7 @@ class GameScene extends Phaser.Scene {
       const tapA = this.resultTap === 'a' && this.resultReady(), tapB = this.resultTap === 'b' && this.resultReady(); if (this.resultTap && this.resultReady()) this.resultTap = null;
       if (m.state === 'over' && o.session.seasonFx && this.resultReady() && (Controls.menu().a || tapA) && !menuOpen) { Controls.owner = null; Controls.claimed.clear(); o.session.close('party_done'); Sound.playMusic('menu'); this.scene.start('SeasonHub'); return; }
       if (m.state === 'over' && this.resultReady() && (Controls.menu().a || tapA) && !menuOpen) { o.session.backToLobby(); if (o.session.cfg.mini) o.session.setConfig({ mini: randomMapFor(o.session.cfg.mini) }); this.scene.start('Room', { role: 'host', session: o.session, again: true }); return; }   /* (play again: straight back in, a new map) */
-      if (m.state === 'over' && this.resultReady() && (Controls.menu().b || tapB) && !menuOpen) { o.session.backToLobby(); this.scene.start('Room', { role: 'host', session: o.session }); return; }
+      if (m.state === 'over' && this.resultReady() && (this.holdBack() || tapB) && !menuOpen) { o.session.backToLobby(); this.scene.start('Room', { role: 'host', session: o.session }); return; }
     } else {
       this.pre3d(dt); o.sim.frame(dt, [{ id: o.session.myId, input: menuOpen ? idle : Controls.mine }, ...guests.map(([id, src]) => ({ id, input: menuOpen ? idle : src }))]);
       if (m.mini) { const me = o.sim.locals[0] && o.sim.locals[0].me; if (me && me.chair) Object.assign(m.ball, { x: me.chair.x, y: me.chair.y }); }   // minigames: the cameras follow your own cart
@@ -607,6 +607,17 @@ class GameScene extends Phaser.Scene {
     if (st[0] !== st[1]) { const adv = st[0] > st[1] ? 0 : 1; this.ppText.setText(`POWER PLAY  ${st[adv]} v ${st[1 - adv]}`).setColor(teamColorHex(m.teams[adv])); }
     else this.ppText.setText(`${st[0]} v ${st[1]}`).setColor('#9fb2bf');
   }
+  /* v14.2.20: back to the lobby (or the room) is press and HOLD B, about 0.8 s, with a bar filling up, so a stray press doesn't leave.
+     A B already held when the result came up (drifting at the whistle) has to be let go first. Clicking the button on screen still works at once. */
+  holdBack() {
+    if (!this.resultReady()) { this.bHold = 0; this.bHoldAt = 0; this.bArmed = false; if (this.holdG) this.holdG.clear(); return false; }
+    const held = Controls.list().some(s => s.held && s.held.b); if (!held) this.bArmed = true;
+    if (held && this.bArmed) { if (!this.bHoldAt) this.bHoldAt = performance.now(); } else this.bHoldAt = 0; this.bHold = this.bHoldAt ? (performance.now() - this.bHoldAt) / 1000 : 0;   // (real time, so a slow frame rate doesn't stretch it)
+    if (!this.holdG || !this.holdG.scene) this.holdG = this.add.graphics().setDepth(60);
+    const G = this.holdG.clear(), V = CONFIG.view, k = Math.min(1, this.bHold / 0.8);
+    if (k > 0) { const w = 320, x = V.width / 2 - w / 2, y = V.height - 100; G.fillStyle(0x0d151b, 0.85).fillRoundedRect(x - 6, y - 6, w + 12, 24, 8).fillStyle(0xff4b5c, 1).fillRoundedRect(x, y, Math.max(6, w * k), 12, 5); }
+    return k >= 1;
+  }
   resultReady() { return this.overAt !== undefined && this.time.now - this.overAt > 1000; }          // buttons only count a moment after the whistle, so a late press does not skip the result
   showResult() {                                           // full time: who won, the score, a few stats and what to press
     if (this.result) return; const m = this.match, V = CONFIG.view, cx = V.width / 2, cy = V.height / 2 + 10, o = this.online, se = this.setup.season;
@@ -624,7 +635,7 @@ class GameScene extends Phaser.Scene {
     const best = s => { const sc = m.scorers || {}, mine = Object.entries(sc).filter(([n]) => m.players && m.players.some(p => p.name === n && p.side === s)).sort((a, b) => b[1] - a[1])[0]; return mine ? `${mine[0]} (${mine[1]})` : '-'; };
     if (m.scorers && Object.keys(m.scorers).length) rows.push(['Top scorer', best(0), best(1)]);
     rows.forEach((r, i) => { const y = cy + 62 + i * 31; T(cx, y, r[0], { fontSize: '20px', color: THEME.dim }); T(cx - 230, y, String(r[1]), { fontSize: '24px', fontStyle: 'bold', color: '#ffffff' }); T(cx + 230, y, String(r[2]), { fontSize: '24px', fontStyle: 'bold', color: '#ffffff' }); });
-    const hint = o ? (o.role === 'host' ? 'A: play again      B: back to the room' : 'Waiting for the host...') : se ? 'A: continue the season' : 'A: play again      B: back to the lobby';
+    const hint = o ? (o.role === 'host' ? 'A: play again      HOLD B: back to the room' : 'Waiting for the host...') : se ? 'A: continue the season' : 'A: play again      HOLD B: back to the lobby';
     const hintT = T(cx, cy + h / 2 - 28, hint, { fontSize: '28px', fontStyle: 'bold', color: '#ffffff' });
     // the same choices as buttons for a mouse or a finger (they act like A / B once the result can be dismissed)
     const btns = o ? (o.role === 'host' ? [['Play again', 'a'], ['Back to the room', 'b']] : []) : se ? [['Continue the season', 'a']] : [['Play again', 'a'], ['Back to the lobby', 'b']];
@@ -741,6 +752,7 @@ class GameScene extends Phaser.Scene {
       g.fillStyle(0x0f1820, 1).fillEllipse(b.x + x * r * 0.72, b.y + y * r * 0.72, r * 0.5 * (0.35 + 0.65 * z), r * 0.5 * (0.35 + 0.65 * z));
     }
   }
+  fitScores() { const c = this.clockText, half = Math.max(62, c.width / 2 + 30); if (this.scoreA) this.scoreA.x = c.x - half; if (this.scoreB) this.scoreB.x = c.x + half; }   // v14.2.19: the scores move out to make room for PRACTICE / GOLDEN GOAL
   myChairs2D() { const out = new Map(); try { (this.localControls ? this.localControls() : []).forEach(([p], i) => { if (p && p.chair) out.set(p.chair, i); }); } catch (e) {} return out; }
   drawChair(g, c, color, speedLevel) {
     const K = CONFIG.chair, cup = CONFIG.cup, T = (x, y) => c.toWorld(x, y), L = CONFIG.look, hw = K.bodyWidth / 2;
@@ -826,13 +838,13 @@ class GameScene extends Phaser.Scene {
     if (m.state === 'over') {
       if (!this.recorded && !m.mini) { this.recorded = true; const sides = [...new Set(this.setup.players.map(p => p.side))]; if (sides.length) Settings.record(m, sides); }
       const e = this.resultReady() ? { ...Controls.menu() } : {}, se = this.setup.season;
-      if (this.resultTap) { if (this.resultReady()) e[this.resultTap] = true; this.resultTap = null; }
+      this.resultTap0 = null; if (this.resultTap) { if (this.resultReady()) { e[this.resultTap] = true; this.resultTap0 = this.resultTap; } this.resultTap = null; }
       if (se) {                                                                                      // Season: file the result and go back to the season screen
         if (!this.filed) { this.filed = true; Season.record(Season.cur, se.fx, m.score[0], m.score[1], m.overtime); Season.save(Season.cur); }
         if (e.a || e.b || e.start) { Sound.playMusic('menu'); Controls.owner = null; this.scene.start('SeasonHub'); }
       } else {
         if (e.a) { this.scene.restart({ ...this.setup, mini: randomMapFor(this.setup.mini) }); }   /* (play again: a new map) */
-        if (e.b) { Sound.playMusic('menu'); this.scene.start('Main'); }
+        if (this.holdBack() || (this.resultTap0 === 'b')) { Sound.playMusic('menu'); this.scene.start('Main'); }
       }
     }
   }
@@ -1001,7 +1013,7 @@ class GameScene extends Phaser.Scene {
     }
     const t = Math.max(0, Math.ceil(m.clock));
     if (m.mini) this.updateMiniHud(m); else {
-    this.clockText.setText(m.practice ? 'PRACTICE' : m.overtime ? 'GOLDEN GOAL' : `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`).setColor('#f2c200');
+    this.clockText.setText(m.practice ? 'PRACTICE' : m.overtime ? 'GOLDEN GOAL' : `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`).setColor('#f2c200'); this.fitScores();
     this.nameA.setText(TEAMS[m.teams[0]].name.toUpperCase() + (m.press[0] ? '  ⚡PRESS' : '')).setColor(teamColorHex(m.teams[0])); this.nameB.setText((m.press[1] ? 'PRESS⚡  ' : '') + TEAMS[m.teams[1]].name.toUpperCase()).setColor(teamColorHex(m.teams[1]));
     this.scoreA.setText(String(m.score[0])).setColor('#ffffff'); this.scoreB.setText(String(m.score[1])).setColor('#ffffff');
     [0, 1].forEach(s => { if (m.score[s] > this.lastScore[s]) this.celebrate(s); });

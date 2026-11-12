@@ -276,7 +276,7 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
     },
     bestSlot(c, d) { const inv = c.gs.inv; let best = -1, bs = -1; inv.forEach((it, i) => { const g = BR_GUNS[it.k]; if (!g || (it.a <= 0 && c.gs.am[BR_AMMO[g.type].i] <= 0)) return; const s = (d <= g.range ? 10 : 2) + g.dmg * (g.pellets || 1) / g.cd / 20 - Math.max(0, d - g.range) * 0.5; if (s > bs) { bs = s; best = i; } }); return best < 0 ? c.gs.sel : best; },
     invAct(c, act, m) {
-      const G = c.gs; if (act && act.op === 'ammo' && !c.out) { const t = AMMO_KEYS[act.a], A = BR_AMMO[t]; if (A && G.am[A.i] > 0) { const n = Math.min(G.am[A.i], A.pack), q = c.toWorld(-1.3, 0), L = this.drop(m, q.x, q.y, G.lv, 'am_' + t, n); G.am[A.i] -= n; L[6] = MG.r2(m.gs.t + 2.5); L[7] = c.k; m.sfx('back'); } return; }
+      const G = c.gs; if (act && act.op === 'ammo' && !c.out) { const t = AMMO_KEYS[act.a], A = BR_AMMO[t]; if (A && G.am[A.i] > 0) { const n = Math.min(G.am[A.i], A.pack), q = c.toWorld(-1.3, 0), L = this.drop(m, q.x, q.y, G.lv, 'am_' + t, n); G.am[A.i] -= n; L[6] = MG.r2(m.gs.t + 2.5); L[7] = c.k; if (typeof brToss === 'function') brToss(this, m, c, L); m.sfx('back'); } return; }
       G.use = null; G.rl = 0; return M0.invAct.call(this, c, act, m);
     },
     tag(c, m, vp) {                                                       // team-mates: name, health, down / carrying a card (enemies: nothing, no tags through walls)

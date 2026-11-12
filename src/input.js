@@ -8,7 +8,7 @@ const KEYMAP = {
          b: ['ControlRight'], y: ['Slash'], start: ['Escape'], spinCW: ['Period'], spinCCW: ['Comma'], speedUp: ['Quote'], speedDown: ['Semicolon'], x: ['Backslash'], halfCW: ['BracketRight'], halfCCW: ['BracketLeft'], camera: ['KeyP'], talk: ['KeyL'], quick: ['KeyM'], social: [], aimUp: ['PageUp'], aimDown: ['PageDown'], melee: ['Numpad0', 'End'] }
 };
 const PAD_BUTTON = { a: 0, b: 1, y: 3, start: 9, spinCW: 7, spinCCW: 6, speedUp: 15, speedDown: 14, x: 2, halfCW: 5, halfCCW: 4, camera: 13, social: 8, talk: 10, quick: 12, up: 12, down: 13, left: 14, right: 15, melee: 11 };   // (melee: R3, Volt Royale)
-const padInMatch = () => { const g = typeof window !== 'undefined' && window.voltGame; if (!g || !g.scene.isActive('Game')) return false; for (const k of ['Pause', 'BRInv', 'BRMap', 'Settings', 'SettingsPage']) if (g.scene.isActive(k)) return false; return !(typeof FriendsBar !== 'undefined' && FriendsBar.open); };   // (in a match, not in a menu over it)
+const padInMatch = () => { const g = typeof window !== 'undefined' && window.voltGame; if (!g || !g.scene.isActive('Game')) return false; { const G = g.scene.getScene('Game'); if (G && G.match && G.match.state === 'over') return false; }   /* (the result screen is a menu: B is B again) */ for (const k of ['Pause', 'BRInv', 'BRMap', 'Settings', 'SettingsPage']) if (g.scene.isActive(k)) return false; return !(typeof FriendsBar !== 'undefined' && FriendsBar.open); };   // (in a match, not in a menu over it)
 const PAD = { deadzone: 0.2, menuThreshold: 0.55 };
 const MENU_REPEAT = { delayMs: 350, intervalMs: 110 };   // holding a direction in a menu repeats
 const DIRECTIONS = ['up', 'down', 'left', 'right'];
@@ -46,7 +46,7 @@ class Source {
   readTouch() {                                                    // the on-screen controller (touch.js): its stick and buttons look just like a gamepad's
     const T = TouchPad.state, held = {};
     for (const b of BUTTONS) held[b] = !!(T.held[b] || (T.tapped && T.tapped[b]));
-    this.ax = T.ax; this.ay = T.ay;
+    this.ax = T.ax; this.ay = T.ay; this.rx = T.rx || 0; this.ry = T.ry || 0;   // (v14.2.18: the touch right stick in Volt Royale)
     held.up = held.up || T.ay < -TOUCH.stickMenuThreshold; held.down = held.down || T.ay > TOUCH.stickMenuThreshold;
     held.left = held.left || T.ax < -TOUCH.stickMenuThreshold; held.right = held.right || T.ax > TOUCH.stickMenuThreshold;
     return held;
@@ -88,8 +88,10 @@ const Controls = {
     if (frame === this.lastFrame) return;
     this.lastFrame = frame;
     TouchPad.sync();
-    if (Settings.touch && !this.sources.touch) this.sources.touch = new Source('touch', 'Touch controls');     // the on-screen controller is a device like any other
-    if (!Settings.touch && this.sources.touch) delete this.sources.touch;
+    /* the on-screen controller is a device like any other. v14.2.17: turned off and on again it's the same device, so you're still the
+       same player (before, a new one was made and pressing START joined you a second time as player 2) */
+    if (Settings.touch && !this.sources.touch) this.sources.touch = this.touchSrc || (this.touchSrc = new Source('touch', 'Touch controls'));
+    if (!Settings.touch && this.sources.touch) { this.touchSrc = this.sources.touch; delete this.sources.touch; }
     const pads = navigator.getGamepads ? [...navigator.getGamepads()] : [];
     pads.forEach((p, i) => {
       const id = 'pad' + i;

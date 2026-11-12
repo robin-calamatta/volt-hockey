@@ -14,7 +14,7 @@ FriendsBar.build();
 Controls.init(); TouchPad.init();
 MUSIC_READY = scanMusic();                                  // looks for your music files in the background, never blocks start-up
 
-const SCENES = [BootScene, TitleScene, LobbyHomeScene, MinigamesScene, MiniListScene, MiniSetupScene, HowToScene, DemoScene, BRInvScene, BRMapScene, SettingsScene, SettingsPageScene, ControlsGuideScene, SetupScene, LobbyScene, GameScene, PreviewScene, CameraPageScene, PauseScene, OnlineMenuScene, BrowseScene, JoinCodeScene, RoomScene, NameEntryScene, JoinMenuScene, SeasonMenuScene, SeasonSetupScene, SeasonHubScene, StandingsScene, GamesScene, BracketScene, TrophyScene, HistoryScene, LeaderboardScene];
+const SCENES = [BootScene, TitleScene, LobbyHomeScene, MinigamesScene, MiniListScene, MiniSetupScene, HowToScene, DemoScene, BRInvScene, BRMapScene, BRQueueScene, SettingsScene, SettingsPageScene, ControlsGuideScene, SetupScene, LobbyScene, GameScene, PreviewScene, CameraPageScene, PauseScene, OnlineMenuScene, BrowseScene, JoinCodeScene, RoomScene, NameEntryScene, JoinMenuScene, SeasonMenuScene, SeasonSetupScene, SeasonHubScene, StandingsScene, GamesScene, BracketScene, TrophyScene, HistoryScene, LeaderboardScene];
 
 /* Phaser stops its whole loop if a scene throws, which looks like a freeze. Catch it, keep running, and tell the player with a small toast that can be dismissed
    (the full error is always in the browser console, F12). "Details" shows it on screen so it can be copied and sent to whoever looks after the game. */

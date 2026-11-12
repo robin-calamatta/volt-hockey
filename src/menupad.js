@@ -29,7 +29,7 @@ const MenuPad = {
       if (k.c) el.style.borderColor = k.c;
       if (k.g !== 's') { el.style.left = (k.x * 45) + 'px'; el.style.top = (k.y * 45) + 'px'; grp[k.g].append(el); } else root.append(el);
       const T = () => TouchPad.state;
-      const down = e => { e.preventDefault(); e.stopPropagation(); if (!Controls.sources.touch) Controls.sources.touch = new Source('touch', 'Touch controls'); T().held[k.id] = true; T().tapped[k.id] = true; el.classList.add('down'); try { el.setPointerCapture(e.pointerId); } catch (er) { /* fine */ } };
+      const down = e => { e.preventDefault(); e.stopPropagation(); if (!Controls.sources.touch) Controls.sources.touch = Controls.touchSrc || (Controls.touchSrc = new Source('touch', 'Touch controls')); T().held[k.id] = true; T().tapped[k.id] = true; el.classList.add('down'); try { el.setPointerCapture(e.pointerId); } catch (er) { /* fine */ } };
       const up = e => { T().held[k.id] = false; el.classList.remove('down'); };
       el.addEventListener('pointerdown', down); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
     }

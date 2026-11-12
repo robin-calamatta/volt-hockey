@@ -195,7 +195,7 @@ Object.assign(BR_COLS, { seat: 0x2f5fa8, stone: 0x9a948a, hangar: 0xc8ced4, silo
     });
     const tot = k => team.reduce((a, s) => a + s[k], 0);
     if (n > 1) T(cx, y0 + h + 30, `SQUAD:  ${tot('kills')} eliminations   ·   ${tot('dmg')} damage   ·   ${tot('rvs')} revives   ·   ${tot('rzs')} rezzes`, { fontSize: '20px', fontStyle: 'bold', color: '#cfd8de' });
-    const hint = o ? (o.role === 'host' ? 'A: play again   B: back to the room' : 'Waiting for the host...') : 'A: play again (new map)   B: back to the lobby';
+    const hint = o ? (o.role === 'host' ? 'A: play again   HOLD B: back to the room' : 'Waiting for the host...') : 'A: play again (new map)   HOLD B: back to the lobby';
     const hintT = T(cx, V.height - 92, hint, { fontSize: '20px', fontStyle: 'bold', color: THEME.dim });
     const btns = o ? (o.role === 'host' ? [['Play again', 'a'], ['Back to the room', 'b']] : []) : [['Play again', 'a'], ['Back to the lobby', 'b']];
     btns.forEach(([label, b], i) => { const x = cx + (i - (btns.length - 1) / 2) * 280, tb = tapButton(this, x, V.height - 44, 250, label, () => { this.resultTap = b; }); for (const o2 of [tb.bg, tb.t, tb.hit]) { o2.setDepth(42); add(o2); } });

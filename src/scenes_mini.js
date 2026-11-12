@@ -91,9 +91,13 @@ class MiniListScene extends ListMenuScene {                            // the ga
 class MiniSetupScene extends ListMenuScene {
   constructor() { super('MiniSetup'); }
   init(data) { this.kind = data.kind || 'balloons'; }
-  update(time, delta) { super.update(); if (this.demo) this.demo.update(time, delta); }
+  update(time, delta) {
+    /* v14.2.17: START plays straight away (handy on a touch screen: no scrolling down to "Play on this screen") */
+    Controls.update(this.game.loop.frame); this.ready = (this.ready || 0) + 1;
+    if (this.ready > 3 && !PadNav.active() && Controls.list().some(x => x.pressed && x.pressed.start)) { const it = (this.items || []).find(i => /^Play /.test(typeof i.label === 'function' ? i.label() : i.label)); if (it && it.select) { Sound.play('select'); it.select(); return; } }
+    super.update(); if (this.demo) this.demo.update(time, delta); }
   create() {
-    const k = this.kind, o = () => miniOpts(), step = (key, d, lo, hi) => miniSave({ [key]: clamp(o()[key] + d, lo, hi) });
+    this.ready = 0; const k = this.kind, o = () => miniOpts(), step = (key, d, lo, hi) => miniSave({ [key]: clamp(o()[key] + d, lo, hi) });
     const items = [];
     if (k === 'balloons') {
       const flip = () => miniSave({ balloonMode: o().balloonMode === 'teams' ? 'ffa' : 'teams' });
@@ -228,7 +232,7 @@ Object.assign(GameScene.prototype, {
   },
   updateMiniHud(m) {
     const H = m.hud();
-    this.clockText.setText(H.clock).setColor('#f2c200');
+    this.clockText.setText(H.clock).setColor('#f2c200'); if (this.fitScores) this.fitScores();
     this.nameA.setText(H.a).setColor(teamColorHex(m.teams[0])); this.nameB.setText(H.b).setColor(teamColorHex(m.teams[1]));
     this.scoreA.setText(H.sa).setColor('#ffffff'); this.scoreB.setText(H.sb).setColor('#ffffff');
     this.shotsA.setText(H.left).setColor('#e8eef2'); this.shotsB.setText(H.right).setColor('#e8eef2'); this.penA.setText(''); this.penB.setText(''); this.ppText.setText(H.mid).setColor('#9fb2bf');
@@ -247,7 +251,7 @@ Object.assign(GameScene.prototype, {
     T(cx, cy - h / 2 + 92, R.title, { fontSize: R.title.length > 22 ? '44px' : '58px', fontStyle: 'bold', color: R.winSide >= 0 ? teamColorHex(m.teams[R.winSide]) : '#ffffff' }).setStroke('#0d151b', 8);
     if (R.sub) T(cx, cy - h / 2 + 138, R.sub, { fontSize: '22px', color: '#9fb2bf' });
     R.rows.slice(0, 8).forEach((r, i) => { const y = cy - h / 2 + 178 + i * 30; T(cx - 250, y, ordinal(r.place), { fontSize: '22px', fontStyle: 'bold', color: i === 0 ? '#f2c200' : '#9fb2bf' }); T(cx - 90, y, r.name, { fontSize: '22px', fontStyle: 'bold', color: teamColorHex(m.teams[r.side]) }); T(cx + 170, y, r.text, { fontSize: '20px', color: '#e8eef2' }); });
-    const hint = o ? (o.role === 'host' ? 'A: play again   B: back to the room' : 'Waiting for the host...') : 'A: play again (new map)   B: back to the lobby';
+    const hint = o ? (o.role === 'host' ? 'A: play again   HOLD B: back to the room' : 'Waiting for the host...') : 'A: play again (new map)   HOLD B: back to the lobby';
     const hintT = T(cx, cy + h / 2 - 100, hint, { fontSize: '20px', fontStyle: 'bold', color: THEME.dim });
     const btns = o ? (o.role === 'host' ? [['Play again', 'a'], ['Back to the room', 'b']] : []) : [['Play again', 'a'], ['Back to the lobby', 'b']];
     btns.forEach(([label, b], i) => { const x = cx + (i - (btns.length - 1) / 2) * 280, tb = tapButton(this, x, cy + h / 2 - 44, 250, label, () => { this.resultTap = b; }); for (const o2 of [tb.bg, tb.t, tb.hit]) { o2.setDepth(42); add(o2); } });

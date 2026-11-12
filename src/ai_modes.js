@@ -35,13 +35,13 @@ const cpuDiffOf = (c, m) => c.cpuDiff || m.difficulty || {};
   /* v14.2.3: the storm is the CPU's first priority. While the storm waits, the next circle isn't known yet, but it must fit inside the
      current one: anywhere within "rSafe" of the middle is inside it wherever it lands. A CPU heads there in good time (allowing for the
      roads not being straight). Once the storm moves, it heads well inside the final circle and makes sure the edge never catches it. */
-  const PHT = [[45, 25, 0.62], [30, 20, 0.42], [25, 18, 0.26], [20, 15, 0.12], [15, 12, 0.03], [8, 15, 0]];
+  const PHT = BR_PHASES;   // (v14.2.24: the same stages as the game; times per map from brPhases)
   const stormDanger = (m, c) => {
     const S = m.gs.st; if (!S || S.ph >= PHT.length) return null; const sp = CONFIG.chair.maxSpeed * 0.55, dNow = Math.hypot(c.x - S.x, c.y - S.y) - S.r;
     const deep = (cx, cy, rr) => { const d = Math.hypot(c.x - cx, c.y - cy) || 1, k = Math.min(d, rr) / d; return { x: cx + (c.x - cx) * k, y: cy + (c.y - cy) * k }; };
     if (dNow > -5) { const p = deep(S.fx !== undefined && S.shrink > 0 ? S.fx : S.x, S.fx !== undefined && S.shrink > 0 ? S.fy : S.y, (S.shrink > 0 ? S.fr : S.r) * 0.5); return { ...p, urgent: true }; }   // in it, or about to be: go now
     if (S.wait > 0) {                                                                                                // waiting: be inside the guaranteed-safe part in time
-      const [, sh, f] = PHT[S.ph], nr = f ? Math.max(1.5, Math.min(m.width, m.height) * f) : 0, rSafe = Math.max(nr * 0.4, nr - 0.6 * Math.max(0, S.r - nr));
+      const [, sh, f] = brPhases(m)[S.ph], nr = f ? Math.max(1.5, Math.min(m.width, m.height) * f) : 0, rSafe = Math.max(nr * 0.4, nr - 0.6 * Math.max(0, S.r - nr));
       const d0 = Math.hypot(c.x - S.x, c.y - S.y), need = d0 - rSafe * 0.85; if (need <= 0) return null;
       const t = need / sp, left = S.wait + sh * 0.4, p = deep(S.x, S.y, rSafe * 0.6);
       if (t > left - 8) return { ...p, urgent: true };                                                              // cutting it fine: drop everything

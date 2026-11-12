@@ -54,6 +54,42 @@ export function createApi(store, opts = {}) {
   const online = u => !!u && now() - (u.lastSeen || 0) < LIMITS.onlineMs;
   const me = u => ({ name: u.name, adult: !!u.adult, br: canBR(u), created: u.created, email: u.email ? maskEmail(u.email) : '' });
   const GAME_DEFAULTS = { brThird: true };
+  /* v14.2.22 Volt Royale public matchmaking. One queue per team size (1 to 5). Queued players poll every couple of seconds; a match forms when
+     everyone queued has pressed START, when the first one has waited 5 minutes, or when the queue fills a match (as many people as it has carts; CPUs fill any spots left). The first one queued hosts: their game opens an online room
+     and posts its code here; the others see the code and join. Matches live under their own keys (and each player gets a pointer to theirs),
+     so two polls writing the queue at the same moment can't lose a match. */
+  const MM_WAIT = 5 * 60e3, MM_GONE = 15e3, MM_KEEP = 3 * 60e3, MM_SPOTS = { 1: 32, 2: 32, 3: 30, 4: 32, 5: 30 };   // (v14.2.23: a match takes as many people as it has carts)
+  const mmSquad = b => { const q = Number(b && b.squad); return q >= 1 && q <= 5 ? Math.floor(q) : 1; };
+  async function mmLoad(sq) { const Q = (await store.get('mm/q' + sq)) || {}; Q.players = Q.players || {}; Q.sq = sq; return Q; }
+  async function mmMine(u) { const id = await store.get('mm/u/' + u.name.toLowerCase()); if (!id) return null; const M = await store.get('mm/m/' + id); if (!M || now() - M.at > MM_KEEP) return null; return M; }
+  const mmView = (u, Q, M) => { const list = Object.values(Q.players).sort((a, b) => a.at - b.at), first = list[0];
+    return { count: list.length, ready: list.filter(p => p.go).length, you: { go: !!(Q.players[u.name.toLowerCase()] || {}).go }, since: first ? first.at : null, startsAt: first ? first.at + MM_WAIT : null, cap: MM_SPOTS[Q.sq] || 20, now: now(),   /* (v14.2.23: counts, not a list of names) */
+      match: M ? { id: M.id, host: M.host, you: M.host === u.name ? 'host' : 'guest', members: M.members, code: M.code || null, squad: M.squad } : null }; };
+  async function mmPoll(u, b) {
+    if (!canBR(u)) bad('Volt Royale is for players 16 and over.', 403);
+    const sq = mmSquad(b), t = now(), M0 = await mmMine(u), Q = await mmLoad(sq);
+    for (const [k, p] of Object.entries(Q.players)) if (t - p.seen > MM_GONE) delete Q.players[k];
+    const key = u.name.toLowerCase();
+    if (M0) { if (Q.players[key]) { delete Q.players[key]; await store.set('mm/q' + sq, Q); } return mmView(u, Q, M0); }   // already in a match: show it
+    if (b && b.leave) { delete Q.players[key]; await store.set('mm/q' + sq, Q); return { left: true }; }
+    const p = Q.players[key] || (Q.players[key] = { name: u.name, at: t }); p.seen = t; p.go = !!(b && b.go);
+    const list = Object.values(Q.players).sort((a, c) => a.at - c.at);
+    let M = null;
+    if (list.length && (list.every(x => x.go) || t - list[0].at >= MM_WAIT || list.length >= (MM_SPOTS[sq] || 20))) {
+      const members = list.slice(0, MM_SPOTS[sq] || 20).map(x => x.name), id = crypto.randomBytes(6).toString('hex');
+      M = { id, squad: sq, host: members[0], members, at: t, code: null };
+      await store.set('mm/m/' + id, M); for (const n of members) { await store.set('mm/u/' + n.toLowerCase(), id); delete Q.players[n.toLowerCase()]; }
+    }
+    await store.set('mm/q' + sq, Q);
+    return mmView(u, Q, M && M.members.includes(u.name) ? M : null);
+  }
+  async function mmCode(u, b) {
+    const M = await mmMine(u); if (!M || M.host !== u.name) bad('Not your match.', 403);
+    const code = String((b && b.code) || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12); if (!code) bad('No code.');
+    M.code = code; await store.set('mm/m/' + M.id, M); return { ok: true };
+  }
+  async function mmDone(u) { await store.del('mm/u/' + u.name.toLowerCase()); return { ok: true }; }   // (the game started, or they gave up on it)
+  async function mmCounts() { const out = {}; for (let sq = 1; sq <= 5; sq++) { const Q = await mmLoad(sq); out[sq] = Object.values(Q.players).filter(p => now() - p.seen <= MM_GONE).length; } return { counts: out }; }
   const canBR = u => !!(u && (u.adult || u.over16 || u.brOk));   // Volt Royale: 16 or over, or let in by an admin (v14)
 
   async function auth(headers) {
@@ -323,6 +359,8 @@ export function createApi(store, opts = {}) {
     'POST /register': (b) => register(b), 'POST /login': (b) => login(b),
     'POST /logout': async (b, q, h) => { const { tokenKey } = await auth(h); await store.del(tokenKey); return { ok: true }; },
     'GET /me': async (b, q, h) => { const { u } = await auth(h); return { user: me(u), prefs: u.prefs, progress: u.progress }; },
+    'POST /mm/poll': async (b, q, h) => mmPoll((await auth(h)).u, b), 'POST /mm/code': async (b, q, h) => mmCode((await auth(h)).u, b),
+    'POST /mm/done': async (b, q, h) => mmDone((await auth(h)).u), 'GET /mm/counts': async () => mmCounts(),
     'POST /password': async (b, q, h) => changePassword((await auth(h)).u, b), 'POST /email': async (b, q, h) => setEmail((await auth(h)).u, b),
     'POST /reset/request': (b) => requestReset(b), 'POST /reset/confirm': (b) => confirmReset(b),
     'PUT /prefs': async (b, q, h) => putPrefs((await auth(h)).u, b), 'PUT /progress': async (b, q, h) => putProgress((await auth(h)).u, b),

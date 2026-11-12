@@ -3,6 +3,99 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.2.24: more CPUs, and Fortnite-length storm stages
+
+- **Bigger Volt Royale matches.**
+  - **Public matches** have 32 spots (30 in Trios and Fives, so the teams come out even), and CPU carts fill whatever players don't.
+  - **On this screen**, the Carts setting goes up to 24, 32 and 40, and new players start on 24.
+  - Tested: a 40-cart game on a huge map runs at about 7 ms a game step on average, with peaks of 20 to 30 ms when a lot of CPUs land or plan routes at once.
+- **The storm takes its time, like Fortnite.** There are seven stages now, with long waits and slow closes:
+
+  | Stage | Waits | Closes over | Circle left |
+  | --- | --- | --- | --- |
+  | 1 | 2:30 | 2:00 | 62% of the map |
+  | 2 | 1:50 | 1:30 | 42% |
+  | 3 | 1:30 | 1:15 | 26% |
+  | 4 | 1:10 | 1:00 | 13% |
+  | 5 | 0:50 | 0:45 | 6% |
+  | 6 | 0:35 | 0:35 | 2% |
+  | 7 | 0:20 | 0:25 | nothing |
+
+  That's about 16 minutes in all on the huge maps (it was about 5). The older, smaller maps scale the times down (to 40% at the least), so a small map isn't a long wait. The CPUs plan around the same stages, and the storm still hurts more each stage.
+
+## v14.2.23: public match screen like Fortnite / Apex, matches as big as the carts
+
+- **The matchmaking screen works like Fortnite's and Apex's:**
+  - a MATCHMAKING timer counting up while you search;
+  - players found as a number out of the match's spots (for example **2 / 20**), with a row of pips that light up as players are found;
+  - no list of names;
+  - how many have pressed START NOW, and when the match will start at the latest.
+  - The buttons are START NOW and CANCEL.
+- **A match takes as many players as it has spots:** 20 carts (18 in Trios). It starts the moment the queue fills it; CPU carts fill whatever is left. (It was 10.) Online rooms made by matchmaking now take up to 20 players; ordinary rooms keep their 6.
+  - Every player's game is carried by the host's upload, so very full matches will lean on the host's connection.
+- **Pressing START NOW always reaches the server.** Before, a press made while the game was already checking in could be lost until the next check-in two seconds later.
+- **Server:** `/mm/poll` now returns counts (`count`, `ready`, `cap`) instead of names.
+
+## v14.2.22: Volt Royale public matchmaking (the online way to play Volt Royale)
+
+- **"Public match (find players online)" on the Volt Royale page.** Log in, pick **Solos, Duos, Trios, Squads (4) or Fives** with ◀ ▶, and you're queued with everyone else looking for that team size.
+- **The queue screen** shows how many people are queued and who they are (✓ means they've pressed START), how long until the match starts, and how many have pressed START.
+- **When a match starts:**
+  - straight away, as soon as **everyone queued presses START** (for the early days: one or two people can just go);
+  - otherwise **5 minutes after the first person queued**;
+  - or as soon as **10 people** are queued (the host's connection carries everyone, so a match takes up to 10 people);
+  - **CPU carts fill the rest:** 20 carts (18 in Trios).
+  - People in the same match fill squads together (like Fortnite's "fill"); CPUs make up the rest of each squad.
+- **How it works:** the first person queued hosts. Their game opens the room by itself and the server passes its code to everyone else, whose games join on their own. If the host never opens the room within 45 s, the others go back into the queue.
+- Volt Royale is 16+: under-16 accounts are turned away by the server too.
+- **Public matches are now the only way to play Volt Royale online:** "Host an online room" is gone from the Volt Royale page, and online rooms can no longer switch to Volt Royale. **"Play on this screen" is still there** for local Volt Royale with CPUs (and split screen).
+- **Server:**
+  - new routes `POST /api/mm/poll` (join, update, START, leave), `POST /api/mm/code` (the host posts the room code), `POST /api/mm/done` and `GET /api/mm/counts`;
+  - stored under `mm/` in Blobs;
+  - each match is kept under its own key, so two players checking in at the same moment can't lose it.
+
+## v14.2.21: Tactical layout fixes, no door-bash hint, dropped guns fly out
+
+- **With the Tactical controller layout, B is B again on the result screen.** B and R3 only swap while a match is being played. On the result screen (and every menu) the buttons are where they say, so HOLD B to leave really is B.
+- **The door prompt only says "X: open the door"** (or "X: shut the door"). The bash part is gone, because which button bashes depends on your layout.
+- "INVENTORY FULL" now says to open your bag to drop something, instead of naming a button.
+- **In Volt Royale, things you drop fly out of your cart:** a gun or item you drop from the bag, the one you swap out for something on the ground, and ammo you drop. Each one arcs up, tumbles, lands about 1.5 m away beside you and a little behind, and bounces, like loot spilling from a chest. It never lands in a wall, or off the floor when you're upstairs, and it can't be grabbed mid-air. It works online too.
+
+## v14.2.20: hold B to go back to the lobby after a game; touch result buttons fixed
+
+- **After a game, press and hold B (about 0.8 s) to go back to the lobby** (or to the room when you're hosting online). A red bar fills while you hold. A quick tap does nothing, so you can't leave by accident.
+  - If you were already holding B when the game ended (drifting at the whistle), let go first and then hold.
+  - The hold is timed in real time, so a slow frame rate doesn't stretch it.
+  - The "Back to the lobby" button on screen still works with one click or tap.
+  - The result screens say **HOLD B**.
+- **Fixed (from v14.2.17): the touch buttons on the result screen show AGAIN and HOLD: LOBBY again.** The line that labels them had been switched off by mistake.
+
+## v14.2.19: the scoreboard makes room for PRACTICE
+
+- The two scores now move out to make room for the word in the middle. PRACTICE, GOLDEN GOAL and the minigames' longer clocks no longer run into the score numbers. With a normal clock (5:00) they stay where they were.
+
+## v14.2.18: a right thumbstick for Volt Royale on touch screens; half turns in the corner in Volt Hockey
+
+- **Volt Royale on a touch screen has an aim stick on the right.** Push it up or down to tilt your gun, and left or right to aim and look to the side. While your thumb is on it you **aim down the sights**, like holding LT. Let go and the view swings back to straight ahead, just as with a gamepad's right stick.
+  - It replaces the AIM, AIM UP and AIM DOWN buttons.
+  - DRIFT (B) moved up so it no longer sits on the hotbar.
+- **Volt Hockey on a touch screen: the half turns are nearest the bottom-right corner**, with the bigger 90° TURN buttons further in.
+- Both are each game's starting spots. If you've moved a button yourself in the layout editor, it stays where you put it.
+
+## v14.2.17: touch controls tested in every game, and fixed
+
+**Every game was run on a phone-sized touch screen** (all 19 games: Volt Hockey, the minigames and Volt Royale). For each one: set it up and start it with only the touch buttons, drive with the stick, press every button, open the pause menu and close it again. There were no errors and no buttons overlapping.
+
+**Fixed:**
+- **Moving your buttons no longer reaches the menu behind.** While you're moving the touch buttons, the screen is dimmed and taps can't reach the menu underneath. Before, you could turn off touch controls by accident.
+- **Turning touch controls off and on again keeps you the same player.** Before, the game made a brand-new touch controller, so pressing START joined you a second time as player 2.
+- **Volt Hockey has the half-turn buttons back.** The two big buttons are now **90° TURN** (like RT and LT) and the two small ones are **HALF** turns (like RB and LB). Before, the big buttons did half turns and there were no 90° turns at all.
+- **Button names are easier to read:** bigger, bold, white on a dark tag.
+- **On the Controllers screen, a touch player joins straight onto a team.** Tap A and you're on the team with room (◀ ▶ still moves you). Pressing START before joining puts you on a team and starts the game. Before, A put you in "Not playing", and START with nobody joined started a CPU-only match.
+- **START plays straight away in every minigame's setup**, so you don't have to scroll down to "Play on this screen".
+- **Volt Royale gets a PING button** (next to the bag). The **MAP** button moved below the emote button, so it no longer covers GRAB.
+- **When a match is over, only AGAIN, LOBBY and pause are shown**, so the game buttons don't cover the results.
+
 ## v14.2.16: menu buttons for phones and tablets
 
 - **Every menu now has controller buttons on touch screens.** A small D-pad sits bottom left, and A (OK), B (BACK), X, Y and START sit bottom right. Before, on a phone there was no way to join, choose a side or start the game on the team and controller screens.

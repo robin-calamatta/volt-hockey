@@ -25,6 +25,10 @@ const BR_GUNS = {
   sniper: { name: 'SNIPER', dmg: 65, cd: 1.5, spd: 50, life: 1.6, spread: 0, ammo: 8, range: 40, col: 0xb28dff },
   rocket: { name: 'ROCKETS', dmg: 55, splash: 2.8, cd: 1.8, spd: 13, life: 2.4, spread: 0.02, ammo: 4, range: 20, col: 0xff4d4d }
 };
+/* v14.2.24 the storm, like Fortnite: long waits and slow closes (about 16 minutes in all on the huge maps), seven stages. [wait s, close s,
+   size left as a share of the map]. Smaller maps scale the times down (to 40% at most) so a little map isn't a long wait. */
+const BR_PHASES = [[150, 120, 0.62], [110, 90, 0.42], [90, 75, 0.26], [70, 60, 0.13], [50, 45, 0.06], [35, 35, 0.02], [20, 25, 0]];
+const brPhases = m => { const k = Math.max(0.4, Math.min(1, Math.min(m.width, m.height) / 520)); return m._ph && m._phK === k ? m._ph : (m._phK = k, m._ph = BR_PHASES.map(([w, s, f]) => [Math.round(w * k), Math.round(s * k), f])); };
 const BR_ITEMS = { med: { name: 'MEDKIT', icon: '➕', stack: 3, col: 0xff4d6a }, pot: { name: 'SHIELD POTION', icon: '🛡', stack: 3, col: 0x3d8bff }, boost: { name: 'BOOST', icon: '🚀', stack: 3, col: 0xffd23f }, wall: { name: 'SHIELD WALL', icon: '🧱', stack: 2, col: 0x7ff6ff } };
 const BR_LOOT = [['pistol', 5], ['smg', 4], ['shotgun', 4], ['rifle', 3], ['sniper', 1.5], ['rocket', 1], ['med', 3], ['pot', 3], ['boost', 2.5], ['wall', 2], ['ammo', 4]];
 const BR_TEAMCOL = [0x3dd6ff, 0xff4d6a, 0x7dff6a, 0xffd23f, 0xb28dff, 0xff9f1c, 0xffffff, 0xff7ad9, 0x39e0c0, 0xc9a26b, 0x8fa8ff, 0xd0ff4d];
@@ -159,7 +163,7 @@ MODES.br = {
     const order = m.chairs.slice().sort((a, b) => (b.player ? 1 : 0) - (a.player ? 1 : 0));   // people first, so friends on one screen share a team
     order.forEach((c, i) => { c.gs = { team: Math.floor(i / sq), lv: 0, z: 0, ramp: -1, air: 0, vz: 0, ap: 0, ads: 0, hp: BR.hp, sh: 0, inv: [], sel: 0, cd: 0, boost: 0, kills: 0, dmg: 0 }; });
     g.teams = Math.ceil(m.chairs.length / sq);
-    const R = Math.hypot(m.width, m.height) / 2 + 4; g.st = { x: m.width / 2, y: m.height / 2, r: R, fx: m.width / 2, fy: m.height / 2, fr: R, ph: 0, wait: 45, shrink: 0, sx: 0, sy: 0, sr: R };
+    const R = Math.hypot(m.width, m.height) / 2 + 4; g.st = { x: m.width / 2, y: m.height / 2, r: R, fx: m.width / 2, fy: m.height / 2, fr: R, ph: 0, wait: brPhases(m)[0][0], shrink: 0, sx: 0, sy: 0, sr: R };
     for (const [x, y, lv] of M.loot) this.drop(m, x, y, lv, Math.random() < 0.72 ? 'chest' : 'ammo');      // chests (guns) and ammo crates where the map puts loot
     for (let i = 0; i < 12; i++) { const p = this.freeGround(m); if (p) this.drop(m, p.x, p.y, 0, Math.random() < 0.6 ? 'chest' : 'ammo'); }
     for (let i = 0; i < 34; i++) { const p = this.freeGround(m); if (p) this.drop(m, p.x, p.y, 0, ['med', 'med', 'med', 'pot', 'pot', 'boost', 'wall'][Math.floor(Math.random() * 7)]); }   // health and items lying in the open
@@ -265,14 +269,14 @@ MODES.br = {
     const same = inv.find(it => it.k === k);
     if (BR_GUNS[k] && same) { if (same.a >= BR_GUNS[k].ammo * 2) return false; same.a = Math.min(BR_GUNS[k].ammo * 2, same.a + a); if (c.player) this.say(m, c, '+' + BR_GUNS[k].name + ' AMMO'); return true; }
     if (BR_ITEMS[k] && same && same.a < BR_ITEMS[k].stack) { same.a++; if (c.player) this.say(m, c, BR_ITEMS[k].name); return true; }
-    if (inv.length >= BR.slots) { if (c.player && !(G.fullAt > m.simTime)) { G.fullAt = m.simTime + 2; this.say(m, c, 'INVENTORY FULL: press B to drop something'); } return false; }
+    if (inv.length >= BR.slots) { if (c.player && !(G.fullAt > m.simTime)) { G.fullAt = m.simTime + 2; this.say(m, c, 'INVENTORY FULL: open your bag to drop something'); } return false; }
     inv.push({ k, a }); if (c.player) { m.sfx('select'); this.say(m, c, (BR_GUNS[k] || BR_ITEMS[k]).name); }
     if (!c.player) G.sel = this.bestSlot(c, 99);                         // the CPU holds its best gun
     return true;
   },
   say(m, c, t) { MG.notice(m, `${MG.up(m.name(c))}: ${t}`, 1.1); },
   storm(m, h) {                                                            // the storm circle: wait, then shrink towards a new, smaller circle inside it
-    const S = m.gs.st, PH = [[45, 25, 0.62], [30, 20, 0.42], [25, 18, 0.26], [20, 15, 0.12], [15, 12, 0.03], [8, 15, 0]];
+    const S = m.gs.st, PH = brPhases(m);
     if (S.ph >= PH.length) return;
     if (S.wait > 0) { S.wait -= h; if (S.wait <= 0) { const [, sh, f] = PH[S.ph], nr = f ? Math.max(1.5, Math.min(m.width, m.height) * f) : 0, a = Math.random() * Math.PI * 2, d = Math.random() * Math.max(0, S.r - nr) * 0.6; S.sx = S.x; S.sy = S.y; S.sr = S.r; S.fx = Math.max(nr * 0.5, Math.min(m.width - nr * 0.5, S.x + Math.cos(a) * d)); S.fy = Math.max(nr * 0.5, Math.min(m.height - nr * 0.5, S.y + Math.sin(a) * d)); S.fr = nr; S.shrink = sh; S.st = sh; MG.notice(m, 'THE STORM IS CLOSING IN!', 2); m.sfx('whistle'); } return; }
     S.shrink -= h; const k = 1 - Math.max(0, S.shrink) / S.st; S.x = S.sx + (S.fx - S.sx) * k; S.y = S.sy + (S.fy - S.sy) * k; S.r = S.sr + (S.fr - S.sr) * k;
@@ -448,7 +452,7 @@ MODES.br = {
   },
   hud(m) {
     const S = m.gs.st, live = MG.live(m), teams = new Set(live.map(c => c.gs.team)).size, sq = m.mini.squad || 1, t = Math.ceil(S.wait > 0 ? S.wait : Math.max(0, S.shrink));
-    return { clock: S.ph >= 6 ? 'FINAL' : `${S.wait > 0 ? '⏳' : '🌀'} ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, a: 'VOLT ROYALE', b: sq > 1 ? `${teams} TEAMS LEFT` : `${live.length} LEFT`, mid: S.wait > 0 ? 'Storm closes in' : 'THE STORM IS MOVING', left: MG.peopleLine(m, c => c.out ? 'OUT' : `❤${Math.ceil(c.gs.hp)} 🛡${Math.ceil(c.gs.sh)} ✖${c.gs.kills}`) };
+    return { clock: S.ph >= BR_PHASES.length ? 'FINAL' : `${S.wait > 0 ? '⏳' : '🌀'} ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, a: 'VOLT ROYALE', b: sq > 1 ? `${teams} TEAMS LEFT` : `${live.length} LEFT`, mid: S.wait > 0 ? 'Storm closes in' : 'THE STORM IS MOVING', left: MG.peopleLine(m, c => c.out ? 'OUT' : `❤${Math.ceil(c.gs.hp)} 🛡${Math.ceil(c.gs.sh)} ✖${c.gs.kills}`) };
   },
   tag(c, m, vp) {                                                          // your team-mates' names (enemies show nothing: no tags through walls)
     const me = vp && vp.p && vp.p.chair; if (c.out) return '';
@@ -478,4 +482,4 @@ GAME_INFO.br = { name: 'Volt Royale', cat: 'sneaky', noCarts: true, blurb: 'Loot
     'Switch item: LB / RB  /  Z / R or the mouse wheel  /  [ / ]  /  touch ◀ ITEM ▶', 
     'Bag (and the map): tap D-pad ▲  /  H  /  M  /  touch BAG.  Hold it for the emote wheel', 'Aim up and down: right stick  /  I and K  /  Page Up and Page Down  /  touch AIM UP / AIM DOWN', 'When you are out: LB / RB switch whose view you watch, ▼ first / third person, Y takes over a CPU team-mate', CTRL.pause],
   opts: [{ key: 'map', label: 'Map', values: ['downtown', 'jungle', 'port', 'suburbs', 'canyon'], names: ['Downtown', 'The Jungle', 'The Port', 'The Suburbs', 'The Canyon'], def: 'downtown', hint: () => (BR_MAPS[modeOpts('br').map] || BR_MAPS.downtown).blurb },
-    { key: 'squad', label: 'Teams', values: [1, 2, 3, 4, 5], names: ['Solo', 'Duos (teams of 2)', 'Trios (teams of 3)', 'Squads (teams of 4)', 'Fives (teams of 5)'], def: 1 }, { key: 'carts', label: 'Carts', values: [6, 8, 10, 12, 16, 20], def: 12, hint: 'Carts nobody drives are played by the CPU.' }, { key: 'music', label: 'Music', values: [0, 1], names: ['Off', 'On'], def: 0, hint: 'Game music while you play (your songs in assets/music/game/). Off by default.' }] };
+    { key: 'squad', label: 'Teams', values: [1, 2, 3, 4, 5], names: ['Solo', 'Duos (teams of 2)', 'Trios (teams of 3)', 'Squads (teams of 4)', 'Fives (teams of 5)'], def: 1 }, { key: 'carts', label: 'Carts', values: [6, 8, 10, 12, 16, 20, 24, 32, 40], def: 24, hint: 'Carts nobody drives are played by the CPU.' }, { key: 'music', label: 'Music', values: [0, 1], names: ['Off', 'On'], def: 0, hint: 'Game music while you play (your songs in assets/music/game/). Off by default.' }] };

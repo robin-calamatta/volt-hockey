@@ -204,7 +204,7 @@ class HostSession {
   guestsOf(owner) { return this.roster.filter(r => r.own === owner); }
   /* A local guest: another person on the same machine as a player, with a controller of their own. They get a cart and a roster entry, but share the owner's connection. */
   addGuest(owner, name, k, preferSide) {
-    if (this.state !== 'lobby' || this.roster.length >= CONFIG.online.maxPlayers || this.guestsOf(owner).length >= CONFIG.online.maxGuests) return null;
+    if (this.state !== 'lobby' || this.roster.length >= (this.mmFill ? 32 : CONFIG.online.maxPlayers) || this.guestsOf(owner).length >= CONFIG.online.maxGuests) return null;
     const side = preferSide !== undefined && this.count(preferSide) < this.cfg.sizes[preferSide] ? preferSide : this.openSide(); if (side === undefined) return null;
     const g = { id: this.nextId++, name: this.uniqueName(Settings.cleanName(name) || this.guestName(this.roster.map(r => r.name))), side, mid: !this.cfg.season, own: owner, guest: true, k: k || 0 };   // mid: still in the middle of the side picker (v13.6)
     this.roster.push(g); this.sendRoster(); return g;
@@ -244,7 +244,7 @@ class HostSession {
         return this.sendRoster();
       }
       const side = this.openSide();
-      if (this.roster.length >= CONFIG.online.maxPlayers || side === undefined) return this.reject(entry, 'full');
+      if (this.roster.length >= (this.mmFill ? 32 : CONFIG.online.maxPlayers) || side === undefined) return this.reject(entry, 'full');
       if (this.cfg.mini && this.cfg.mini.kind === 'br' && (+msg.psize || 1) > (this.cfg.mini.squad || 1)) return this.reject(entry, 'party-too-big');   // Volt Royale: your party plays as one squad
       entry.id = this.nextId++; clearTimeout(entry.hello);
       this.roster.push({ id: entry.id, name: this.uniqueName(Settings.cleanName(msg.name) || 'Player ' + (this.roster.length + 1)), side, mid: !this.cfg.season, look: Avatar.cleanLook(msg.look), party: cleanText(msg.party, 80), acct: cleanText(msg.acct, 20), adult: !!msg.adult, vid: cleanText(msg.vid, 80) });
@@ -306,7 +306,7 @@ class HostSession {
 
   /* ---- in a match ---- */
   start(localSource) {                                           // returns the Match; call from the host's room screen
-    const players = this.roster.map((r, i) => ({ id: r.id, name: r.name, side: r.side, locked: !!r.lock, tag: 'P' + (i + 1), speedLevel: Settings.speedLevel, chair: null, spinQueued: 0, look: r.host ? null : r.look || null, squadKey: r.host ? (typeof Party !== 'undefined' && Party.active ? 'party:' + Party.id : null) : r.party ? 'party:' + r.party : null,
+    const players = this.roster.map((r, i) => ({ id: r.id, name: r.name, side: r.side, locked: !!r.lock, tag: 'P' + (i + 1), speedLevel: Settings.speedLevel, chair: null, spinQueued: 0, look: r.host ? null : r.look || null, squadKey: this.mmFill ? 'mm' : r.host ? (typeof Party !== 'undefined' && Party.active ? 'party:' + Party.id : null) : r.party ? 'party:' + r.party : null,
       remote: !(r.host || r.own === 1), src: r.host ? localSource : r.own === 1 ? this.guestSrc.get(r.id) : { ax: 0, ay: 0, pressed: {} } }));
     for (const e of this.entries.values()) e.players = new Map(players.filter(p => p.id === e.id || (this.roster.find(r => r.id === p.id) || {}).own === e.id).map(p => [p.id, p]));
     if (this.cfg.mini) { this.cfg.sizesRoom = this.cfg.sizesRoom || this.cfg.sizes; this.cfg.sizes = fitSizes(this.cfg.mini, players, this.cfg.sizesRoom); }   // no CPU carts: just the people in the room
