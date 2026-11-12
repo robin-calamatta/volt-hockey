@@ -86,7 +86,7 @@
   M.move = function (m, c, h) {
     const G = c.gs, was = G.ramp, r = was >= 0 ? this.map(m).ramps[was] : null; mv.call(this, m, c, h);
     if (r && r.kick && G.ramp === -1 && !G.air && G.lv === r.lv + 1 && !this.floorAt(this.map(m), G.lv, c.x, c.y)) {
-      const sp = Math.hypot(c.vx, c.vy); G.air = 1; G.vz = Math.min(7.5, 2.5 + sp * 0.75); G.kickJ = 1; G.ramp = -1; if (c.player) { m.sfx('drift'); this.say && this.say(m, c, sp > 5 ? 'SEND IT!' : 'HOP!'); }
+      const sp = Math.hypot(c.vx, c.vy); G.air = 1; G.vz = Math.min(7.5, 2.5 + sp * 0.75); G.kickJ = 1; G.ramp = -1; if (c.player) { this.psfx(m, c, 'drift'); this.say && this.say(m, c, sp > 5 ? 'SEND IT!' : 'HOP!'); }
     }
   };
   M.land = function (m, c, z) { const G = c.gs; if (G.kickJ) { G.kickJ = 0; G.vz = Math.max(G.vz, -BR.fallSafe); } return land.call(this, m, c, z); };

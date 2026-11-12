@@ -237,7 +237,7 @@ Object.assign(GameScene.prototype, {
     this.scoreA.setText(H.sa).setColor('#ffffff'); this.scoreB.setText(H.sb).setColor('#ffffff');
     this.shotsA.setText(H.left).setColor('#e8eef2'); this.shotsB.setText(H.right).setColor('#e8eef2'); this.penA.setText(''); this.penB.setText(''); this.ppText.setText(H.mid).setColor('#9fb2bf');
     if (!this.itemText || !this.itemText.scene) this.itemText = this.add.text(CONFIG.view.width / 2, CONFIG.view.height - 92, '', { fontFamily: FONT, fontSize: '26px', fontStyle: 'bold', color: '#ffe27a', backgroundColor: '#0d151bb3', padding: { x: 12, y: 4 } }).setOrigin(0.5).setDepth(30);
-    const mine = (this.setup.players || []).filter(p => !p.remote && p.chair), one = this.flat || !this.vps || this.vps.length < 2;
+    const mine = this.brMine(), one = this.flat || !this.vps || this.vps.length < 2;
     const txt = mine.map(p => { const l = this.itemLine(p); return l ? (mine.length > 1 ? `${p.name || p.tag}: ${l}` : l) : ''; }).filter(Boolean).join('     ');
     this.itemText.setText(one && m.state === 'play' ? txt : '').setVisible(!!txt && one && m.state === 'play');
   },

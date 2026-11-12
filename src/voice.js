@@ -28,7 +28,9 @@ const Voice = {
   async sync() {
     const want = this.channel().filter(p => this.allowed(p)), on = this.mode() !== 'off' && this.supported() && Account.loggedIn && want.length > 0;
     if (!on) { this.hangUpAll(); if (!this.testing) this.closeMic(); return; }
-    try { await this.ensurePeer(); if (this.mode() !== 'mute') await this.ensureMic(); else if (!this.testing) this.closeMic(); } catch (e) { this.lastError = e.message || String(e); return; }
+    try { await this.ensurePeer(); } catch (e) { this.lastError = e.message || String(e); return; }
+    /* v14.2.25: no microphone (refused, or none) no longer means no voice at all: you still hear everyone (you send silence) */
+    if (this.mode() !== 'mute') { try { await this.ensureMic(); } catch (e) { this.lastError = e.message || String(e); if (!this.micWarned) { this.micWarned = true; Toasts.show('Voice chat: ' + esc(this.lastError) + ' You can still hear the others.', [], 5000); } } } else if (!this.testing) this.closeMic();
     this.wantIds = new Set(want.filter(p => p.vid).map(p => p.vid));                 // (someone without a voice id yet gets one in a moment and is called then)
     for (const [vid, c] of this.calls) if (!this.wantIds.has(vid)) this.hangUp(vid);
     for (const p of want) if (p.vid && !this.calls.has(p.vid) && this.id < p.vid) this.call(p.vid);      // the lower id rings, so each pair makes one call
@@ -38,7 +40,7 @@ const Voice = {
   ensurePeer() {
     if (this.peer && !this.peer.destroyed && this.id) return Promise.resolve();
     if (this.opening) return this.opening;
-    this.opening = new Promise((resolve, reject) => {
+    this.opening = Promise.resolve(Account.iceReady).then(() => new Promise((resolve, reject) => {   // (v14.2.25: after the relay servers are known)
       const id = CONFIG.online.roomPrefix + 'v-' + randomId(12), peer = new Peer(id, PEER_OPTS());
       peer.on('open', () => {
         this.peer = peer; this.id = id; this.opening = null; resolve();
@@ -47,7 +49,7 @@ const Voice = {
       peer.on('call', call => this.answer(call));
       peer.on('error', e => { if (!this.id) { this.opening = null; peer.destroy(); reject(e); } });
       peer.on('disconnected', () => { if (!peer.destroyed) peer.reconnect(); });
-    });
+    }));
     return this.opening;
   },
   outStream() { return this.nodes ? this.nodes.dest.stream : this.silent(); },
@@ -67,11 +69,20 @@ const Voice = {
   },
   play(vid, stream) {                                          // their voice: an audio element (so the chosen speaker and volume apply) plus a level meter
     const e = this.calls.get(vid); if (!e) return;
-    if (!e.el) { e.el = new Audio(); e.el.autoplay = true; }
-    e.el.srcObject = stream; this.applyVolumes(); this.applySpeaker(); e.el.play().catch(() => {});
+    /* v14.2.25: phones (iPhone Safari above all) won't start sound that isn't started by a tap. The element is now on the page, plays inline, and
+       if the browser says no it starts on your next tap or key press (with a note telling you so) */
+    if (!e.el) { e.el = document.createElement('audio'); e.el.autoplay = true; e.el.setAttribute('playsinline', ''); e.el.style.display = 'none'; document.body.append(e.el); }
+    e.el.srcObject = stream; e.el.muted = false; this.applyVolumes(); this.applySpeaker();
+    e.el.play().catch(() => this.needTap(e.el));
     try { const c = this.ctx(), src = c.createMediaStreamSource(stream), an = c.createAnalyser(); an.fftSize = 512; src.connect(an); e.an = an; } catch (x) { /* meters only */ }
   },
-  drop(vid, call) { const e = this.calls.get(vid); if (e && (!call || e.call === call)) { if (e.el) { e.el.srcObject = null; } this.calls.delete(vid); this.levels.delete(vid); } },
+  needTap(el) {
+    (this.blocked || (this.blocked = new Set())).add(el); if (this.tapHook) return;
+    this.tapHook = () => { Sound.resume(); for (const a of this.blocked) a.play().catch(() => {}); this.blocked.clear(); for (const ev of ['pointerdown', 'keydown', 'touchend']) document.removeEventListener(ev, this.tapHook, true); this.tapHook = null; };
+    for (const ev of ['pointerdown', 'keydown', 'touchend']) document.addEventListener(ev, this.tapHook, true);
+    Toasts.show('Tap the screen (or press any key) to hear voice chat.', [], 5000);
+  },
+  drop(vid, call) { const e = this.calls.get(vid); if (e && (!call || e.call === call)) { if (e.el) { e.el.srcObject = null; e.el.remove(); } this.calls.delete(vid); this.levels.delete(vid); } },
   hangUp(vid) { const e = this.calls.get(vid); if (e) { try { e.call.close(); } catch (x) { /* gone */ } this.drop(vid); } },
   hangUpAll() { for (const vid of [...this.calls.keys()]) this.hangUp(vid); },
 
@@ -119,7 +130,11 @@ const Voice = {
       this.levels.set(vid, this.level(e.an));
       const pc = e.call.peerConnection, ice = pc ? pc.iceConnectionState : '';                     // how each voice link is doing (shown in the friends panel)
       e.state = ice === 'connected' || ice === 'completed' ? 'connected' : ice === 'failed' || (ice !== 'connected' && performance.now() - e.at > 15000 && !e.el) ? 'failed' : 'connecting';
+      if (e.state === 'failed' && performance.now() - e.at > 20000) this.hangUp(vid);          // (v14.2.25: a link that failed is dropped, and rung again below)
     }
+    /* v14.2.25: every few seconds, ring anyone we should hear but aren't linked to. A call the other side turned down (their list hadn't caught up
+       yet) used to be the end of it until something else changed */
+    const t = performance.now(); if (t - (this.lastSync || 0) > 4000) { this.lastSync = t; if (Account.loggedIn && this.mode() !== 'off' && (Party.active || Online.current)) this.sync(); }
   },
   /* 'connected' | 'connecting' | 'failed' | 'blocked' (age / mute rules) | 'off' for a person in your party or room */
   statusOf(acct, vid) {

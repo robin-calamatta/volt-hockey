@@ -3,6 +3,52 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.3.0: online first, like Fortnite
+
+- **A switch on the game card: 🌐 ONLINE or 🏠 THIS SCREEN.** It sits just above the selected game in the lobby. Tap it, or press ◀ ▶ on the PLAY tab. ONLINE is the default, and the game remembers your choice.
+- **ONLINE: PLAY goes straight into matchmaking.** There is no team screen and nothing to edit first. ▼ shows the online playlists:
+  | Playlist | What it is | Players | Starts |
+  | --- | --- | --- | --- |
+  | **Volt Royale** | Public match, Solos to Fives (◀ ▶ on the search screen) | 32 (30 in Trios and Fives) | When it's full, when everyone presses START NOW, or after 5 minutes |
+  | **Volt Hockey** | Quick match, 3 v 3 | 6 | When it's full, when everyone presses START NOW, or after 1 minute |
+  | **Minigame Mix** | A different minigame each match | Up to 8 | Same as Volt Hockey |
+  | **Private Room** | Make a room for friends (share its code), or join one | Up to 6 | When the host starts |
+
+  CPUs fill every empty spot.
+- **Your party and local players come with you.**
+  - **Party:** the leader presses PLAY and the whole party queues as one group, taking as many spots as it has people. If someone else ends up hosting the match, your party still follows you into it.
+  - **Local players** on your screen come along too.
+- **THIS SCREEN** keeps everything as before: Volt Hockey with team picking, Volt Royale, any minigame, seasons and practice, against the CPU or with players on your screen.
+- **Not logged in?** PLAY on ONLINE offers to log you in, or you can switch to THIS SCREEN. The search screen also has a LOG IN / SIGN UP button, and joins the queue as soon as you're logged in.
+- **Server:** `/mm/poll` takes `mode` (`br`, `hockey` or `mini`), `n` (spots your group needs) and `accts` (accounts in your group). Volt Royale keeps its old queues, so older versions still match with this one.
+- **Tested:** two accounts queued online for each playlist and landed in the same match:
+  - Volt Hockey: 3 v 3, one player on each side
+  - Minigame Mix: Manhunt with 6 carts
+  - Volt Royale: 32 carts
+
+## v14.2.25: party guests in Volt Royale, and voice chat
+
+- **A guest's screen shows their own cart.** On a guest's screen, Volt Royale picked "your" cart from the host's player list. So the hotbar came up empty, the crosshair was missing, and some panels followed the leader's cart instead. Now every part of the guest's screen uses the cart the host gave them:
+  - the hotbar, crosshair and health
+  - the bag, the map and the markers
+  - the kill-feed colours and the result screen
+- **Your messages and sounds are only yours.** Messages like "ROBIN: CHEST OPENED" and "OUT OF AMMO", and the pick-up sounds, used to go to everyone in the match. That is why guests saw everything the party leader picked up. Now each one only shows and plays on the screen of the player it happened to.
+- **The stats line under the clock** only shows your own eliminations. It used to list everyone in the match.
+- **Much less data for guests, so less lag.**
+  - **Before:** a snapshot was 7 to 14 KB, 30 times a second. On a phone, or through a relay (TURN) server, guests fell behind. The host then skipped them, which caused the stutter.
+  - **Now:** about 2 to 3 KB, still 30 times a second:
+    - the carts' state goes whole twice a second, with only what changed in between
+    - the loot goes in smaller pieces
+    - picked-up items are named one by one, instead of the full 1,300-item list every few snapshots
+    - doors only go when they change
+  - Tested with two players online: the guest's loot matches the host's item for item.
+- **Voice chat fixes.**
+  - If a microphone can't be opened, you still hear everyone (listen-only), and a message says so.
+  - Phones that block sound until you touch the screen now play voices after your next tap.
+  - Calls that never connect are retried.
+  - The relay (TURN) settings load before voice starts, so calls between a phone and a PC can get through.
+  - **Note:** voice only connects when both accounts are 18+, or when the two players are friends.
+
 ## v14.2.24: more CPUs, and Fortnite-length storm stages
 
 - **Bigger Volt Royale matches.**

@@ -132,7 +132,7 @@ Object.assign(BR_COLS, { seat: 0x2f5fa8, stone: 0x9a948a, hangar: 0xc8ced4, silo
     if (!X.g3 || !X.g3.scene) { X.g3 = this.add.graphics().setDepth(33); X.nums = []; X.marks = []; X.storm = this.add.text(V.width / 2, 170, '', { fontFamily: FONT, fontSize: '54px', fontStyle: 'bold', color: '#ffffff', stroke: '#3a0a6a', strokeThickness: 9, align: 'center' }).setOrigin(0.5).setDepth(36); X.storm2 = this.add.text(V.width / 2, 222, '', { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: '#e6d4ff', stroke: '#1a0533', strokeThickness: 5 }).setOrigin(0.5).setDepth(36); }
     const G3 = X.g3; G3.clear(); let ni = 0, mi = 0;
     const T = (list, i, size) => list[i] || (list[i] = this.add.text(0, 0, '', { fontFamily: FONT, fontSize: size, fontStyle: 'bold', color: '#ffffff', stroke: '#0d151b', strokeThickness: 5, align: 'center' }).setOrigin(0.5).setDepth(34));
-    const mine = (this.setup.players || []).filter(p => !p.remote && p.chair).map(p => p.chair); if (this.online && this.brMyChair) { const c = this.brMyChair(); if (c && !mine.includes(c)) mine.push(c); }
+    const mine = this.brMine().map(p => p.chair); if (this.online && this.brMyChair) { const c = this.brMyChair(); if (c && !mine.includes(c)) mine.push(c); }
     const myK = new Set(mine.map(c => c.k)), me = mine[0], vp = this.vps && this.vps[0];
     if (this.v3 && !this.flat && vp && m.state === 'play') {
       for (const o of g.objs || []) { if (o.t !== 'dn' || !myK.has(o.by)) continue;           // the damage you did, over whoever you hit
@@ -176,7 +176,7 @@ Object.assign(BR_COLS, { seat: 0x2f5fa8, stone: 0x9a948a, hangar: 0xc8ced4, silo
   P.showMiniResult = function () {
     const m = this.match, R = m.result; if (this.result || m.kind !== 'br' || !R || !R.br) return show.call(this);
     const V = CONFIG.view, cx = V.width / 2, o = this.online, items = [], add = x => { items.push(x); return x; }, T = (x, y, str, st) => add(this.add.text(x, y, str, { fontFamily: FONT, ...st }).setOrigin(0.5).setDepth(41));
-    const mine = (this.setup.players || []).filter(p => !p.remote && p.chair).map(p => p.chair); if (o && this.brMyChair) { const c = this.brMyChair(); if (c && !mine.includes(c)) mine.push(c); }
+    const mine = this.brMine().map(p => p.chair); if (o && this.brMyChair) { const c = this.brMyChair(); if (c && !mine.includes(c)) mine.push(c); }
     const myTeam = mine.length ? mine[0].gs.team : R.br.stats[0].team, place = R.br.place[myTeam] || R.br.teams, won = place === 1, sq = m.mini.squad || 1;
     this.overAt = this.time.now;
     add(this.add.rectangle(cx, V.height / 2, V.width, V.height, 0x0d151b, 0.7).setDepth(39));

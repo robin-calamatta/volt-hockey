@@ -137,7 +137,7 @@ Object.assign(View3D.prototype, {
   P.drawFloor = function (back, wood, gr) { const m = this.match; if (m && m.kind === 'br') { const T = MODES.br.map(m).theme; back.fillStyle(T.ground, 1).fillRect(-30, -30, m.width + 60, m.height + 60); return; } return floor.call(this, back, wood, gr); };
   P.drawMode2D = function (g, under) {
     const m = this.match; if (m.kind !== 'br') return d2.call(this, g, under);
-    const M = MODES.br.map(m), s = m.gs, t = this.time.now / 1000, me = (this.setup.players || []).map(p => p.chair).filter(Boolean)[0], myLv = me ? me.gs.lv : 0;
+    const M = MODES.br.map(m), s = m.gs, t = this.time.now / 1000, me = (this.brMine()[0] || {}).chair, myLv = me ? me.gs.lv : 0;
     if (under) {
       for (const w of M.walls) if (w.lv === 0) g.fillStyle(BR_COLS[w.kind] || 0xb8b2a6, 1).fillRect(w.x0, w.y0, w.x1 - w.x0, w.y1 - w.y0);
       for (const tr of M.trees) g.fillStyle(0x2f6b2a, 1).fillCircle(tr.x, tr.y, tr.r * 2.2);
@@ -191,7 +191,7 @@ function brDrawIcon(c, k) {
 Object.assign(GameScene.prototype, {
   brIcon(k) { const key = 'bricon-' + k; if (!this.textures.exists(key)) { const cv = document.createElement('canvas'); cv.width = 128; cv.height = 72; brDrawIcon(cv.getContext('2d'), k); this.textures.addCanvas(key, cv); } return key; },
   brHud(m) {
-    const mine = (this.setup.players || []).filter(p => !p.remote && p.chair), one = !this.vps || this.vps.length < 2, c = mine[0] && mine[0].chair;
+    const mine = this.brMine(), one = !this.vps || this.vps.length < 2, c = mine[0] && mine[0].chair;
     const show = one && c && !c.out && m.state !== 'over';
     if (!this.brH || !this.brH.g.scene) {
       const V = CONFIG.view, g = this.add.graphics().setDepth(30), slots = [];
@@ -227,7 +227,7 @@ Object.assign(GameScene.prototype, {
 /* ===== v11.2: crosshair, hit markers, damage flash, kill feed, spectating, the storm on the minimap, and the inventory screen (B) ===== */
 Object.assign(GameScene.prototype, {
   brExtras(m) {
-    const V = CONFIG.view, g = m.gs, mine = (this.setup.players || []).filter(p => !p.remote && p.chair), p0 = mine[0] || (this.online ? { chair: this.brMyChair() } : null), c = p0 && p0.chair;
+    const V = CONFIG.view, g = m.gs, mine = this.brMine(), p0 = mine[0] || (this.online ? { chair: this.brMyChair() } : null), c = p0 && p0.chair;
     if (!this.brX || !this.brX.g.scene) this.brX = { g: this.add.graphics().setDepth(29), feed: Array.from({ length: 5 }, () => this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '15px', fontStyle: 'bold', color: '#ffffff', backgroundColor: '#0d151bb0', padding: { x: 6, y: 2 } }).setOrigin(1, 0).setDepth(31)), spec: this.add.text(V.width / 2, 108, '', { fontFamily: FONT, fontSize: '20px', fontStyle: 'bold', color: '#ffd23f', backgroundColor: '#0d151bc0', padding: { x: 10, y: 4 } }).setOrigin(0.5).setDepth(31) };
     const X = this.brX, G2 = X.g; G2.clear();
     const feed = (g.feed || []).filter(f => g.t - f[3] < 7);                 // the kill feed, under the minimap
@@ -247,6 +247,9 @@ Object.assign(GameScene.prototype, {
     if (G.hitT > 0) { const k = G.hitT / 0.25 * 0.35; G2.fillStyle(0xff2a2a, k).fillRect(0, 0, V.width, 24).fillRect(0, V.height - 24, V.width, 24).fillRect(0, 0, 24, V.height).fillRect(V.width - 24, 0, 24, V.height); }   // you were hit
     if (G.hp < 30) G2.lineStyle(10, 0xff2a2a, 0.15 + 0.1 * Math.sin(this.time.now / 150)).strokeRect(5, 5, V.width - 10, V.height - 10);
   },
+  /* v14.2.25: the carts played on THIS screen. An online guest's list of players has everyone in it, without their carts filled in, so the guest's
+     hotbar, crosshair, bag, map and markers all came up empty: for a guest it's the cart the host gave them */
+  brMine() { const o = this.online; if (o && o.role === 'client') { const c = this.brMyChair(); return c ? [{ chair: c, remote: false, id: c.player && c.player.id }] : []; } return (this.setup.players || []).filter(p => !p.remote && p.chair); },
   brMyChair() { const o = this.online, m = this.match; if (!o) return null; const id = o.role === 'host' ? (o.me && o.me.id) : o.session.myId; return m.chairs.find(c => c.player && c.player.id === id) || null; },
   openInventory(p) {
     if (this.scene.isActive('BRInv')) return; const m = this.match, M = modeOf(m), o = this.online, chair = p.chair;

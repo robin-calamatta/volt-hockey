@@ -113,7 +113,7 @@ Object.assign(GameScene.prototype, {
 });
 { const P = GameScene.prototype, extras = P.brExtras, hud = P.brHud;
   P.brExtras = function (m) {
-    extras.call(this, m); const mine = (this.setup.players || []).filter(p => !p.remote && p.chair), p0 = mine[0] || (this.online ? { chair: this.brMyChair() } : null), c = p0 && p0.chair, vp = this.vps && this.vps.length === 1 ? this.vps[0] : null, X = this.brX;
+    extras.call(this, m); const mine = this.brMine(), p0 = mine[0] || (this.online ? { chair: this.brMyChair() } : null), c = p0 && p0.chair, vp = this.vps && this.vps.length === 1 ? this.vps[0] : null, X = this.brX;
     this.brTeamPanel(m, c, c && c.out && vp ? vp.spect : null);
     if (c && c.out) { const s = vp && vp.spect, cpuMate = s && !s.player && s.gs.team === c.gs.team; X.spec.setText(s ? `ELIMINATED  -  watching ${m.name(s)}     LB / RB: switch     ▼: 1st / 3rd person${cpuMate ? '     Y: TAKE OVER this cart' : ''}` : 'ELIMINATED').setVisible(m.state !== 'over'); }
     if (X.prompt) X.prompt.setVisible(false);
@@ -121,7 +121,7 @@ Object.assign(GameScene.prototype, {
     /* (the touch buttons' names come from TouchPad.profile in touch.js) */
   };
   P.brHud = function (m) {
-    const r = hud.call(this, m); if (!r) return r; const H = this.brH, c = ((this.setup.players || []).filter(p => !p.remote && p.chair)[0] || {}).chair; if (!c) return r; const G = c.gs;
+    const r = hud.call(this, m); if (!r) return r; const H = this.brH, c = (this.brMine()[0] || {}).chair; if (!c) return r; const G = c.gs;
     for (let i = 0; i < BR.slots; i++) { const it = brSlotItem(G, i), s = H.slots[i]; if (!it) continue; const gun = BR_GUNS[it.k]; if (gun) s.txt.setText(`${it.a}/${G.am[BR_AMMO[gun.type].i]}`).setColor(it.a <= 0 ? '#ff6b6b' : '#ffffff'); s.img.setAlpha(G.hol ? 0.45 : gun && it.a <= 0 && G.am[BR_AMMO[gun.type].i] <= 0 ? 0.35 : s.sel ? 1 : 0.6); }
     const it = G.inv[G.sel], gun = it && BR_GUNS[it.k];
     H.name.setText(G.down ? '' : G.hol || !it ? (G.inv.length ? 'Hands free: driving faster    Y: take your item out' : 'Empty-handed: drive into a CHEST for a gun') : `${(gun || BR_ITEMS[it.k]).name}${gun ? `  ${it.a}/${gun.mag}` : ''}    RT ${gun ? 'fire' : 'use'} · LT ${gun ? 'aim' : BR_ITEMS[it.k].heal ? 'heal a team-mate' : 'aim'} · X reload · Y put away · A jump`);
@@ -138,7 +138,7 @@ Object.assign(GameScene.prototype, {
     mm.call(this); const m = this.match; if (m.kind !== 'br' || !m.gs || !this.mapG) return;
     const g = this.mapG, Mm = CONFIG.view3d.minimap, C = CONFIG.court, B = CONFIG.courtBase || C, fit = Math.min(1, B.width / C.width, B.height / C.height), s = Mm.scale * fit, ox = Mm.x + (B.width - C.width * fit) * Mm.scale, oy = Mm.y, M = MODES.br.map(m);
     (M.rez || []).forEach((q, i) => g.fillStyle(m.gs.gar && m.gs.gar[i] > m.gs.t ? 0xff4d4d : 0x7dff6a, 1).fillRect(ox + q.cx * s - 2.5, oy + q.cy * s - 2.5, 5, 5));
-    const me = ((this.setup.players || []).find(p => p.chair) || {}).chair || (this.online && this.brMyChair());
+    const me = (this.brMine()[0] || {}).chair;
     if (me) for (const o of m.chairs) if (o !== me && !o.out && o.gs.team === me.gs.team) g.fillStyle(o.gs.down ? 0xff4d4d : 0x3dd6ff, 1).fillCircle(ox + o.x * s, oy + o.y * s, 3);
     for (const L of m.gs.L || []) if (L[1] === 'card' && me && m.chairs[L[5]] && m.chairs[L[5]].gs.team === me.gs.team) g.fillStyle(0xffd23f, 1).fillRect(ox + L[2] * s - 2, oy + L[3] * s - 3, 4, 6);
   };

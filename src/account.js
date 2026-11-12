@@ -45,8 +45,10 @@ const Account = {
     }
     this.ready = true; this.emit();
     try { addEventListener('pagehide', () => this.flush()); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') this.flush(); }); } catch (e) { /* no page events */ }
-    this.loadIce();
-    if (this.loggedIn && typeof Social !== 'undefined') Social.start();
+    /* v14.2.25: the relay (TURN) servers are fetched first, then the party / voice connections are made: made before, they had no relay, so a
+       phone on mobile data (which usually needs one) could never connect voice */
+    this.iceReady = Promise.race([this.loadIce(), new Promise(r => setTimeout(r, 3000))]);
+    if (this.loggedIn && typeof Social !== 'undefined') this.iceReady.then(() => Social.start());
   },
   persist() { try { localStorage.setItem(this.key, JSON.stringify(this.loggedIn ? { token: this.token, user: this.user } : null)); } catch (e) { /* storage blocked */ } },
   dropLogin() { this.token = null; this.user = null; this.persist(); if (typeof Social !== 'undefined') Social.stop(); this.emit(); },

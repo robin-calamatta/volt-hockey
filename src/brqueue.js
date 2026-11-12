@@ -11,15 +11,27 @@ const BRQ = {
   preset(sq, n) {
     const carts = this.carts[sq] || 20, mini = { ...miniCfg('br'), squad: sq, carts };
     return { mini, sizes: miniSizes(carts), teamA: Settings.teamA, teamB: Settings.teamB, difficulty: Settings.difficulty, practice: true, autoStart: Math.max(1, n) };
-  }
+  },
+  /* v14.3: the other online playlists */
+  modes: { br: { name: 'VOLT ROYALE', sub: 'PUBLIC MATCH', col: '#c44dff' }, hockey: { name: 'VOLT HOCKEY', sub: 'QUICK MATCH  ·  3 V 3', col: '#19c3ff' }, mini: { name: 'MINIGAME MIX', sub: 'A DIFFERENT MINIGAME EACH MATCH', col: '#ff9a3c' } },
+  mixKinds() { return MINI_KINDS().filter(k => !['br', 'timetrial'].includes(k) && GAME_INFO[k]); },
+  presetFor(mode, M) {
+    const n = Math.max(1, (M && M.accts) || (M && M.members && M.members.length) || 1), base = { teamA: Settings.teamA, teamB: Settings.teamB, difficulty: Settings.difficulty, autoStart: n };
+    if (mode === 'hockey') return { ...base, practice: false, sizes: [3, 3] };
+    if (mode === 'mini') { const ks = this.mixKinds(), k = ks[Math.floor(Math.random() * ks.length)] || 'race'; return { ...base, practice: true, mini: miniCfg(k), sizes: miniSizes(cartsFor(k)) }; }
+    return this.preset(M.squad || 1, n);
+  },
+  /* how many spots you take: you, the players on your screen, and your party (if you lead one) */
+  people() { return 1 + (typeof Locals !== 'undefined' ? Locals.live().length : 0) + (Party.role === 'leader' ? Party.others().length : 0); },
+  accts() { return Party.role === 'leader' ? Party.members.length : 1; }
 };
 class BRQueueScene extends Phaser.Scene {
   constructor() { super('BRQueue'); }
-  init(data) { this.squad = (data && data.squad) || (modeOpts('br') || {}).squad || 1; this.go = false; this.view = null; this.busy = false; this.lastPoll = 0; this.err = ''; this.leaving = false; this.matchSeen = 0; }
+  init(data) { this.mode = (data && data.mode) || 'br'; this.squad = (data && data.squad) || (modeOpts('br') || {}).squad || 1; this.go = false; this.view = null; this.busy = false; this.lastPoll = 0; this.err = ''; this.leaving = false; this.matchSeen = 0; }
   create() {
     const V = CONFIG.view, cx = V.width / 2, T = (y, s, o = {}) => this.add.text(cx, y, s, { fontFamily: FONT, fontSize: '26px', color: '#ffffff', align: 'center', ...o }).setOrigin(0.5);
     this.cameras.main.setBackgroundColor('#0b141b');
-    T(70, 'VOLT ROYALE  ·  PUBLIC MATCH', { fontSize: '46px', fontStyle: 'bold', color: '#19c3ff' });
+    const MD = BRQ.modes[this.mode] || BRQ.modes.br; T(70, `${MD.name}  ·  ${this.mode === 'br' ? 'PUBLIC MATCH' : 'ONLINE'}`, { fontSize: '46px', fontStyle: 'bold', color: MD.col });
     this.sizeT = T(132, '', { fontSize: '30px', fontStyle: 'bold' });
     this.mmT = T(196, 'MATCHMAKING', { fontSize: '30px', fontStyle: 'bold', color: '#9fb3c2' });   // v14.2.23: laid out like Fortnite's and Apex's matchmaking: a search timer and players found, no names
     this.countT = T(250, '', { fontSize: '64px', fontStyle: 'bold', color: '#f2c200' });
@@ -27,40 +39,40 @@ class BRQueueScene extends Phaser.Scene {
     this.subT = T(390, '', { fontSize: '24px', color: '#9fb3c2' });
     this.listT = T(430, '', { fontSize: '22px', color: '#9fb3c2' });
     this.timeT = T(510, '', { fontSize: '26px', fontStyle: 'bold' });
-    this.helpT = T(552, 'START NOW: when everyone searching has pressed it, the match starts right away and CPU carts fill the empty spots.\nOtherwise it starts when the match is full, or 5 minutes after the first player started searching.', { fontSize: '20px', color: '#9fb3c2' });
+    this.helpT = T(552, `START NOW: when everyone searching has pressed it, the match starts right away and CPU carts fill the empty spots.\nOtherwise it starts when the match is full, or ${this.mode === 'br' ? '5 minutes' : '1 minute'} after the first player started searching.`, { fontSize: '20px', color: '#9fb3c2' });
     this.goB = tapButton(this, cx - 150, 630, 270, 'START NOW', () => this.toggleGo());
     tapButton(this, cx + 150, 630, 270, 'CANCEL', () => this.leave());
-    tapButton(this, cx - 330, 132, 70, '◀', () => this.size(-1)); tapButton(this, cx + 330, 132, 70, '▶', () => this.size(1));
-    if (!Account.loggedIn) { this.err = 'Log in to play public matches.'; }
-    else if (typeof brAllowed === 'function' && !brAllowed()) { this.err = 'Volt Royale is for players 16 and over.'; }
+    if (this.mode === 'br') { tapButton(this, cx - 330, 132, 70, '◀', () => this.size(-1)); tapButton(this, cx + 330, 132, 70, '▶', () => this.size(1)); }
+    if (!Account.loggedIn) { this.err = 'Log in to play online.'; tapButton(this, cx, 470, 330, 'LOG IN / SIGN UP', () => FriendsBar.toggle(true)); }
+    else if (this.mode === 'br' && typeof brAllowed === 'function' && !brAllowed()) { this.err = 'Volt Royale is for players 16 and over.'; }
     this.events.once('shutdown', () => { this.stopped = true; });
     this.poll(); this.draw();
   }
-  size(d) { if (this.go || this.matchSeen) return; const i = BRQ.sizes.indexOf(this.squad); const old = this.squad; this.squad = BRQ.sizes[(i + d + BRQ.sizes.length) % BRQ.sizes.length]; Sound.play('blip');
-    Account.req('POST', '/mm/poll', { squad: old, leave: true }).catch(() => {}); this.view = null; this.poll(true); }
+  size(d) { if (this.go || this.matchSeen || this.mode !== 'br') return; const i = BRQ.sizes.indexOf(this.squad); const old = this.squad; this.squad = BRQ.sizes[(i + d + BRQ.sizes.length) % BRQ.sizes.length]; Sound.play('blip');
+    Account.req('POST', '/mm/poll', { squad: old, mode: this.mode, leave: true }).catch(() => {}); this.view = null; this.poll(true); }
   toggleGo() { if (this.err || this.matchSeen) return; this.go = !this.go; Sound.play(this.go ? 'select' : 'back'); this.poll(true); this.draw(); }
-  leave() { if (this.leaving) return; this.leaving = true; Sound.play('back'); if (!this.err) Account.req('POST', '/mm/poll', { squad: this.squad, leave: true }).catch(() => {}); this.scene.start('MiniSetup', { kind: 'br' }); }
+  leave() { if (this.leaving) return; this.leaving = true; Sound.play('back'); if (!this.err) Account.req('POST', '/mm/poll', { squad: this.squad, mode: this.mode, leave: true }).catch(() => {}); this.scene.start('Main'); }
   async poll(now) {
     if (this.err || this.stopped || this.leaving) return; if (this.busy) { if (now) this.again = true; return; } if (!now && this.time.now - this.lastPoll < 2000) return;
     this.busy = true; this.lastPoll = this.time.now;
-    try { const r = await Account.req('POST', '/mm/poll', { squad: this.squad, go: this.go }); if (this.stopped || this.leaving) return; this.view = r; this.offset = r.now ? r.now - Date.now() : 0; if (r.match) this.onMatch(r.match); }
+    try { const r = await Account.req('POST', '/mm/poll', { squad: this.squad, go: this.go, mode: this.mode, n: BRQ.people(), accts: BRQ.accts() }); if (this.stopped || this.leaving) return; this.view = r; this.offset = r.now ? r.now - Date.now() : 0; if (r.match) this.onMatch(r.match); }
     catch (e) { this.err = (e && e.message) || 'Could not reach the server.'; }
     finally { this.busy = false; this.draw(); if (this.again) { this.again = false; this.poll(true); } }
   }
   onMatch(M) {
     if (!this.matchSeen) { this.matchSeen = this.time.now; Sound.play('goal'); }
     if (M.you === 'host') {                                              // you host: open the room (the others join it when its code reaches them)
-      if (this.started) return; this.started = true; this.scene.start('Room', { role: 'host', preset: { ...BRQ.preset(M.squad || this.squad, M.members.length), mm: { id: M.id } } }); return; }
-    if (M.code && !this.started) { this.started = true; Account.req('POST', '/mm/done', {}).catch(() => {}); joinRoomFromAnywhere(M.code); return; }
+      if (this.started) return; this.started = true; this.scene.start('Room', { role: 'host', preset: { ...BRQ.presetFor(M.mode || this.mode, M), mm: { id: M.id } } }); return; }
+    if (M.code && !this.started) { this.started = true; Account.req('POST', '/mm/done', {}).catch(() => {}); if (Party.role === 'leader') Party.goRoom(M.code); joinRoomFromAnywhere(M.code); return; }   /* (your party comes with you) */
     if (this.time.now - this.matchSeen > 45000) { Account.req('POST', '/mm/done', {}).catch(() => {}); this.matchSeen = 0; this.go = false; Toasts.show('The host didn\'t open the match. Back in the queue.', [], 4000); }
   }
   draw() {
     const v = this.view, sq = this.squad;
-    this.sizeT.setText(`Teams:  ${BRQ.names[sq]}`);
+    this.sizeT.setText(this.mode === 'br' ? `Teams:  ${BRQ.names[sq]}` : (BRQ.modes[this.mode] || {}).sub || '');
     if (this.err) { this.countT.setText('—'); this.subT.setText(this.err); this.listT.setText(''); this.timeT.setText(''); return; }
     if (!v) { this.countT.setText('...'); this.subT.setText('Joining the queue'); return; }
     const mmss = ms => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`, cap = v.cap || 20;
-    if (this.matchSeen) { this.mmT.setText('MATCH FOUND'); this.countT.setText(v.match ? `${v.match.members.length} player${v.match.members.length > 1 ? 's' : ''}` : ''); this.subT.setText(v.match && v.match.you === 'host' ? 'You\'re hosting: opening the match...' : 'Joining the match...'); this.listT.setText(`+ ${Math.max(0, cap - (v.match ? v.match.members.length : 0))} CPU carts`); this.timeT.setText(''); this.drawPips(v.match ? v.match.members.length : 0, cap); return; }
+    if (this.matchSeen) { this.mmT.setText('MATCH FOUND'); { const k = v.match ? v.match.people || v.match.members.length : 0; this.countT.setText(v.match ? `${k} player${k > 1 ? 's' : ''}` : ''); } this.subT.setText(v.match && v.match.you === 'host' ? 'You\'re hosting: opening the match...' : 'Joining the match...'); this.listT.setText(`+ ${Math.max(0, cap - (v.match ? v.match.people || v.match.members.length : 0))} CPU carts`); this.timeT.setText(''); this.drawPips(v.match ? v.match.people || v.match.members.length : 0, cap); return; }
     this.mmT.setText(`MATCHMAKING   ${mmss(Date.now() - this.joinedAt)}`);
     this.countT.setText(`${v.count} / ${cap}`); this.subT.setText('players found'); this.drawPips(v.count, cap);
     this.listT.setText(v.count > 1 ? `${v.ready || 0} of ${v.count} pressed START NOW` : 'Press START NOW to play right away with CPU carts');
@@ -76,7 +88,8 @@ class BRQueueScene extends Phaser.Scene {
     Controls.update(this.game.loop.frame); const e = Controls.menu();
     if (e.b) return this.leave();
     if (e.a || e.start) this.toggleGo();
-    if (e.left) this.size(-1); if (e.right) this.size(1);
+    if (e.left) this.size(-1); if (e.right) this.size(1); if (this.err && e.x && !Account.loggedIn) FriendsBar.toggle(true);
+    if (this.err && Account.loggedIn && /Log in/.test(this.err)) { this.err = ''; this.scene.restart({ mode: this.mode, squad: this.squad }); return; }   /* (logged in from this screen: into the queue) */
     this.poll(); if (this.view && !this.matchSeen && this.time.now % 1000 < 20) this.draw();
     if (this.view && !this.matchSeen) this.draw();
   }

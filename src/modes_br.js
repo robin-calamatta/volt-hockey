@@ -270,7 +270,7 @@ MODES.br = {
     if (BR_GUNS[k] && same) { if (same.a >= BR_GUNS[k].ammo * 2) return false; same.a = Math.min(BR_GUNS[k].ammo * 2, same.a + a); if (c.player) this.say(m, c, '+' + BR_GUNS[k].name + ' AMMO'); return true; }
     if (BR_ITEMS[k] && same && same.a < BR_ITEMS[k].stack) { same.a++; if (c.player) this.say(m, c, BR_ITEMS[k].name); return true; }
     if (inv.length >= BR.slots) { if (c.player && !(G.fullAt > m.simTime)) { G.fullAt = m.simTime + 2; this.say(m, c, 'INVENTORY FULL: open your bag to drop something'); } return false; }
-    inv.push({ k, a }); if (c.player) { m.sfx('select'); this.say(m, c, (BR_GUNS[k] || BR_ITEMS[k]).name); }
+    inv.push({ k, a }); if (c.player) { this.psfx(m, c, 'select'); this.say(m, c, (BR_GUNS[k] || BR_ITEMS[k]).name); }
     if (!c.player) G.sel = this.bestSlot(c, 99);                         // the CPU holds its best gun
     return true;
   },
@@ -320,13 +320,13 @@ MODES.br = {
     m.finishGame(team === undefined ? 'NOBODY SURVIVED' : sq === 1 ? `${MG.up(m.name(win[0]))} WINS!` : `TEAM ${team + 1} WINS!`, rows, -1, team === undefined ? '' : sq > 1 ? win.map(c => m.name(c)).join(' + ') + ': victory royale' : 'Victory royale!');
   },
   /* A / X: fire the gun you hold, or use the item. Y: next slot. */
-  cycle(c, m, d = 1) { const G = c.gs; if (!G.inv.length || c.out) return; G.sel = (G.sel + (d < 0 ? G.inv.length - 1 : 1)) % G.inv.length; if (c.player) m.sfx('blip'); },
+  cycle(c, m, d = 1) { const G = c.gs; if (!G.inv.length || c.out) return; G.sel = (G.sel + (d < 0 ? G.inv.length - 1 : 1)) % G.inv.length; if (c.player) this.psfx(m, c, 'blip'); },
   shooterPad: true,                                                      // a controller here: RT fires, LB / RB step through your items, no spin buttons (see scenes.js / net.js)
   use(c, m) {
     const G = c.gs, it = G.inv[G.sel]; if (!it || G.cd > 0 || c.out) return;
     const gun = BR_GUNS[it.k];
     if (gun) {
-      if (it.a <= 0) { G.cd = 0.4; if (c.player) { m.sfx('back'); this.say(m, c, 'OUT OF AMMO'); } return; }
+      if (it.a <= 0) { G.cd = 0.4; if (c.player) { this.psfx(m, c, 'back'); this.say(m, c, 'OUT OF AMMO'); } return; }
       it.a--; G.cd = gun.cd; const f = c.toWorld(0.8, 0), err = c.player ? 0 : (Math.random() - 0.5) * (0.08 + ((m.difficulty || {}).reaction || 0.2) * 0.6), aim = this.aim(c, m, gun), pitch = this.aimP, cp = Math.cos(pitch), vz = Math.round(Math.sin(pitch) * gun.spd * 1000) / 1000;
       for (let p = 0; p < (gun.pellets || 1); p++) { const a = aim + err + (Math.random() - 0.5) * gun.spread * (gun.pellets ? 1 : 1.4) * (G.ads ? (gun.pellets ? 0.6 : 0.3) : 1);   /* aiming tightens the spread */ MG.add(m, { t: 'bul', w: it.k, k: c.k, x: MG.r2(f.x), y: MG.r2(f.y), z: G.z, vx: MG.r2(Math.cos(a) * gun.spd * cp + c.vx * 0.3), vy: MG.r2(Math.sin(a) * gun.spd * cp + c.vy * 0.3), vz, until: MG.r2(m.gs.t + gun.life) }); }
       m.sfx('gun_' + it.k); return;

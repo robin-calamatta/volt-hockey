@@ -113,7 +113,7 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
     take(m, c, L) {
       const G = c.gs, [, k, , , , a] = L, inv = G.inv;
       if (G.down) return false;
-      if (k === 'card') { if (m.chairs[a] && m.chairs[a].gs.team === G.team && m.chairs[a] !== c) { G.cards.push(a); if (c.player) { m.sfx('select'); this.say(m, c, `${MG.up(m.name(m.chairs[a]))}'S REZ CARD: TAKE IT TO A REZ GARAGE`); } MG.notice(m, `${MG.up(m.name(c))} HAS ${MG.up(m.name(m.chairs[a]))}'S REZ CARD`, 1.6); return true; } return false; }
+      if (k === 'card') { if (m.chairs[a] && m.chairs[a].gs.team === G.team && m.chairs[a] !== c) { G.cards.push(a); if (c.player) { this.psfx(m, c, 'select'); this.say(m, c, `${MG.up(m.name(m.chairs[a]))}'S REZ CARD: TAKE IT TO A REZ GARAGE`); } MG.notice(m, `${MG.up(m.name(c))} HAS ${MG.up(m.name(m.chairs[a]))}'S REZ CARD`, 1.6); return true; } return false; }
       if (k === 'chest') {                                                // a chest bursts open: a gun with ammo for it, often a heal
         if (c.player && !c.player.remote) Progress.ev('chest');
         const gun = (L[4] > 0 && Math.random() < 0.6 ? ['rifle', 'sniper', 'rocket', 'shotgun'] : ['pistol', 'pistol', 'smg', 'smg', 'shotgun', 'rifle', 'rifle', 'sniper', 'rocket'])[Math.floor(Math.random() * (L[4] > 0 ? 4 : 9))];
@@ -126,13 +126,13 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
         for (const t of types) { const A = BR_AMMO[t], before = G.am[A.i]; G.am[A.i] = Math.min(A.max, G.am[A.i] + A.pack * 2); if (G.am[A.i] > before) got.push(A.name); }
         if (c.player) this.say(m, c, got.length ? 'AMMO CRATE: ' + got.join(', ') : 'AMMO FULL'); if (got.length) m.sfx('select'); return got.length > 0;
       }
-      if (k.startsWith('am_')) { const A = BR_AMMO[k.slice(3)]; if (!A || G.am[A.i] >= A.max) return false; const n = Math.min(a, A.max - G.am[A.i]); G.am[A.i] += n; L[5] -= n; if (c.player) { m.sfx('blip'); this.say(m, c, `+${n} ${A.name}`); } return L[5] <= 0 || (L[5] > 0 && false); }
+      if (k.startsWith('am_')) { const A = BR_AMMO[k.slice(3)]; if (!A || G.am[A.i] >= A.max) return false; const n = Math.min(a, A.max - G.am[A.i]); G.am[A.i] += n; L[5] -= n; if (c.player) { this.psfx(m, c, 'blip'); this.say(m, c, `+${n} ${A.name}`); } return L[5] <= 0 || (L[5] > 0 && false); }
       const same = inv.find(it => it.k === k);
       if (BR_GUNS[k] && same) { const A = BR_AMMO[BR_GUNS[k].type]; if (G.am[A.i] >= A.max || a <= 0) return false; G.am[A.i] = Math.min(A.max, G.am[A.i] + a); if (c.player) this.say(m, c, `+${a} ${A.name}`); return true; }   // the same gun again: its bullets
       if (BR_ITEMS[k] && same && same.a < BR_ITEMS[k].stack) { const n = Math.min(a, BR_ITEMS[k].stack - same.a); same.a += n; L[5] -= n; if (c.player) this.say(m, c, `${BR_ITEMS[k].name} x${same.a}`); return L[5] <= 0; }
       if (inv.length >= BR.slots) { if (c.player && !(G.fullAt > m.simTime)) { G.fullAt = m.simTime + 2.5; this.say(m, c, 'BAG FULL: X swaps it for what you hold'); } G.swapL = L[0]; return false; }
       inv.push({ k, a: BR_ITEMS[k] ? Math.min(a, BR_ITEMS[k].stack) : a }); if (BR_ITEMS[k] && a > BR_ITEMS[k].stack) { L[5] = a - BR_ITEMS[k].stack; return false; }
-      if (c.player) { m.sfx('select'); this.say(m, c, (BR_GUNS[k] || BR_ITEMS[k]).name); if (G.hol) { G.last = inv.length - 1; } }
+      if (c.player) { this.psfx(m, c, 'select'); this.say(m, c, (BR_GUNS[k] || BR_ITEMS[k]).name); if (G.hol) { G.last = inv.length - 1; } }
       if (!c.player) G.sel = this.bestSlot(c, 99);
       return true;
     },
@@ -141,12 +141,12 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
       m.gs.L = m.gs.L.filter(x => x !== L); G.inv[G.sel] = { k: L[1], a: L[5] }; const d = this.drop(m, c.x, c.y, G.lv, it.k, it.a); d[6] = MG.r2(m.gs.t + 2.5); d[7] = c.k; G.swapL = 0; m.sfx('select'); if (c.player) this.say(m, c, (BR_GUNS[L[1]] || BR_ITEMS[L[1]]).name); return true;
     },
     /* ---- holding things: Y puts your item away (faster driving), Y again takes the last one out; LB / RB step through ---- */
-    holster(c, m) { const G = c.gs; if (c.out || G.down) return; G.use = null; G.rl = 0; if (G.hol) { G.hol = 0; if (G.inv[G.last]) G.sel = G.last; } else { G.hol = 1; G.last = G.sel; } if (c.player) m.sfx('blip'); },
-    cycle(c, m, d = 1) { const G = c.gs; if (!G.inv.length || c.out || G.down) return; G.use = null; G.rl = 0; if (G.hol) { G.hol = 0; G.sel = Math.min(G.last, G.inv.length - 1); } else G.sel = (G.sel + (d < 0 ? G.inv.length - 1 : 1)) % G.inv.length; if (c.player) m.sfx('blip'); },
+    holster(c, m) { const G = c.gs; if (c.out || G.down) return; G.use = null; G.rl = 0; if (G.hol) { G.hol = 0; if (G.inv[G.last]) G.sel = G.last; } else { G.hol = 1; G.last = G.sel; } if (c.player) this.psfx(m, c, 'blip'); },
+    cycle(c, m, d = 1) { const G = c.gs; if (!G.inv.length || c.out || G.down) return; G.use = null; G.rl = 0; if (G.hol) { G.hol = 0; G.sel = Math.min(G.last, G.inv.length - 1); } else G.sel = (G.sel + (d < 0 ? G.inv.length - 1 : 1)) % G.inv.length; if (c.player) this.psfx(m, c, 'blip'); },
     reload(c, m) {
       const G = c.gs, it = gunOf(c); if (!it || G.rl > 0 || G.down || G.use) return; const gun = BR_GUNS[it.k], A = BR_AMMO[gun.type];
       if (it.a >= gun.mag) return; if (G.am[A.i] <= 0) { if (c.player && !(G.noAmmoAt > m.simTime)) { G.noAmmoAt = m.simTime + 2; this.say(m, c, 'NO ' + A.name); m.sfx('back'); } return; }
-      G.rl = gun.rl; G.rlT = gun.rl; G.rlS = G.sel; G.rlN = 0; if (c.player) m.sfx('rl_' + it.k);
+      G.rl = gun.rl; G.rlT = gun.rl; G.rlS = G.sel; G.rlN = 0; if (c.player) this.psfx(m, c, 'rl_' + it.k);
     },
     /* ---- RT: fire, or start using a heal (it takes time); boosts and walls are instant ---- */
     use(c, m) {
@@ -184,7 +184,7 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
       for (const c of m.chairs) {
         const G = c.gs; if (c.out) continue;
         if (G.rl > 0) { const it = G.inv[G.rlS]; if (!it || G.sel !== G.rlS || G.hol || G.down) G.rl = 0; else if ((G.rl -= h) <= 0) { const gun = BR_GUNS[it.k], A = BR_AMMO[gun.type], n = Math.min(gun.shell ? 1 : gun.mag - it.a, G.am[A.i]); it.a += n; G.am[A.i] -= n; G.rl = 0;
-          if (gun.shell) { G.rlN = (G.rlN || 0) + 1; if (it.a < gun.mag && G.am[A.i] > 0) { G.rl = G.rlT = gun.rl; if (c.player) m.sfx('rl_shell'); } else { G.pumpT = m.gs.t; if (c.player) m.sfx('rl_pump'); } } } }   // shell by shell, then a pump
+          if (gun.shell) { G.rlN = (G.rlN || 0) + 1; if (it.a < gun.mag && G.am[A.i] > 0) { G.rl = G.rlT = gun.rl; if (c.player) this.psfx(m, c, 'rl_shell'); } else { G.pumpT = m.gs.t; if (c.player) this.psfx(m, c, 'rl_pump'); } } } }   // shell by shell, then a pump
         if (G.use) { const U = G.use, it = G.inv[U.s], t = U.tk >= 0 ? m.chairs[U.tk] : c;   // a heal in progress (on you or a team-mate)
           if (!it || it.k !== U.k || G.sel !== U.s || G.hol || G.down || !t || t.out || t.gs.down || (t !== c && (MH.dist(c, t) > BR.mateRange + 0.5 || (c.player && U.tk >= 0 && !G.ads)))) { if (it && it.k === U.k && U.left < U.tot) this.spend(c, U.s); G.use = null; }   // stopped part-way: what went on stays on, and the item is used up
           else { const I = BR_ITEMS[U.k], T = t.gs, f = Math.min(h, U.left) / U.tot;   // health and armour go on bit by bit while you apply it

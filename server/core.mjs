@@ -59,28 +59,36 @@ export function createApi(store, opts = {}) {
      and posts its code here; the others see the code and join. Matches live under their own keys (and each player gets a pointer to theirs),
      so two polls writing the queue at the same moment can't lose a match. */
   const MM_WAIT = 5 * 60e3, MM_GONE = 15e3, MM_KEEP = 3 * 60e3, MM_SPOTS = { 1: 32, 2: 32, 3: 30, 4: 32, 5: 30 };   // (v14.2.23: a match takes as many people as it has carts)
+  /* v14.3: other playlists queue too: Volt Hockey quick match (3 v 3) and the minigame mix (up to 8). They start sooner (1 minute). */
+  const MM_MODES = { hockey: { spots: 6, wait: 60e3 }, mini: { spots: 8, wait: 60e3 } };
   const mmSquad = b => { const q = Number(b && b.squad); return q >= 1 && q <= 5 ? Math.floor(q) : 1; };
-  async function mmLoad(sq) { const Q = (await store.get('mm/q' + sq)) || {}; Q.players = Q.players || {}; Q.sq = sq; return Q; }
+  const mmMode = b => { const m = String((b && b.mode) || 'br'); return MM_MODES[m] ? m : 'br'; };
+  const mmKey = (mode, sq) => mode === 'br' ? 'mm/q' + sq : 'mm/q-' + mode;
+  const mmCap = Q => Q.mode && Q.mode !== 'br' ? MM_MODES[Q.mode].spots : (MM_SPOTS[Q.sq] || 20);
+  const mmWait = Q => Q.mode && Q.mode !== 'br' ? MM_MODES[Q.mode].wait : MM_WAIT;
+  const mmN = p => Math.max(1, Math.min(8, Number(p.n) || 1));                          // (a party, or players on one screen, take that many spots)
+  async function mmLoad(sq, mode = 'br') { const Q = (await store.get(mmKey(mode, sq))) || {}; Q.players = Q.players || {}; Q.sq = sq; Q.mode = mode; return Q; }
   async function mmMine(u) { const id = await store.get('mm/u/' + u.name.toLowerCase()); if (!id) return null; const M = await store.get('mm/m/' + id); if (!M || now() - M.at > MM_KEEP) return null; return M; }
-  const mmView = (u, Q, M) => { const list = Object.values(Q.players).sort((a, b) => a.at - b.at), first = list[0];
-    return { count: list.length, ready: list.filter(p => p.go).length, you: { go: !!(Q.players[u.name.toLowerCase()] || {}).go }, since: first ? first.at : null, startsAt: first ? first.at + MM_WAIT : null, cap: MM_SPOTS[Q.sq] || 20, now: now(),   /* (v14.2.23: counts, not a list of names) */
-      match: M ? { id: M.id, host: M.host, you: M.host === u.name ? 'host' : 'guest', members: M.members, code: M.code || null, squad: M.squad } : null }; };
+  const mmView = (u, Q, M) => { const list = Object.values(Q.players).sort((a, b) => a.at - b.at), first = list[0], cnt = list.reduce((k, p) => k + mmN(p), 0);
+    return { count: cnt, ready: list.filter(p => p.go).reduce((k, p) => k + mmN(p), 0), you: { go: !!(Q.players[u.name.toLowerCase()] || {}).go }, since: first ? first.at : null, startsAt: first ? first.at + mmWait(Q) : null, cap: mmCap(Q), mode: Q.mode || 'br', now: now(),   /* (v14.2.23: counts, not a list of names) */
+      match: M ? { id: M.id, host: M.host, you: M.host === u.name ? 'host' : 'guest', members: M.members, people: M.people || M.members.length, accts: M.accts || M.members.length, code: M.code || null, squad: M.squad, mode: M.mode || 'br' } : null }; };
   async function mmPoll(u, b) {
-    if (!canBR(u)) bad('Volt Royale is for players 16 and over.', 403);
-    const sq = mmSquad(b), t = now(), M0 = await mmMine(u), Q = await mmLoad(sq);
+    const mode = mmMode(b); if (mode === 'br' && !canBR(u)) bad('Volt Royale is for players 16 and over.', 403);
+    const sq = mmSquad(b), t = now(), M0 = await mmMine(u), Q = await mmLoad(sq, mode), qk = mmKey(mode, sq);
     for (const [k, p] of Object.entries(Q.players)) if (t - p.seen > MM_GONE) delete Q.players[k];
     const key = u.name.toLowerCase();
-    if (M0) { if (Q.players[key]) { delete Q.players[key]; await store.set('mm/q' + sq, Q); } return mmView(u, Q, M0); }   // already in a match: show it
-    if (b && b.leave) { delete Q.players[key]; await store.set('mm/q' + sq, Q); return { left: true }; }
-    const p = Q.players[key] || (Q.players[key] = { name: u.name, at: t }); p.seen = t; p.go = !!(b && b.go);
+    if (M0) { if (Q.players[key]) { delete Q.players[key]; await store.set(qk, Q); } return mmView(u, Q, M0); }   // already in a match: show it
+    if (b && b.leave) { delete Q.players[key]; await store.set(qk, Q); return { left: true }; }
+    const cap = mmCap(Q), p = Q.players[key] || (Q.players[key] = { name: u.name, at: t }); p.seen = t; p.go = !!(b && b.go);
+    p.n = Math.min(cap, Math.max(1, Math.min(8, Number(b && b.n) || 1))); p.a = Math.max(1, Math.min(p.n, Number(b && b.accts) || 1));
     const list = Object.values(Q.players).sort((a, c) => a.at - c.at);
-    let M = null;
-    if (list.length && (list.every(x => x.go) || t - list[0].at >= MM_WAIT || list.length >= (MM_SPOTS[sq] || 20))) {
-      const members = list.slice(0, MM_SPOTS[sq] || 20).map(x => x.name), id = crypto.randomBytes(6).toString('hex');
-      M = { id, squad: sq, host: members[0], members, at: t, code: null };
+    let M = null; const take = []; let used = 0; for (const x of list) { if (used + mmN(x) > cap) continue; take.push(x); used += mmN(x); }   // (first come, first in: a group that doesn't fit waits for the next match)
+    if (list.length && (list.every(x => x.go) || t - list[0].at >= mmWait(Q) || used >= cap)) {
+      const members = take.map(x => x.name), id = crypto.randomBytes(6).toString('hex');
+      M = { id, squad: sq, mode, host: members[0], members, people: used, accts: take.reduce((k, x) => k + (x.a || 1), 0), at: t, code: null };
       await store.set('mm/m/' + id, M); for (const n of members) { await store.set('mm/u/' + n.toLowerCase(), id); delete Q.players[n.toLowerCase()]; }
     }
-    await store.set('mm/q' + sq, Q);
+    await store.set(qk, Q);
     return mmView(u, Q, M && M.members.includes(u.name) ? M : null);
   }
   async function mmCode(u, b) {
@@ -89,7 +97,7 @@ export function createApi(store, opts = {}) {
     M.code = code; await store.set('mm/m/' + M.id, M); return { ok: true };
   }
   async function mmDone(u) { await store.del('mm/u/' + u.name.toLowerCase()); return { ok: true }; }   // (the game started, or they gave up on it)
-  async function mmCounts() { const out = {}; for (let sq = 1; sq <= 5; sq++) { const Q = await mmLoad(sq); out[sq] = Object.values(Q.players).filter(p => now() - p.seen <= MM_GONE).length; } return { counts: out }; }
+  async function mmCounts() { const out = {}, live = Q => Object.values(Q.players).filter(p => now() - p.seen <= MM_GONE).reduce((k, p) => k + mmN(p), 0); for (let sq = 1; sq <= 5; sq++) out[sq] = live(await mmLoad(sq)); for (const m of Object.keys(MM_MODES)) out[m] = live(await mmLoad(1, m)); return { counts: out }; }
   const canBR = u => !!(u && (u.adult || u.over16 || u.brOk));   // Volt Royale: 16 or over, or let in by an admin (v14)
 
   async function auth(headers) {

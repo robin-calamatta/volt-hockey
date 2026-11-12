@@ -18,7 +18,7 @@ const PING = { life: 8, enemy: 4.5, perPlayer: 2, reach: 60 };
   M.planeAt = function (m, u, place) { const D = m.gs.drop, x = D.ax + (D.bx - D.ax) * u, y = D.ay + (D.by - D.ay) * u, h = Math.atan2(D.by - D.ay, D.bx - D.ax);
     if (place) for (const c of m.chairs) if (c.gs.plane) Object.assign(c, { x, y, px: x, py: y, heading: h, ph: h, vx: Math.cos(h) * DROP.speed, vy: Math.sin(h) * DROP.speed }); return { x, y, h }; };
   M.leavePlane = function (m, c) { const G = c.gs; if (!G.plane) return; G.plane = 0; G.glide = 1; G.air = 1; G.vz = -2; G.kickJ = 1; c.vx *= 0.25; c.vy *= 0.25;
-    if (c.player) { m.sfx('whistle'); if (this.say) this.say(m, c, 'GERONIMO!'); const D = m.gs.drop, u = D.t / D.dur; for (const t of [G.team]) D.tf[t] = Math.min(D.tf[t], MG.r2(u + 0.015)); } };
+    if (c.player) { MODES.br.psfx(m, c, 'whistle'); MODES.br.say(m, c, 'GERONIMO!'); const D = m.gs.drop, u = D.t / D.dur; for (const t of [G.team]) D.tf[t] = Math.min(D.tf[t], MG.r2(u + 0.015)); } };
   M.step = function (m, h, ...a) {
     const g = m.gs, D = g.drop;
     if (D && D.t < D.dur + 0.5) { D.t += h; const u = Math.min(1, D.t / D.dur); this.planeAt(m, u, true);
@@ -36,7 +36,7 @@ const PING = { life: 8, enemy: 4.5, perPlayer: 2, reach: 60 };
       if (!c.player) { const T = G.dropTo || (G.dropTo = this.freeGround(m) || { x: m.width / 2, y: m.height / 2 }), want = Math.atan2(T.y - c.y, T.x - c.x); c.heading += normalizeAngle(want - c.heading) * Math.min(1, h * 2); }
       else { const S = c.player.src || {}, mag = Math.min(1, Math.hypot(+S.ax || 0, +S.ay || 0)); push = 0.45 + 0.8 * mag; }   /* (steer the parachute with the stick like driving: push to glide that way, let go to drift down slowly) */
       const sp = (G.vz < -DROP.glideV - 0.5 ? DROP.glideH * 0.6 : DROP.glideH) * push; c.vx += (Math.cos(c.heading) * sp - c.vx) * Math.min(1, h * 2.5); c.vy += (Math.sin(c.heading) * sp - c.vy) * Math.min(1, h * 2.5);
-      const r = mv.call(this, m, c, h); if (G.air) { if (G.z < DROP.z - 6) G.vz = Math.max(G.vz, -DROP.glideV); else G.vz = Math.max(G.vz, -DROP.fall); G.kickJ = 1; } else { G.glide = 0; G.dropTo = null; if (c.player) m.sfx('bump'); } return r;
+      const r = mv.call(this, m, c, h); if (G.air) { if (G.z < DROP.z - 6) G.vz = Math.max(G.vz, -DROP.glideV); else G.vz = Math.max(G.vz, -DROP.fall); G.kickJ = 1; } else { G.glide = 0; G.dropTo = null; if (c.player) MODES.br.psfx(m, c, 'bump'); } return r;
     }
     return mv.call(this, m, c, h);
   };
@@ -114,7 +114,7 @@ const PING_COL = { enemy: 0xff3b3b, danger: 0xff3b3b, loot: 0xffd23f, spot: 0x3d
   };
 }
 { const P = GameScene.prototype, up = P.update;
-  P.brMyTeam = function () { const m = this.match; if (!m || m.kind !== 'br') return -1; let c = (this.setup.players || []).filter(p => !p.remote && p.chair).map(p => p.chair)[0]; if (!c && this.online && this.brMyChair) c = this.brMyChair(); return c && c.gs ? c.gs.team : -1; };
+  P.brMyTeam = function () { const m = this.match; if (!m || m.kind !== 'br') return -1; let c = this.brMine().map(p => p.chair)[0]; if (!c && this.online && this.brMyChair) c = this.brMyChair(); return c && c.gs ? c.gs.team : -1; };
   P.update = function (time, delta) { const r = up.call(this, time, delta); try { this.drawDropPings(); } catch (e) { console.warn(e); } return r; };
   P.drawDropPings = function () {
     const m = this.match; if (!m || m.kind !== 'br' || !this.sys.isActive() || !this.v3 || !this.vps) { if (this.dpG) { this.dpG.clear(); this.dpT.forEach(t => t.setVisible(false)); } return; }

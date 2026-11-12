@@ -52,7 +52,7 @@ function kfText(f) {
     const r = bx.call(this, m, ...a); const X = this.brX; if (!X || !m || m.kind !== 'br') return r;
     for (const t of X.feed || []) t.setVisible(false);                     // (the old feed under the minimap)
     if (!X.kf || !X.kf[0] || !X.kf[0].scene) X.kf = Array.from({ length: 6 }, () => this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#ffffff', backgroundColor: '#0d151bc8', padding: { x: 8, y: 3 } }).setOrigin(0, 0).setDepth(31));
-    const g = m.gs, feed = (g.feed || []).filter(f => g.t - f[3] < 7), mine = (this.setup.players || []).filter(p => !p.remote && p.chair), c = (mine[0] && mine[0].chair) || (this.online && this.brMyChair ? this.brMyChair() : null);
+    const g = m.gs, feed = (g.feed || []).filter(f => g.t - f[3] < 7), mine = this.brMine(), c = (mine[0] && mine[0].chair) || (this.online && this.brMyChair ? this.brMyChair() : null);
     X.kf.forEach((t, i) => { const f = feed[feed.length - 1 - i]; if (!f) return t.setVisible(false); const age = g.t - f[3];
       t.setText(kfText(f)).setPosition(12, 282 + i * 30).setAlpha(age > 6 ? Math.max(0, 7 - age) : 1).setColor(c && f[4] === c.gs.team ? '#7dff6a' : c && f[5] === c.gs.team ? '#ff6b6b' : '#ffffff').setVisible(true); });
     return r;

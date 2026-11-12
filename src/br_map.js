@@ -4,7 +4,7 @@
      name, the storm and the next safe circle, rez garages, your pings, and where you and your squad are right now (live). */
 const BRMAP = {
   padState() { const o = {}; for (const p of (navigator.getGamepads ? [...navigator.getGamepads()] : [])) if (p) p.buttons.forEach((b, i) => { if (b && b.pressed) o[i] = true; }); return o; },
-  me(sc) { const m = sc.match; let c = (sc.setup.players || []).filter(p => !p.remote && p.chair).map(p => p.chair)[0]; if (!c && sc.online && sc.brMyChair) c = sc.brMyChair(); return c || null; },
+  me(sc) { const m = sc.match; let c = sc.brMine ? (sc.brMine()[0] || {}).chair : null; if (!c && sc.online && sc.brMyChair) c = sc.brMyChair(); return c || null; },
   /* the map drawn once into a canvas (ground, biomes, buildings, roofs, walls), cached per map */
   canvas(M, W, H, px) {
     const key = M.name + ':' + px; if (this.cache && this.cache.key === key) return this.cache.cv;

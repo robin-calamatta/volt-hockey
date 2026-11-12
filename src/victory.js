@@ -50,7 +50,7 @@ const VIC = { secs: 12 };
     /* a glow band behind the words */
     G.fillStyle(0x05070f, 0.35).fillRect(0, 86, V.width, 170); G.lineStyle(3, won ? 0xffd23f : 0x8fa3b3, 0.5 + 0.4 * Math.sin(age * 6)).lineBetween(0, 86, V.width, 86).lineBetween(0, 256, V.width, 256);
   };
-  P.vicMine = function () { const mine = (this.setup.players || []).filter(p => !p.remote && p.chair).map(p => p.chair); let c = mine[0]; if (!c && this.online && this.brMyChair) c = this.brMyChair(); return c ? c.gs.team : -1; };
+  P.vicMine = function () { const mine = this.brMine().map(p => p.chair); let c = mine[0]; if (!c && this.online && this.brMyChair) c = this.brMyChair(); return c ? c.gs.team : -1; };
 }
 
 /* v14.2.11: your team's place: the last team standing is #1, the first team knocked out is last */
