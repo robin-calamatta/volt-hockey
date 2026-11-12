@@ -3,6 +3,29 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.3.1: no fill, phones don't host, snappier guests, touch fixes
+
+- **FILL / NO FILL** on the matchmaking screen (tap it, or press Y). It shows for Duos and up in Volt Royale, and always in Volt Hockey and the Minigame Mix.
+  - **NO FILL:** only your party, and the players on your screen, are on your team. CPUs fill the rest of your squad.
+    - In Volt Hockey and the Minigame Mix, a no-fill match is two groups, one on each side.
+  - **FILL** (like Fortnite): you can be teamed with other players from the queue. A party always stays together.
+  - The game remembers your choice.
+- **Phones don't host.** A phone's browser stops the game when its screen turns off or it goes behind another app, and that froze the game for everyone in it.
+  - **A party leader on a phone** hands the hosting to a party member on a computer. That computer opens the room with the leader's game, and everyone is brought in automatically. If there's no computer in the party, the phone hosts as before.
+  - **Public matches** pick a computer in the match to host.
+  - **Screen stays awake:** phones keep the screen on while you're in an online room or game.
+  - **If a host's screen still turns off,** the guests see why the game stopped. Nobody is dropped for the time the host was away.
+- **Guests feel less lag.**
+  - **Weapons:** changing guns or items (◀ ▶, the wheel, Y) shows straight away on a guest's hotbar and in their hands.
+  - **Shots:** a guest hears their own shots the moment they fire.
+  - **Drift:** a guest's drift charged several times faster than the host's. Each snapshot replayed the same moments onto it again. It now starts from the host's drift.
+- **Rez garages:** being half in the doorway counts, and you stop bleeding out while the garage gets you up. A recharging garage tells you how long it has left.
+- **Touch:**
+  - **Lobby:** on a phone or tablet, the PLAY tab moves up, clear of the browser's bottom bar. The daily quests panel moves off it (they're on the QUESTS tab), and so does the button-hint line.
+  - **Chat bar:** the chat / quick chat / mic buttons are in the top left now, not on top of the D-pad.
+  - **Menu buttons:** the menu D-pad and A / B / X / Y / START sit higher.
+  - **Volt Royale X button:** it says what it will do right now: GRAB, OPEN, DOOR, REVIVE or RELOAD.
+
 ## v14.3.0: online first, like Fortnite
 
 - **A switch on the game card: 🌐 ONLINE or 🏠 THIS SCREEN.** It sits just above the selected game in the lobby. Tap it, or press ◀ ▶ on the PLAY tab. ONLINE is the default, and the game remembers your choice.

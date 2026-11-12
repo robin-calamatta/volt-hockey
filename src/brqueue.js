@@ -43,19 +43,24 @@ class BRQueueScene extends Phaser.Scene {
     this.goB = tapButton(this, cx - 150, 630, 270, 'START NOW', () => this.toggleGo());
     tapButton(this, cx + 150, 630, 270, 'CANCEL', () => this.leave());
     if (this.mode === 'br') { tapButton(this, cx - 330, 132, 70, '◀', () => this.size(-1)); tapButton(this, cx + 330, 132, 70, '▶', () => this.size(1)); }
+    /* v14.3.1: FILL (team up with other players from the queue) or NO FILL (only your party; CPUs make up the rest of your team) */
+    this.fillB = tapButton(this, V.width - 150, 132, 240, '', () => this.toggleFill()); this.fillHint = this.add.text(V.width - 150, 176, '', { fontFamily: FONT, fontSize: '16px', color: '#9fb3c2' }).setOrigin(0.5);
     if (!Account.loggedIn) { this.err = 'Log in to play online.'; tapButton(this, cx, 470, 330, 'LOG IN / SIGN UP', () => FriendsBar.toggle(true)); }
     else if (this.mode === 'br' && typeof brAllowed === 'function' && !brAllowed()) { this.err = 'Volt Royale is for players 16 and over.'; }
     this.events.once('shutdown', () => { this.stopped = true; });
     this.poll(); this.draw();
   }
   size(d) { if (this.go || this.matchSeen || this.mode !== 'br') return; const i = BRQ.sizes.indexOf(this.squad); const old = this.squad; this.squad = BRQ.sizes[(i + d + BRQ.sizes.length) % BRQ.sizes.length]; Sound.play('blip');
-    Account.req('POST', '/mm/poll', { squad: old, mode: this.mode, leave: true }).catch(() => {}); this.view = null; this.poll(true); }
+    Account.req('POST', '/mm/poll', { squad: old, mode: this.mode, nofill: !!Settings.mmNoFill, leave: true }).catch(() => {}); this.view = null; this.poll(true); }
+  fillShown() { return this.mode !== 'br' || this.squad > 1; }
+  toggleFill() { if (this.matchSeen || !this.fillShown()) return; const old = !!Settings.mmNoFill; Settings.mmNoFill = !old; Settings.save(); Sound.play('select');
+    if (!this.err) Account.req('POST', '/mm/poll', { squad: this.squad, mode: this.mode, nofill: old, leave: true }).catch(() => {}); this.go = false; this.view = null; this.poll(true); this.draw(); }
   toggleGo() { if (this.err || this.matchSeen) return; this.go = !this.go; Sound.play(this.go ? 'select' : 'back'); this.poll(true); this.draw(); }
-  leave() { if (this.leaving) return; this.leaving = true; Sound.play('back'); if (!this.err) Account.req('POST', '/mm/poll', { squad: this.squad, mode: this.mode, leave: true }).catch(() => {}); this.scene.start('Main'); }
+  leave() { if (this.leaving) return; this.leaving = true; Sound.play('back'); if (!this.err) Account.req('POST', '/mm/poll', { squad: this.squad, mode: this.mode, nofill: !!Settings.mmNoFill, leave: true }).catch(() => {}); this.scene.start('Main'); }
   async poll(now) {
     if (this.err || this.stopped || this.leaving) return; if (this.busy) { if (now) this.again = true; return; } if (!now && this.time.now - this.lastPoll < 2000) return;
     this.busy = true; this.lastPoll = this.time.now;
-    try { const r = await Account.req('POST', '/mm/poll', { squad: this.squad, go: this.go, mode: this.mode, n: BRQ.people(), accts: BRQ.accts() }); if (this.stopped || this.leaving) return; this.view = r; this.offset = r.now ? r.now - Date.now() : 0; if (r.match) this.onMatch(r.match); }
+    try { const r = await Account.req('POST', '/mm/poll', { squad: this.squad, go: this.go, mode: this.mode, nofill: !!Settings.mmNoFill, dev: (window.matchMedia && matchMedia('(pointer: coarse)').matches) ? 'mobile' : 'desktop', n: BRQ.people(), accts: BRQ.accts() }); if (this.stopped || this.leaving) return; this.view = r; this.offset = r.now ? r.now - Date.now() : 0; if (r.match) this.onMatch(r.match); }
     catch (e) { this.err = (e && e.message) || 'Could not reach the server.'; }
     finally { this.busy = false; this.draw(); if (this.again) { this.again = false; this.poll(true); } }
   }
@@ -67,7 +72,8 @@ class BRQueueScene extends Phaser.Scene {
     if (this.time.now - this.matchSeen > 45000) { Account.req('POST', '/mm/done', {}).catch(() => {}); this.matchSeen = 0; this.go = false; Toasts.show('The host didn\'t open the match. Back in the queue.', [], 4000); }
   }
   draw() {
-    const v = this.view, sq = this.squad;
+    const v = this.view, sq = this.squad, fs = this.fillShown();
+    if (this.fillB) { this.fillB.t.setText(Settings.mmNoFill ? 'NO FILL' : 'FILL'); [this.fillB, this.fillB.t, this.fillB.bg, this.fillHint].forEach(o => o && o.setVisible && o.setVisible(fs)); if (this.fillHint) this.fillHint.setText(Settings.mmNoFill ? 'Only your party on your team' : 'Team up with other players').setVisible(fs); }
     this.sizeT.setText(this.mode === 'br' ? `Teams:  ${BRQ.names[sq]}` : (BRQ.modes[this.mode] || {}).sub || '');
     if (this.err) { this.countT.setText('—'); this.subT.setText(this.err); this.listT.setText(''); this.timeT.setText(''); return; }
     if (!v) { this.countT.setText('...'); this.subT.setText('Joining the queue'); return; }
@@ -87,7 +93,7 @@ class BRQueueScene extends Phaser.Scene {
   update() {
     Controls.update(this.game.loop.frame); const e = Controls.menu();
     if (e.b) return this.leave();
-    if (e.a || e.start) this.toggleGo();
+    if (e.a || e.start) this.toggleGo(); if (e.y) this.toggleFill();
     if (e.left) this.size(-1); if (e.right) this.size(1); if (this.err && e.x && !Account.loggedIn) FriendsBar.toggle(true);
     if (this.err && Account.loggedIn && /Log in/.test(this.err)) { this.err = ''; this.scene.restart({ mode: this.mode, squad: this.squad }); return; }   /* (logged in from this screen: into the queue) */
     this.poll(); if (this.view && !this.matchSeen && this.time.now % 1000 < 20) this.draw();

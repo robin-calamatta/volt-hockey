@@ -167,7 +167,7 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
       const G = c.gs; if (c.out || G.down || G.use) return; const it = !G.hol && G.inv[G.sel];
       if (it && it.k === 'riot') return this.melee(c, m, true);           // the riot shield: RT bashes with it
       if (it && it.k === 'bubble' && G.cd <= 0) { MG.add(m, { t: 'bub', x: MG.r2(c.x), y: MG.r2(c.y), z: G.z, lv: G.lv, r: BR_BUBBLE.r, until: MG.r2(m.gs.t + BR_BUBBLE.life), t0: MG.r2(m.gs.t) }); this.sfxNear(m, 'bubble', c.x, c.y); G.cd = 0.8; this.spend(c, G.sel); return; }
-      const sf = m.sfx; m.sfx = (n, ...r) => { if (String(n).startsWith('gun_')) { if (m.chairs.some(o => o.player && Math.hypot(o.x - c.x, o.y - c.y) < 60)) sf.call(m, n, ...r); } else sf.call(m, n, ...r); };   // (gunfire is heard within 60 m)
+      const sf = m.sfx; m.sfx = (n, ...r) => { if (String(n).startsWith('gun_')) { if (m.chairs.some(o => o.player && Math.hypot(o.x - c.x, o.y - c.y) < 60)) sf.call(m, n, r[0] || (c.player ? c.player.id : 0), ...r.slice(1)); }   /* (v14.3.1: tagged with the shooter: a guest already heard their own shot) */ else sf.call(m, n, ...r); };   // (gunfire is heard within 60 m)
       try { return P2.use.call(this, c, m); } finally { m.sfx = sf; }
     },
     cmd(c, cmd, m) { const r = P2.cmd.call(this, c, cmd, m); const it = !c.gs.hol && c.gs.inv[c.gs.sel]; if (it && it.k === 'riot') c.speedMul *= 0.88; return r; },
@@ -385,9 +385,9 @@ Object.assign(BR, { bleed: 38 });                                     // the las
     selfRez(m, h) {
       const g = m.gs, M = this.map(m);
       for (const c of m.chairs) { const G = c.gs; if (c.out || !G.down) { G.srz = 0; continue; }
-        const i = (M.rez || []).findIndex(q => c.x > q.x0 && c.x < q.x1 && c.y > q.y0 && c.y < q.y1 && (G.lv || 0) === 0);
+        const e = 0.6, i = (M.rez || []).findIndex(q => c.x > q.x0 - e && c.x < q.x1 + e && c.y > q.y0 - e && c.y < q.y1 + e && (G.lv || 0) < 1);   /* (v14.3.1: half in the doorway counts) */
         if (i < 0 || g.gar[i] > g.t) { G.srz = 0; continue; }
-        const before = G.srz || 0; G.srz = before + h; if (Math.floor(before / 0.85) !== Math.floor(G.srz / 0.85)) this.sfxNear(m, 'heartbeat', c.x, c.y);
+        const before = G.srz || 0; G.srz = before + h; G.dhp = Math.min(BR.downHp, (G.dhp || 0) + h * BR.downHp / BR.bleed);   /* (v14.3.1: no bleeding out while the garage gets you up) */ if (Math.floor(before / 0.85) !== Math.floor(G.srz / 0.85)) this.sfxNear(m, 'heartbeat', c.x, c.y);
         if (G.srz >= BR.rezTime) { Object.assign(G, { down: 0, dhp: 0, hp: BR.reviveHp, srz: 0 }); g.gar[i] = MG.r2(g.t + BR.rezCool); this.sfxNear(m, 'defib', c.x, c.y); MG.notice(m, `${MG.up(m.name(c))} GOT BACK UP AT A REZ GARAGE`, 2); if (c.player) this.say(m, c, 'BACK ON YOUR WHEELS!'); }
       }
       for (const c of m.chairs) { const G = c.gs; if (c.out || !(G.rv > 0)) { G.rvBeat = 0; continue; } const b = G.rvBeat || 0; G.rvBeat = b + h; if (Math.floor(b / 0.85) !== Math.floor(G.rvBeat / 0.85)) this.sfxNear(m, 'heartbeat', c.x, c.y); }   // (reviving: a heartbeat too)

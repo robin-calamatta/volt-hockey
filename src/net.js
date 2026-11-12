@@ -13,7 +13,7 @@ const STATE_CODE = { countdown: 0, play: 1, goal: 2, over: 3 }, STATE_NAME = ['c
 const r3 = v => Math.round(v * 1000) / 1000;
 const randomCode = () => Array.from({ length: CONFIG.online.codeLength }, () => CONFIG.online.codeAlphabet[Math.floor(Math.random() * CONFIG.online.codeAlphabet.length)]).join('');
 // Who you are, for other players' chat and voice rules (guests: no account, so quick chat only and no voice).
-const accountTag = () => ({ party: typeof Party !== 'undefined' && Party.active ? Party.id : '', psize: typeof Party !== 'undefined' && Party.active ? Party.members.length : 1, look: typeof Progress !== 'undefined' ? Progress.look() : null, acct: typeof Account !== 'undefined' ? Account.name : '', adult: typeof Account !== 'undefined' && Account.adult, vid: typeof Voice !== 'undefined' ? Voice.myId() : '' });
+const accountTag = () => ({ party: typeof Party !== 'undefined' && Party.active ? Party.id : '', psize: typeof Party !== 'undefined' && Party.active ? Party.members.length : 1, look: typeof Progress !== 'undefined' ? Progress.look() : null, acct: typeof Account !== 'undefined' ? Account.name : '', adult: typeof Account !== 'undefined' && Account.adult, vid: typeof Voice !== 'undefined' ? Voice.myId() : '', nf: !!Settings.mmNoFill });   /* nf: v14.3.1 no fill (public matches) */
 const cleanCode = text => String(text || '').toUpperCase().split('').filter(ch => CONFIG.online.codeAlphabet.includes(ch)).join('').slice(0, CONFIG.online.codeLength);
 
 /* ---- transport: a "connection" is { send(obj), close(), onMessage, onClose } ---- */
@@ -247,7 +247,7 @@ class HostSession {
       if (this.roster.length >= (this.mmFill ? 32 : CONFIG.online.maxPlayers) || side === undefined) return this.reject(entry, 'full');
       if (this.cfg.mini && this.cfg.mini.kind === 'br' && (+msg.psize || 1) > (this.cfg.mini.squad || 1)) return this.reject(entry, 'party-too-big');   // Volt Royale: your party plays as one squad
       entry.id = this.nextId++; clearTimeout(entry.hello);
-      this.roster.push({ id: entry.id, name: this.uniqueName(Settings.cleanName(msg.name) || 'Player ' + (this.roster.length + 1)), side, mid: !this.cfg.season, look: Avatar.cleanLook(msg.look), party: cleanText(msg.party, 80), acct: cleanText(msg.acct, 20), adult: !!msg.adult, vid: cleanText(msg.vid, 80) });
+      this.roster.push({ id: entry.id, name: this.uniqueName(Settings.cleanName(msg.name) || 'Player ' + (this.roster.length + 1)), side, mid: !this.cfg.season, look: Avatar.cleanLook(msg.look), party: cleanText(msg.party, 80), acct: cleanText(msg.acct, 20), adult: !!msg.adult, vid: cleanText(msg.vid, 80), nf: !!msg.nf });
       entry.token = Math.random().toString(36).slice(2) + Date.now().toString(36);   // (keep it: it lets you back into a game if your connection drops)
       entry.conn.send({ t: 'welcome', id: entry.id, code: this.code, roster: this.roster, cfg: this.cfg, token: entry.token });
       return this.sendRoster();
@@ -306,7 +306,17 @@ class HostSession {
 
   /* ---- in a match ---- */
   start(localSource) {                                           // returns the Match; call from the host's room screen
-    const players = this.roster.map((r, i) => ({ id: r.id, name: r.name, side: r.side, locked: !!r.lock, tag: 'P' + (i + 1), speedLevel: Settings.speedLevel, chair: null, spinQueued: 0, look: r.host ? null : r.look || null, squadKey: this.mmFill ? 'mm' : r.host ? (typeof Party !== 'undefined' && Party.active ? 'party:' + Party.id : null) : r.party ? 'party:' + r.party : null,
+    /* v14.3.1 public matches: who plays with whom. NO FILL: only your party (and the players on your screen) are on your team, CPUs make up the
+       rest. FILL: you can be teamed with other players from the queue (your party always stays together). */
+    const ownerOf = r => (r.own && this.roster.find(q => q.id === r.own)) || r, grpOf = r => { const o = ownerOf(r); return o.party ? 'party:' + o.party : 'solo:' + o.id; };
+    const nfOf = r => { const o = ownerOf(r); return o.party ? this.roster.some(q => q.party === o.party && q.nf) : !!o.nf; };
+    const mmKeyOf = r => nfOf(r) ? grpOf(r) : 'fill:' + grpOf(r);
+    if (this.mmFill && !(this.cfg.mini && (this.cfg.mini.kind === 'br' || this.cfg.mini.mode !== 'teams'))) {   /* two-team games: each group on one side, the fewest players first */
+      const groups = new Map(); for (const r of this.roster) { const k = grpOf(r); (groups.get(k) || groups.set(k, []).get(k)).push(r); }
+      const list = [...groups.values()].sort((a, b) => (nfOf(b[0]) - nfOf(a[0])) || b.length - a.length), n = [0, 0];
+      for (const G of list) { if (nfOf(G[0])) { const sd = n[0] <= n[1] ? 0 : 1; for (const r of G) r.side = sd; n[sd] += G.length; } else for (const r of G) { const sd = n[0] <= n[1] ? 0 : 1; r.side = sd; n[sd]++; } }
+    }
+    const players = this.roster.map((r, i) => ({ id: r.id, name: r.name, side: r.side, locked: !!r.lock, tag: 'P' + (i + 1), speedLevel: Settings.speedLevel, chair: null, spinQueued: 0, look: r.host ? null : r.look || null, squadKey: this.mmFill ? mmKeyOf(r) : r.host ? (typeof Party !== 'undefined' && Party.active ? 'party:' + Party.id : null) : r.party ? 'party:' + r.party : null,
       remote: !(r.host || r.own === 1), src: r.host ? localSource : r.own === 1 ? this.guestSrc.get(r.id) : { ax: 0, ay: 0, pressed: {} } }));
     for (const e of this.entries.values()) e.players = new Map(players.filter(p => p.id === e.id || (this.roster.find(r => r.id === p.id) || {}).own === e.id).map(p => [p.id, p]));
     if (this.cfg.mini) { this.cfg.sizesRoom = this.cfg.sizesRoom || this.cfg.sizes; this.cfg.sizes = fitSizes(this.cfg.mini, players, this.cfg.sizesRoom); }   // no CPU carts: just the people in the room
@@ -358,7 +368,7 @@ class HostSession {
     const m = this.match, b = m.ball;
     return { t: 'snap', n: ++this.tickNo, st: STATE_CODE[m.state], tm: r3(m.timer), ck: r3(m.clock), ot: m.overtime ? 1 : 0, pe: m.period, sc: m.score.slice(), sh: m.shots.slice(), pr: m.press.map(v => v ? 1 : 0),
       bn: m.bannerLeft > 0 ? m.banner : '', nt: m.noticeLeft > 0 ? m.notice : '',
-      c: m.chairs.map(c => [r3(c.x), r3(c.y), r3(c.heading), r3(c.vx), r3(c.vy), r3(Math.max(0, c.binLeft)), c.player ? c.player.id : 0]),
+      c: m.chairs.map(c => [r3(c.x), r3(c.y), r3(c.heading), r3(c.vx), r3(c.vy), r3(Math.max(0, c.binLeft)), c.player ? c.player.id : 0, c.dr && (c.dr.on || c.dr.boost > 0) ? [c.dr.on ? 1 : 0, r3(c.dr.ch), r3(c.dr.boost), c.dr.lvl, c.dr.dir] : 0]),   /* (v14.3.1: + the drift: see project()) */
       b: [r3(b.x), r3(b.y), r3(b.vx), r3(b.vy)], lv: m.players.map(p => [p.id, p.speedLevel]), sf: m.sfxQueue.splice(0), cm: m.callQueue.splice(0), em: m.emoQ && m.emoQ.length ? m.emoQ.splice(0) : undefined, mg: m.mini ? m.miniSnap() : undefined };
   }
   /* v14.2.14: a guest whose connection is still sending earlier snapshots is skipped this time (the sounds and calls in it are kept for
@@ -406,6 +416,7 @@ class ClientSession {
       case 'start': this.state = 'playing'; if (this.onStart) this.onStart(msg); else this.pendingStart = msg; break;   // (a rejoin's start can arrive before the room screen is up)
       case 'snap': if (this.onSnapshot) this.onSnapshot(msg); break;
       case 'rules': Settings.applyRules(msg.rules || {}); break;
+      case 'away': if (typeof Toasts !== 'undefined') Toasts.show(msg.on ? 'The host\'s screen turned off (or they switched apps), so the game is on hold until they come back.' : 'The host is back.', [], msg.on ? 6000 : 2500); this.lastHeard = performance.now() + (msg.on ? 60000 : 0); break;   /* (v14.3.1) */
       case 'lobby': this.state = 'lobby'; if (this.onLobby) this.onLobby(); break;
       case 'pong': this.rtt = performance.now() - msg.n; break;
       case 'chat': Chat.receive({ channel: 'room', ...msg }); break;
@@ -504,6 +515,9 @@ class ClientSim {
     m.chairs.forEach((c, j) => {
       const r = S.c[j]; if (!r) return;
       c.x = r[0]; c.y = r[1]; c.heading = r[2]; c.vx = r[3]; c.vy = r[4]; c.binLeft = r[5]; c.player = this.byId.get(r[6]) || null; c.omega = 0; c.spinLeft = c.spinCooldown = 0; c.onSpin = null;
+      /* v14.3.1: the drift starts from the host's too. It used to carry on from the last prediction, so every snapshot replayed the same
+         unacknowledged moments onto a drift that already had them: a guest's drift charged several times faster than the host's */
+      if (r.length > 7) { const d = r[7]; c.dr = d ? { on: d[0], ch: d[1], boost: d[2], lvl: d[3], dir: d[4], hop: 0 } : { on: 0, dir: 0, ch: 0, boost: 0, lvl: 0, hop: 0 }; }
     });
     Object.assign(m.ball, { x: S.b[0], y: S.b[1], vx: S.b[2], vy: S.b[3] });
     const ack = S.a || 0;
@@ -564,3 +578,7 @@ class ClientSim {
     }
   }
 }
+
+/* v14.3.1: a host whose phone screen turns off (or who switches apps) stops running the game: tell the guests why it froze */
+if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { const S = typeof Online !== 'undefined' && Online.current; if (!S || !(S instanceof HostSession) || !S.entries) return;
+  for (const e of S.entries.values()) { if (!document.hidden) e.lastSeen = performance.now() + 5000; try { e.conn && e.conn.send({ t: 'away', on: document.hidden }); } catch (x) { /* gone */ } } });   /* (back: nobody is dropped for the time the host was away) */

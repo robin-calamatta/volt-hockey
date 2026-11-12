@@ -2,6 +2,7 @@
    phone or tablet can do everything a controller does there: join and pick a side, change teams, open game settings, start the game.
    They act exactly like the on-screen controller's buttons (the "Touch controls" device), so every menu understands them. They show
    whenever the touch controller is on and you aren't in a match (in a match the full on-screen controller takes over). */
+/* v14.3.1: raised 54 px, clear of a phone browser's bottom bar */
 const MenuPad = {
   built: false, shown: false,
   keys: [
@@ -13,14 +14,14 @@ const MenuPad = {
     const css = document.createElement('style');
     css.textContent = `
       #menupad{position:fixed;inset:0;z-index:7;pointer-events:none;display:none;font-family:"Barlow Condensed",Arial,sans-serif;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-      #menupad .grp{position:absolute;bottom:max(10px,env(safe-area-inset-bottom));width:132px;height:132px}
+      #menupad .grp{position:absolute;bottom:max(64px,calc(env(safe-area-inset-bottom) + 64px));width:132px;height:132px}
       #menupad .grp.d{left:max(10px,env(safe-area-inset-left))} #menupad .grp.f{right:max(10px,env(safe-area-inset-right))}
       #menupad .k{position:absolute;width:42px;height:42px;pointer-events:auto;touch-action:none;display:flex;flex-direction:column;align-items:center;justify-content:center;box-sizing:border-box;
         color:#fff;font-weight:800;font-size:19px;line-height:1;text-shadow:0 2px 3px #000a;background:rgba(14,32,46,.55);border:2px solid rgba(25,195,255,.75);border-radius:12px;box-shadow:0 3px 10px #0008}
       #menupad .f .k{border-radius:50%}
       #menupad .k .s{font-size:9px;letter-spacing:.06em;opacity:.9;margin-top:2px;font-weight:700}
       #menupad .k.down{background:rgba(25,195,255,.6);border-color:#fff;transform:scale(.94)}
-      #menupad .k.st{position:absolute;right:max(34px,calc(env(safe-area-inset-right) + 34px));bottom:max(150px,calc(env(safe-area-inset-bottom) + 150px));width:78px;height:36px;border-radius:18px;font-size:16px}`;
+      #menupad .k.st{position:absolute;right:max(34px,calc(env(safe-area-inset-right) + 34px));bottom:max(206px,calc(env(safe-area-inset-bottom) + 206px));width:78px;height:36px;border-radius:18px;font-size:16px}`;
     document.head.append(css);
     const root = this.root = document.createElement('div'); root.id = 'menupad'; document.body.append(root);
     const grp = { d: document.createElement('div'), f: document.createElement('div') }; grp.d.className = 'grp d'; grp.f.className = 'grp f'; root.append(grp.d, grp.f);

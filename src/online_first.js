@@ -79,3 +79,29 @@ const PlayWhere = {
     return up.call(this, time, delta);
   };
 }
+
+/* v14.3.1 phones and tablets: a phone browser's bottom bar covered PLAY and the game card. On a touch screen the PLAY tab moves up 64 px and
+   leaves out the daily quests panel (they're on the QUESTS tab) and the keyboard / controller hints along the bottom. */
+const lobbyTouchy = () => (window.matchMedia && matchMedia('(pointer: coarse)').matches) || !!Settings.touch;
+{ const P = LobbyHomeScene.prototype, dp = P.drawPlay, rd = P.redraw, LIFT = 64;
+  P.drawPlay = function (...a) {
+    if (!lobbyTouchy()) return dp.apply(this, a);
+    const T0 = this.T, B0 = this.box, Z0 = this.tap, R0 = this.bar, n0 = this.ui.length, mine = new Set(), quests = (x, y) => y < 420 && x < 380;
+    this.T = function (x, y, ...r) { const o = T0.call(this, x, quests(x, y) ? y : y >= 420 ? y - LIFT : y, ...r); mine.add(o); if (quests(x, y)) o.setVisible(false); return o; };
+    this.box = function (x, y, ...r) { const o = B0.call(this, x, quests(x, y) ? y : y >= 420 ? y - LIFT : y, ...r); mine.add(o); if (quests(x, y)) o.setVisible(false); return o; };
+    this.tap = function (x, y, ...r) { const o = Z0.call(this, x, quests(x, y) ? y : y >= 420 ? y - LIFT : y, ...r); mine.add(o); if (quests(x, y)) o.disableInteractive(); return o; };
+    this.bar = function (x, y, ...r) { if (quests(x, y)) return; return R0.call(this, x, y >= 420 ? y - LIFT : y, ...r); };
+    try { return dp.apply(this, a); }
+    finally { this.T = T0; this.box = B0; this.tap = Z0; this.bar = R0; for (const o of this.ui.slice(n0)) if (!mine.has(o) && o.type === 'Graphics' && o.y === 0) o.y = -LIFT; }   /* (the card's colour band is drawn straight on) */
+  };
+  P.redraw = function (...a) {
+    const r = rd.apply(this, a); if (!lobbyTouchy()) return r; const play = LOBBY_TABS[this.tab] === 'PLAY';
+    if (this.foot && this.foot.active && play && !this.overlay) this.foot.setText('');
+    if (this.emoBtn && this.emoBtn.active) this.emoBtn.setY(548 - LIFT); if (this.addBtn && this.addBtn.active) this.addBtn.setY(548 - LIFT);
+    if (this.localHint && this.localHint.active) this.localHint.setY(452 - LIFT);
+    return r;
+  };
+}
+{ const P = LobbyHomeScene.prototype, up = P.update;
+  P.update = function (...a) { const r = up.apply(this, a); if (this.overlay === 'modes' && this.modesC && this.modesC.active && lobbyTouchy()) this.modesC.y -= 56; return r; };   /* (the games menu too) */
+}

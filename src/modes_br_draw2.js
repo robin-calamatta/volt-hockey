@@ -90,6 +90,7 @@ Object.assign(GameScene.prototype, {
     const nm = k => { const o = m.chairs[k]; return o ? MG.up(MG.pname(o) || m.name(o)) : ''; }, fast = n => n > 1 ? `   ⚡ x${n} SPEED` : '';
     if (G.down && G.rvP > 0) { txt = bar(G.rvP, 0x7dff6a, `✚ BEING REVIVED BY ${(G.rvBy || []).map(nm).join(' + ')}  ${Math.round(G.rvP * 100)}%${fast(G.rvN)}`); if (G.rvN > 1) { const w = 220, x = V.width / 2 - w / 2, y = V.height / 2 + 150; G2.lineStyle(3, 0xffe27a, 0.6 + 0.4 * Math.sin(this.time.now / 90)).strokeRoundedRect(x - 6, y - 6, w + 12, 20, 7); } G2.fillStyle(0x00ff66, 0.06 + 0.04 * Math.sin(this.time.now / 200)).fillRect(0, 0, V.width, V.height); }
     else if (G.down && G.srz > 0) txt = bar(G.srz / BR.rezTime, 0x7dff6a, `✚ GETTING YOURSELF BACK UP  ${Math.round(G.srz / BR.rezTime * 100)}%   stay inside the garage`);
+    else if (G.down && (() => { const g0 = m.gs, e = 0.6; return (MODES.br.map(m).rez || []).some((q, i) => c.x > q.x0 - e && c.x < q.x1 + e && c.y > q.y0 - e && c.y < q.y1 + e && g0.gar[i] > g0.t); })()) { const R = MODES.br.map(m).rez || [], e = 0.6, i = R.findIndex(q => c.x > q.x0 - e && c.x < q.x1 + e && c.y > q.y0 - e && c.y < q.y1 + e); txt = `✚ THIS REZ GARAGE IS RECHARGING: ${Math.ceil(g.gar[i] - g.t)} s   find another one, or a team-mate`; bar(G.dhp / BR.downHp, 0xff2a2a); }
     else if (G.down) { txt = `✚ YOU'RE DOWN  ${Math.ceil(G.dhp / BR.downHp * BR.bleed)} s   crawl to a team-mate or a rez garage`; bar(G.dhp / BR.downHp, 0xff2a2a); G2.fillStyle(0x5a0000, 0.18 + 0.08 * Math.sin(this.time.now / 200)).fillRect(0, 0, V.width, V.height); }
     else if (G.rl > 0) { const it = G.inv[G.rlS], gun = it && BR_GUNS[it.k]; txt = gun && gun.shell ? bar((it.a + 1 - G.rl / (G.rlT || 1)) / gun.mag, 0xffd23f, `LOADING SHELLS  ${it.a}/${gun.mag}   RT: fire`) : bar(1 - G.rl / (G.rlT || 1), 0xffd23f, 'RELOADING'); }
     else if (G.use) { const U = G.use, I = BR_ITEMS[U.k], t = U.tk >= 0 ? m.chairs[U.tk] : null; txt = bar(1 - U.left / U.tot, I.sh && !I.hp ? 0x3d8bff : 0x5ad45a, `${I.name} ${t ? '→ ' + (MG.pname(t) || m.name(t)) : ''}`); }
@@ -108,6 +109,12 @@ Object.assign(GameScene.prototype, {
       else if (gun && gun.mag > 2 && it.a < gun.mag && it.a <= Math.ceil(gun.mag * 0.2) && G.am[BR_AMMO[gun.type].i] > 0) txt = 'X: reload'; }   /* (not for one-shot guns like the rocket launcher: they say it when empty) */
     const S = g.st, inStorm = S && Math.hypot(c.x - S.x, c.y - S.y) > S.r;
     if (inStorm && !G.down) { G2.lineStyle(60, 0x7b3dff, 0.22 + 0.12 * Math.sin(this.time.now / 180)).strokeRect(0, 0, V.width, V.height); if (!txt) txt = `🌀 YOU'RE IN THE STORM: get inside the circle!  (-${[1, 2, 4, 6, 8, 12, 20][Math.min(6, S.ph)]} a second)`; }
+    /* v14.3.1: the touch X button says what it will do right now (it grabs, opens, revives and reloads) */
+    if (typeof BR_TOUCH !== 'undefined' && !(this.brMine()[0] && this.brMine()[0].chair !== c)) { let xl = ['✋', 'GRAB'];
+      if (!G.down) { const dn = M.reviveTarget(m, c), it = G.inv[G.sel], gun = it && !G.hol && BR_GUNS[it.k], L = G.foc > 0 && (g.L || []).find(x => x[0] === G.foc);
+        if (dn) xl = ['✚', 'REVIVE']; else if (L && (L[1] === 'chest' || L[1] === 'ammo')) xl = ['📦', 'OPEN']; else if (L) xl = ['✋', 'GRAB'];
+        else if (G.foc < 0) xl = ['🚪', 'DOOR']; else if (gun && it.a < gun.mag && G.am[BR_AMMO[gun.type].i] > 0) xl = ['🔄', 'RELOAD']; }
+      if (BR_TOUCH.x[1] !== xl[1]) BR_TOUCH.x = xl; }
     X.prompt.setText(txt).setVisible(!!txt && m.state === 'play');
   }
 });

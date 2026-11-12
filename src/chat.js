@@ -25,10 +25,10 @@ const Chat = {
       #chat.open .bar{display:flex}#chat .bar input{flex:1;min-width:0;font:inherit;font-size:18px;background:#0a1116;color:#fff;border:1px solid #3c5566;border-radius:7px;padding:4px 8px}
       #chatq{position:fixed;z-index:31;display:none;flex-direction:column;gap:4px;background:rgba(13,21,27,.95);border:1px solid #2f4a5c;border-radius:10px;padding:8px;font-family:"Barlow Condensed",Arial,sans-serif}
       #chatq button.on{background:#19c3ff;color:#06222f;border-color:#19c3ff;font-weight:700}#chatq .hint{color:#9fb2bf;font-size:15px;text-align:center}
-      #chatbtns{position:fixed;left:12px;bottom:58px;z-index:30;display:none;gap:8px;pointer-events:none}
-      #chat.right{left:auto;right:12px}#chatbtns.right{left:auto;right:12px}#voicelist.right{left:auto;right:12px;top:300px;align-items:flex-end}#chatbtns button{pointer-events:auto;font-size:22px;padding:4px 12px;opacity:.85}
+      #chatbtns{position:fixed;left:12px;top:calc(14vh + 6px);z-index:30;display:none;gap:8px;pointer-events:none}
+      #chat.right{left:auto;right:12px}#chatbtns.right{left:auto;right:12px}#voicelist.right{left:auto;right:12px;top:calc(14vh + 60px);align-items:flex-end}#chatbtns button{pointer-events:auto;font-size:22px;padding:4px 12px;opacity:.85}
       #chatbtns button.live{background:#19c3ff;color:#06222f}#chatbtns .dot{display:inline-block;min-width:18px;font-size:14px;background:#ff5a3c;border-radius:9px;margin-left:4px}
-      #voicelist{position:fixed;left:12px;top:110px;z-index:30;display:none;flex-direction:column;gap:4px;font-family:"Barlow Condensed",Arial,sans-serif;font-size:17px;pointer-events:none}
+      #voicelist{position:fixed;left:12px;top:calc(14vh + 60px);z-index:30;display:none;flex-direction:column;gap:4px;font-family:"Barlow Condensed",Arial,sans-serif;font-size:17px;pointer-events:none}
       #voicelist div{background:rgba(13,21,27,.8);border-radius:14px;padding:2px 10px 2px 8px;color:#cfe3ef;border:2px solid transparent}#voicelist div.talk{border-color:#3dff9a;color:#fff}#voicelist div.mute{opacity:.6}
       #chatmenu{position:fixed;z-index:41;display:none;flex-direction:column;gap:4px;background:rgba(13,21,27,.97);border:1px solid #2f4a5c;border-radius:10px;padding:8px;font-family:"Barlow Condensed",Arial,sans-serif;color:#ffe27a}`;
     document.head.append(css);

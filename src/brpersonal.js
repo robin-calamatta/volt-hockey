@@ -13,7 +13,7 @@
   P.update = function (...a) {
     const r = up.apply(this, a), m = this.match; if (!m || m.kind !== 'br' || !m.gs || !this.brMine) return r;
     const mine = this.brMine().map(p => p.chair).filter(Boolean), t = m.gs.t;
-    if (this.online && this.online.role === 'client') for (const c of mine) { const ps = c.gs && c.gs.ps; if (ps && ps[0] !== c._psSeen) { if (c._psSeen !== undefined) { try { Sound.play(ps[1]); } catch (e) { /* no sound */ } } c._psSeen = ps[0]; } }
+    if (this.online && this.online.role === 'client') for (const c of mine) { const ps = c.gs && c.gs.ps; if (ps && ps[0] !== c._psSeen) { if (c._psSeen !== undefined && !(ps[1] === 'blip' && performance.now() < (c._blipPred || 0))) { try { Sound.play(ps[1]); } catch (e) { /* no sound */ } } c._psSeen = ps[0]; } }
     if (this.noticeText && !(m.noticeLeft > 0) && m.state === 'play') { const c = mine.find(o => o.gs && o.gs.sy && t < o.gs.syT); this.noticeText.setText(c ? c.gs.sy : ''); }
     /* the stats line under the clock: only the carts on this screen (it listed every person in the match, which a 30-player public match
        couldn't fit, and on a guest's screen it ran into the storm line) */

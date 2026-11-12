@@ -98,7 +98,10 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
     squads(m) {
       const sq = m.mini.squad || 1; if (sq < 2) return; const people = m.chairs.filter(c => c.player), cpu = m.chairs.filter(c => !c.player), groups = new Map();
       for (const c of people) { const key = c.player.squadKey || (c.player.squad ? 'local' + c.player.squad : 'p' + (c.player.id != null ? c.player.id : c.k)); (groups.get(key) || groups.set(key, []).get(key)).push(c); }
-      let t = 0; const teams = []; for (const list of groups.values()) for (let i = 0; i < list.length; i += sq) teams.push(list.slice(i, i + sq));
+      let t = 0; const teams = [], fill = [];
+      for (const [key, list] of groups) { if (key === 'mm' || key.startsWith('fill:')) { for (let i = 0; i < list.length; i += sq) fill.push(list.slice(i, i + sq)); continue; } for (let i = 0; i < list.length; i += sq) teams.push(list.slice(i, i + sq)); }
+      /* v14.3.1 public matches with FILL: parties and solo players who said "fill" share squads (biggest groups first); NO FILL groups keep their own squad */
+      fill.sort((a, b) => b.length - a.length); const open = []; for (const grp of fill) { const tm = open.find(x => x.length + grp.length <= sq); if (tm) tm.push(...grp); else { const nt = grp.slice(); open.push(nt); teams.push(nt); } }
       for (const team of teams) while (team.length < sq && cpu.length) team.push(cpu.shift());
       while (cpu.length) teams.push(cpu.splice(0, sq));
       for (const team of teams) { for (const c of team) c.gs.team = t; t++; } m.gs.teams = t;
