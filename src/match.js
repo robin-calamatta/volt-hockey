@@ -104,7 +104,8 @@ class Match {
   /* ----- flow ----- */
   kickoff() {
     const F = CONFIG.formation, W = this.width, cy = this.centerY, carry = Settings.penalties && Settings.penaltyCarry && this.state !== undefined, freed = this.scoredOn; this.scoredOn = undefined;
-    const keep = new Map(); if (carry) for (const c of this.chairs) if (c.binLeft > 0 && c.side !== freed) keep.set(c, c.binLeft);   /* penalties that carry over: still in the sin bin after the face-off (unless that team was just scored on) */
+    const keep = new Map(); if (carry) for (const c of this.chairs) if (c.binLeft > 0) keep.set(c, c.binLeft);   /* penalties that carry over: still in the sin bin after the face-off */
+    if (carry && freed !== undefined) { const out = [...keep.keys()].filter(c => c.side === freed).sort((a, b) => keep.get(a) - keep.get(b)); if (out.length) keep.delete(out[0]); }   /* (v14.3.6: like a minor in hockey: the team killing a penalty that gets scored on gets ONE player back, the one with the least time left) */
     for (const c of this.chairs) {
       const dir = c.side ? -1 : 1, base = c.side ? W : 0, size = this.sizes[c.side], guard = c.index === 0 && size > 1;
       const x = guard ? this.nets[c.side].mouthX + dir * F.guardStandoff : base + dir * F.fieldX;
@@ -146,7 +147,8 @@ class Match {
   /* ----- stepping ----- */
   update(dt) {                                      // call every frame; runs fixed physics steps
     if (this.remote) return;                        // an online client's copy is driven by snapshots (see net.js)
-    this.accumulator += dt; const h = 1 / CONFIG.physics.hz;
+    this.accumulator += dt; const h = 1 / (this.kind === 'br' ? 120 : CONFIG.physics.hz);   /* (v14.3.6: Volt Royale steps 120 times a second, not 240: half the work for 64 carts) */
+    if (this.kind === 'br' && this.accumulator > 0.1) this.accumulator = 0.1;   /* (after a hitch, catch up a little, not all at once) */
     while (this.accumulator >= h) { this.savePrev(); this.step(h); this.accumulator -= h; }
     this.alpha = this.accumulator / h;               // how far the screen is between the last two steps (see drawBetween)
   }

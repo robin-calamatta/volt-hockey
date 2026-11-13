@@ -204,7 +204,7 @@ class HostSession {
   guestsOf(owner) { return this.roster.filter(r => r.own === owner); }
   /* A local guest: another person on the same machine as a player, with a controller of their own. They get a cart and a roster entry, but share the owner's connection. */
   addGuest(owner, name, k, preferSide) {
-    if (this.state !== 'lobby' || this.roster.length >= (this.mmFill ? 32 : CONFIG.online.maxPlayers) || this.guestsOf(owner).length >= CONFIG.online.maxGuests) return null;
+    if (this.state !== 'lobby' || this.roster.length >= (this.mmFill ? 100 : CONFIG.online.maxPlayers) || this.guestsOf(owner).length >= CONFIG.online.maxGuests) return null;
     const side = preferSide !== undefined && this.count(preferSide) < this.cfg.sizes[preferSide] ? preferSide : this.openSide(); if (side === undefined) return null;
     const g = { id: this.nextId++, name: this.uniqueName(Settings.cleanName(name) || this.guestName(this.roster.map(r => r.name))), side, mid: !this.cfg.season, own: owner, guest: true, k: k || 0 };   // mid: still in the middle of the side picker (v13.6)
     this.roster.push(g); this.sendRoster(); return g;
@@ -244,7 +244,7 @@ class HostSession {
         return this.sendRoster();
       }
       const side = this.openSide();
-      if (this.roster.length >= (this.mmFill ? 32 : CONFIG.online.maxPlayers) || side === undefined) return this.reject(entry, 'full');
+      if (this.roster.length >= (this.mmFill ? 100 : CONFIG.online.maxPlayers) || side === undefined) return this.reject(entry, 'full');
       if (this.cfg.mini && this.cfg.mini.kind === 'br' && (+msg.psize || 1) > (this.cfg.mini.squad || 1)) return this.reject(entry, 'party-too-big');   // Volt Royale: your party plays as one squad
       entry.id = this.nextId++; clearTimeout(entry.hello);
       this.roster.push({ id: entry.id, name: this.uniqueName(Settings.cleanName(msg.name) || 'Player ' + (this.roster.length + 1)), side, mid: !this.cfg.season, look: Avatar.cleanLook(msg.look), party: cleanText(msg.party, 80), acct: cleanText(msg.acct, 20), adult: !!msg.adult, vid: cleanText(msg.vid, 80), nf: !!msg.nf });
@@ -477,7 +477,7 @@ class ClientSim {
     if (s.cm) for (const t of s.cm) m.hear(t);
     if (s.em) for (const [i, e] of s.em) if (m.chairs[i] && !(this.localIds.has(m.chairs[i].player && m.chairs[i].player.id))) Emotes.show(m.chairs[i], e);   // emojis (your own already showed)
     if (s.mg && m.miniApply) m.miniApply(s.mg);
-    for (const [name, pid] of s.sf) if (!this.localIds.has(pid)) Sound.play(name);          // your own spin screech already played locally
+    for (const [name, pid, x, y, z] of s.sf) if (!this.localIds.has(pid)) Sound.playAt(name, x === undefined ? null : { x, y, z });   /* (v14.3.9: from where it happened) */          // your own spin screech already played locally
     for (const L of this.locals) L.predIndex = s.c.findIndex(row => row[6] === L.id);
     this.snap = { s };
   }

@@ -27,7 +27,7 @@ const BR_GUNS = {
 };
 /* v14.2.24 the storm, like Fortnite: long waits and slow closes (about 16 minutes in all on the huge maps), seven stages. [wait s, close s,
    size left as a share of the map]. Smaller maps scale the times down (to 40% at most) so a little map isn't a long wait. */
-const BR_PHASES = [[150, 120, 0.62], [110, 90, 0.42], [90, 75, 0.26], [70, 60, 0.13], [50, 45, 0.06], [35, 35, 0.02], [20, 25, 0]];
+const BR_PHASES = [[75, 60, 0.62], [55, 45, 0.42], [45, 40, 0.26], [35, 30, 0.13], [25, 25, 0.06], [20, 20, 0.02], [15, 15, 0]];   /* (v14.3.8: about half as long: some 8 minutes in all, was 16) */
 const brPhases = m => { const k = Math.max(0.4, Math.min(1, Math.min(m.width, m.height) / 520)); return m._ph && m._phK === k ? m._ph : (m._phK = k, m._ph = BR_PHASES.map(([w, s, f]) => [Math.round(w * k), Math.round(s * k), f])); };
 const BR_ITEMS = { med: { name: 'MEDKIT', icon: '➕', stack: 3, col: 0xff4d6a }, pot: { name: 'SHIELD POTION', icon: '🛡', stack: 3, col: 0x3d8bff }, boost: { name: 'BOOST', icon: '🚀', stack: 3, col: 0xffd23f }, wall: { name: 'SHIELD WALL', icon: '🧱', stack: 2, col: 0x7ff6ff } };
 const BR_LOOT = [['pistol', 5], ['smg', 4], ['shotgun', 4], ['rifle', 3], ['sniper', 1.5], ['rocket', 1], ['med', 3], ['pot', 3], ['boost', 2.5], ['wall', 2], ['ammo', 4]];
@@ -36,6 +36,11 @@ const BR_TEAMCOL = [0x3dd6ff, 0xff4d6a, 0x7dff6a, 0xffd23f, 0xb28dff, 0xff9f1c, 
 /* ----- map building ----- */
 /* v14.2.2: the walls in an 8 m grid, so collisions and line-of-sight only look at the walls nearby */
 function brWallGrid(M) { if (M._wg && M._wgN === M.walls.length) return M._wg; const cell = 8, map = new Map(); for (const w of M.walls) for (let i = Math.floor((w.x0 - 1) / cell); i <= Math.floor((w.x1 + 1) / cell); i++) for (let j = Math.floor((w.y0 - 1) / cell); j <= Math.floor((w.y1 + 1) / cell); j++) { const k = i * 4096 + j; if (!map.has(k)) map.set(k, []); map.get(k).push(w); } M._wgN = M.walls.length; return (M._wg = { cell, map }); }
+/* v14.3.6: ramps in an 8 m grid too (each cart checked every ramp on the map several times a step: the biggest cost with 64 carts) */
+function brRampsAt(M, x, y) {
+  if (!M._rg || M._rgN !== M.ramps.length) { M._rg = new Map(); M._rgN = M.ramps.length; for (const q of M.ramps) for (let i = Math.floor((q.x0 - 2) / 8); i <= Math.floor((q.x1 + 2) / 8); i++) for (let j = Math.floor((q.y0 - 2) / 8); j <= Math.floor((q.y1 + 2) / 8); j++) { const k = i * 4096 + j; let b = M._rg.get(k); if (!b) M._rg.set(k, b = []); b.push(q); } }
+  return M._rg.get(Math.floor(x / 8) * 4096 + Math.floor(y / 8)) || [];
+}
 function brTreesNear(M, x, y) {   // (v14.2.6: trees in an 8 m grid)
   if (!M._tg || M._tgN !== M.trees.length) { M._tg = new Map(); M._tgN = M.trees.length; for (const t of M.trees) for (let i = Math.floor((t.x - t.r - 1) / 8); i <= Math.floor((t.x + t.r + 1) / 8); i++) for (let j = Math.floor((t.y - t.r - 1) / 8); j <= Math.floor((t.y + t.r + 1) / 8); j++) { const k = i * 4096 + j; let b = M._tg.get(k); if (!b) M._tg.set(k, b = []); b.push(t); } }
   return M._tg.get(Math.floor(x / 8) * 4096 + Math.floor(y / 8)) || [];
@@ -178,15 +183,17 @@ MODES.br = {
   },
   /* where a cart may be: walls, ramps (solid except at their ends), floors (on an upper level), trees */
   ramp: (r, x, y) => r.dir === 0 ? (x - r.x0) / (r.x1 - r.x0) : r.dir === 1 ? (y - r.y0) / (r.y1 - r.y0) : r.dir === 2 ? (r.x1 - x) / (r.x1 - r.x0) : (r.y1 - y) / (r.y1 - r.y0),
-  onFloor(M, lv, x, y, pad = 0.2) {                                       // inside the floors of this level (their union: seams between floors do not block; a ramp end counts as floor at the edge)
-    const inF = (px, py) => brFloorsAt(M, px, py).some(f => f.lv === lv && px >= f.x0 && px <= f.x1 && py >= f.y0 && py <= f.y1), inR = (px, py) => M.ramps.some(q => (q.lv === lv || q.lv + 1 === lv) && px >= q.x0 && px <= q.x1 && py >= q.y0 && py <= q.y1);
-    if (!inF(x, y)) return false; for (const [px, py] of [[x - pad, y], [x + pad, y], [x, y - pad], [x, y + pad]]) if (!inF(px, py) && !inR(px, py)) return false; return true;
+  onFloor(M, lv, x, y, pad = 0.2) {   /* (v14.3.8: the top of a ramp coming up through a stairwell counts too: a CPU can drive onto it from the floor) */   // inside the floors of this level (their union: seams between floors do not block; a ramp end counts as floor at the edge)
+    const inF = (px, py) => brFloorsAt(M, px, py).some(f => f.lv === lv && px >= f.x0 && px <= f.x1 && py >= f.y0 && py <= f.y1), inR = (px, py) => brRampsAt(M, px, py).some(q => (q.lv === lv || q.lv + 1 === lv) && px >= q.x0 && px <= q.x1 && py >= q.y0 && py <= q.y1);
+    if (!inF(x, y) && !inR(x, y)) return false; for (const [px, py] of [[x - pad, y], [x + pad, y], [x, y - pad], [x, y + pad]]) if (!inF(px, py) && !inR(px, py)) return false; return true;
   },
   jump(c, m) {                                                            // X: hop (off a roof, over a gap, to dodge)
     const G = c.gs; if (c.out || G.air || !m || m.state !== 'play') return;
     G.air = 1; G.vz = BR.jumpV; G.ramp = -1; m.sfx('bump');
   },
-  floorAt(M, lv, x, y) { return lv === 0 || brFloorsAt(M, x, y).some(f => f.lv === lv && x >= f.x0 && x <= f.x1 && y >= f.y0 && y <= f.y1); },
+  /* v14.3.7: where a ramp comes up through a floor, the floor has a hole (it's drawn that way): you fall through it onto the ramp instead of
+     driving across thin air */
+  floorAt(M, lv, x, y) { return lv === 0 || (brFloorsAt(M, x, y).some(f => f.lv === lv && x >= f.x0 && x <= f.x1 && y >= f.y0 && y <= f.y1) && !brRampsAt(M, x, y).some(r => r.lv + 1 === lv && x > r.x0 - 0.05 && x < r.x1 + 0.05 && y > r.y0 - 0.05 && y < r.y1 + 0.05)); },
   fly(m, c, h) {                                                          // in the air: gravity, walls at the height you are at, and land on whatever is below
     const M = this.map(m), G = c.gs, R = R_CART(), K = CONFIG.chair, z0 = G.z; let z = z0 + G.vz * h; G.vz -= BR.grav * h;
     const top = brTop(M);
@@ -194,7 +201,7 @@ MODES.br = {
     const lvNow = Math.max(0, Math.floor((z + 0.3) / BR.H));
     for (const w of brWallsNear(M, c.x - 2, c.y - 2, c.x + 2, c.y + 2)) if (w.lv === lvNow) MG.rectPush(c, R, w, K.boardBounce);
     if (lvNow === 0 && z < 3) for (const t of brTreesNear(M, c.x, c.y)) { const dx = c.x - t.x, dy = c.y - t.y, d = Math.hypot(dx, dy), mn = R + t.r; if (d < mn && d > 0) { c.x = t.x + dx / d * mn; c.y = t.y + dy / d * mn; } }
-    for (const q of M.ramps) {                                            // a ramp: land on its deck, or bump its side if you are below the deck
+    for (const q of brRampsAt(M, c.x, c.y)) {                             // a ramp: land on its deck, or bump its side if you are below the deck
       if (c.x < q.x0 || c.x > q.x1 || c.y < q.y0 || c.y > q.y1) continue; const t = this.ramp(q, c.x, c.y), sz = (q.lv + Math.max(0, Math.min(1, t))) * BR.H;
       if (z <= sz && z0 >= sz - 0.6 && G.vz <= 0) { this.land(m, c, sz); G.ramp = q.id; G.lv = t >= 1 ? q.lv + 1 : q.lv; return; }
       if (z < sz - 0.6 && z + BR.headroom > sz - 0.1) MG.rectPush(c, R, q, K.boardBounce);   // (v14.2.7: only if your head would hit the deck)
@@ -212,24 +219,29 @@ MODES.br = {
     const M = this.map(m), G = c.gs, R = R_CART(), K = CONFIG.chair;
     if (G.air) return this.fly(m, c, h || 1 / 120);
     let r = G.ramp >= 0 ? M.ramps[G.ramp] : null;
-    if (!r) for (const q of M.ramps) { if (c.x < q.x0 || c.x > q.x1 || c.y < q.y0 || c.y > q.y1) continue; const t = this.ramp(q, c.x, c.y); if ((q.lv === G.lv && t < 0.3) || (q.lv + 1 === G.lv && t > 0.7)) { r = q; break; } }
+    if (!r) for (const q of brRampsAt(M, c.x, c.y)) { if (c.x < q.x0 || c.x > q.x1 || c.y < q.y0 || c.y > q.y1) continue; const t = this.ramp(q, c.x, c.y); if ((q.lv === G.lv && t < 0.3) || (q.lv + 1 === G.lv && t > 0.7)) { r = q; break; } }
     if (r) {                                                                // on a ramp: the side rails keep you on it; leave by either end
-      G.ramp = r.id; if (r.dir % 2 === 0) { if (c.y < r.y0 + R) { c.y = r.y0 + R; c.vy = Math.max(0, c.vy); } if (c.y > r.y1 - R) { c.y = r.y1 - R; c.vy = Math.min(0, c.vy); } } else { if (c.x < r.x0 + R) { c.x = r.x0 + R; c.vx = Math.max(0, c.vx); } if (c.x > r.x1 - R) { c.x = r.x1 - R; c.vx = Math.min(0, c.vx); } }
+      /* v14.3.6: people can drive off the side of a ramp too (and drop); the CPU stays between the rails */
+      if ((c.player || G.letDrop > m.simTime) && (r.dir % 2 === 0 ? c.y < r.y0 || c.y > r.y1 : c.x < r.x0 || c.x > r.x1)) { const t0 = this.ramp(r, c.x, c.y); G.z = MG.r2((r.lv + Math.max(0, Math.min(1, t0))) * BR.H); G.ramp = -1; if (G.z > 0.3) { G.air = 1; G.vz = 0; } else G.lv = r.lv; return; }
+      G.ramp = r.id; if (!(c.player || G.letDrop > m.simTime) && r.dir % 2 === 0) { if (c.y < r.y0 + R) { c.y = r.y0 + R; c.vy = Math.max(0, c.vy); } if (c.y > r.y1 - R) { c.y = r.y1 - R; c.vy = Math.min(0, c.vy); } } else if (!(c.player || G.letDrop > m.simTime)) { if (c.x < r.x0 + R) { c.x = r.x0 + R; c.vx = Math.max(0, c.vx); } if (c.x > r.x1 - R) { c.x = r.x1 - R; c.vx = Math.min(0, c.vx); } }
       const t = this.ramp(r, c.x, c.y); if (t <= 0) { G.lv = r.lv; G.ramp = -1; } else if (t >= 1) { G.lv = r.lv + 1; G.ramp = -1; }
       G.z = MG.r2((r.lv + Math.max(0, Math.min(1, t))) * BR.H); return;
     }
     G.ramp = -1; G.z = G.lv * BR.H;
     { const GR = brWallGrid(M);   // (v14.2.2: walls in an 8 m grid: only the ones near you are checked)
-      const i = Math.floor(c.x / GR.cell), j = Math.floor(c.y / GR.cell), seen = new Set(); for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) for (const w of GR.map.get((i + di) * 4096 + j + dj) || []) if (w.lv === G.lv && !seen.has(w)) { seen.add(w); MG.rectPush(c, R, w, K.boardBounce); } }
-    for (const q of M.ramps) {                                           // a ramp is solid from the sides; its foot (or its top, from above) is open
+      const i = Math.floor(c.x / GR.cell), j = Math.floor(c.y / GR.cell), seen = new Set(); for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) for (const w of GR.map.get((i + di) * 4096 + j + dj) || []) if (w.lv === G.lv && w.x0 < c.x + R && w.x1 > c.x - R && w.y0 < c.y + R && w.y1 > c.y - R && !seen.has(w)) { seen.add(w); MG.rectPush(c, R, w, K.boardBounce); } }   /* (v14.3.6: only walls you touch) */
+    for (const q of brRampsAt(M, c.x, c.y)) {                            // a ramp is solid from the sides; its foot (or its top, from above) is open
       if (q.lv !== G.lv && q.lv + 1 !== G.lv) continue;
       const t = this.ramp(q, c.x, c.y), lat = q.dir % 2 === 0 ? c.y > q.y0 + 0.1 && c.y < q.y1 - 0.1 : c.x > q.x0 + 0.1 && c.x < q.x1 - 0.1, L = q.dir % 2 === 0 ? q.x1 - q.x0 : q.y1 - q.y0, e = (R + 0.3) / L;
       if (lat && ((q.lv === G.lv && t > -e && t < 0.3) || (q.lv + 1 === G.lv && t > 0.7 && t < 1 + e))) continue;
+      /* v14.3.6: a ramp that tops out at your level lies BELOW you everywhere but its top end: drive over its side (off a floor's edge, or
+         into a stairwell) and you drop onto it, instead of hitting an invisible wall. (The CPU keeps its railings unless it means to drop.) */
+      if (q.lv + 1 === G.lv && (c.player || G.letDrop > m.simTime)) { if (c.x >= q.x0 && c.x <= q.x1 && c.y >= q.y0 && c.y <= q.y1 && !this.floorAt(M, G.lv, c.x, c.y)) { G.air = 1; G.vz = 0; G.ramp = -1; return; } continue; }
       MG.rectPush(c, R, q.lv === G.lv ? brRampLow(q) : q, K.boardBounce);   // (v14.2.7: from below, only the low end is solid: you can drive under the high end of a ramp)
     }
     for (const o of MG.all(m, 'dwall')) if (o.lv === G.lv) for (const p of this.wallPosts(o)) { const dx = c.x - p.x, dy = c.y - p.y, d = Math.hypot(dx, dy), mn = R + 0.42; if (d < mn && d > 0) { c.x = p.x + dx / d * mn; c.y = p.y + dy / d * mn; } }
     if (G.lv === 0) { for (const t of brTreesNear(M, c.x, c.y)) { const dx = c.x - t.x, dy = c.y - t.y, d = Math.hypot(dx, dy), mn = R + t.r; if (d < mn && d > 0) { c.x = t.x + dx / d * mn; c.y = t.y + dy / d * mn; const vn = (c.vx * dx + c.vy * dy) / d; if (vn < 0) { c.vx -= 1.4 * vn * dx / d; c.vy -= 1.4 * vn * dy / d; } } } }
-    else if ((c.player || G.letDrop > m.simTime) && !this.floorAt(M, G.lv, c.x, c.y) && !M.ramps.some(q => (q.lv === G.lv || q.lv + 1 === G.lv) && c.x >= q.x0 && c.x <= q.x1 && c.y >= q.y0 && c.y <= q.y1)) { G.air = 1; G.vz = 0; }   // people can drive off the edge (and drop)
+    else if ((c.player || G.letDrop > m.simTime) && !this.floorAt(M, G.lv, c.x, c.y) && !brRampsAt(M, c.x, c.y).some(q => (q.lv === G.lv || q.lv + 1 === G.lv) && c.x >= q.x0 && c.x <= q.x1 && c.y >= q.y0 && c.y <= q.y1)) { G.air = 1; G.vz = 0; }   // people can drive off the edge (and drop)
     else if (!c.player && !(G.letDrop > m.simTime) && !this.onFloor(M, G.lv, c.x, c.y)) {                // the CPU: railings at the edge of every floor (so it keeps to its route)
       if (this.onFloor(M, G.lv, c.x, c.py)) { c.y = c.py; c.vy = 0; } else if (this.onFloor(M, G.lv, c.px, c.y)) { c.x = c.px; c.vx = 0; } else { c.x = c.px; c.y = c.py; c.vx = c.vy = 0; }
     }
@@ -238,7 +250,8 @@ MODES.br = {
   noCollide: (a, b) => Math.abs((a.gs.z || 0) - (b.gs.z || 0)) > 1,
   step(m, h) {
     const g = m.gs, M = this.map(m); g.t += h;
-    const LG = new Map(); for (const L of g.L) { const key = Math.floor(L[2] / 4) * 4096 + Math.floor(L[3] / 4); let b = LG.get(key); if (!b) LG.set(key, b = []); b.push(L); }   // (v14.2.6: loot in 4 m buckets: each cart only checks what's next to it)
+    let LG = m._lg; if (LG && m._lgL === g.L && g.L.length > m._lgN && g.t - m._lgT <= 0.5) { for (let i = m._lgN; i < g.L.length; i++) { const L = g.L[i], key = Math.floor(L[2] / 4) * 4096 + Math.floor(L[3] / 4); let b = LG.get(key); if (!b) LG.set(key, b = []); b.push(L); } m._lgN = g.L.length; }   /* (v14.3.7: new loot dropped is added, not the whole grid rebuilt) */
+    if (!LG || m._lgL !== g.L || m._lgN !== g.L.length || g.t - m._lgT > 0.5) { LG = m._lg = new Map(); m._lgL = g.L; m._lgN = g.L.length; m._lgT = g.t; for (const L of g.L) { const key = Math.floor(L[2] / 4) * 4096 + Math.floor(L[3] / 4); let b = LG.get(key); if (!b) LG.set(key, b = []); b.push(L); } }   /* (v14.3.6: kept between steps until the loot changes) */   // (v14.2.6: loot in 4 m buckets: each cart only checks what's next to it)
     for (const c of m.chairs) {
       const G = c.gs; if (c.out) continue;
       G.cd = Math.max(0, G.cd - h); G.boost = Math.max(0, G.boost - h); G.hitT = Math.max(0, (G.hitT || 0) - h);
@@ -248,7 +261,7 @@ MODES.br = {
       for (const L of near) {                                              // drive over loot to pick it up
         const ddx = c.x - L[2], ddy = c.y - L[3]; if (ddx > 1 || ddx < -1 || ddy > 1 || ddy < -1) continue;   // (v14.2.2: a quick test first: most loot is nowhere near)
         if (L[4] !== G.lv || G.ramp >= 0 || G.air || Math.hypot(ddx, ddy) > R_CART() + 0.4 || (L[7] === c.k && L[6] > g.t)) continue;   // (not what you just dropped)
-        if (this.take(m, c, L)) { g.L = g.L.filter(x => x !== L); const b = LG.get(Math.floor(L[2] / 4) * 4096 + Math.floor(L[3] / 4)); if (b) b.splice(b.indexOf(L), 1); break; }
+        if (this.take(m, c, L)) { g.L = g.L.filter(x => x !== L); m._lgL = g.L; m._lgN = g.L.length; const b = LG.get(Math.floor(L[2] / 4) * 4096 + Math.floor(L[3] / 4)); if (b) b.splice(b.indexOf(L), 1); break; }
       }
     }
     this.storm(m, h);
@@ -283,7 +296,7 @@ MODES.br = {
     if (S.shrink <= 0) { S.ph++; S.wait = S.ph < PH.length ? PH[S.ph][0] : 0; }
   },
   bullet(m, o, h) {
-    const M = this.map(m), n = 4; let hit = false, lv = 0; const top = brTop(M);
+    const M = this.map(m), n = h > 1 / 200 ? 8 : 4; let hit = false, lv = 0; const top = brTop(M);
     for (let s = 0; s < n && !hit; s++) {
       const hz0 = o.z + 0.55; o.x += o.vx * h / n; o.y += o.vy * h / n; o.z += (o.vz || 0) * h / n; const hz = o.z + 0.55; lv = Math.max(0, Math.floor(hz / BR.H));
       if (o.x < 0 || o.y < 0 || o.x > m.width || o.y > m.height || hz < 0.02 || hz > (top + 2) * BR.H) { hit = true; break; }
@@ -295,7 +308,7 @@ MODES.br = {
       const sh = m.chairs[o.k];
       for (const c of m.chairs) { if (c === sh || c.out || (sh && c.gs.team === sh.gs.team) || (o.z + 0.55) < c.gs.z - 0.1 || (o.z + 0.55) > c.gs.z + 1.3) continue; if (Math.hypot(c.x - o.x, c.y - o.y) < R_CART() + 0.12) { if (o.w !== 'rocket') this.hurt(m, c, BR_GUNS[o.w].dmg, sh); hit = true; break; } }
     }
-    if (hit && o.w === 'rocket') { const G = BR_GUNS.rocket; MG.add(m, { t: 'boom', x: MG.r2(o.x), y: MG.r2(o.y), z: o.z, life: 0.7 }); m.sfx('boom'); for (const c of m.chairs) { if (c.out || Math.abs(c.gs.z - o.z) > 1.5) continue; const d = Math.hypot(c.x - o.x, c.y - o.y); if (d < G.splash) { const sh = m.chairs[o.k]; if (!(sh && c.gs.team === sh.gs.team && c !== sh)) this.hurt(m, c, G.dmg * (1 - d / G.splash * 0.6) * (c === sh ? 0.4 : 1), sh); const k = 5 * (1 - d / G.splash); c.vx += (c.x - o.x) / (d || 1) * k; c.vy += (c.y - o.y) / (d || 1) * k; } } }
+    if (hit && o.w === 'rocket') { const G = BR_GUNS.rocket; MG.add(m, { t: 'boom', x: MG.r2(o.x), y: MG.r2(o.y), z: o.z, life: 0.7 }); m.sfx('boom', 0, { x: o.x, y: o.y, z: o.z || 0 }); for (const c of m.chairs) { if (c.out || Math.abs(c.gs.z - o.z) > 1.5) continue; const d = Math.hypot(c.x - o.x, c.y - o.y); if (d < G.splash) { const sh = m.chairs[o.k]; if (!(sh && c.gs.team === sh.gs.team && c !== sh)) this.hurt(m, c, G.dmg * (1 - d / G.splash * 0.6) * (c === sh ? 0.4 : 1), sh); const k = 5 * (1 - d / G.splash); c.vx += (c.x - o.x) / (d || 1) * k; c.vy += (c.y - o.y) / (d || 1) * k; } } }
     if (hit || m.gs.t > o.until) MG.remove(m, o); else { o.x = MG.r2(o.x); o.y = MG.r2(o.y); o.z = Math.round(o.z * 1000) / 1000; }
   },
   hurt(m, c, dmg, by, storm) {
@@ -426,18 +439,20 @@ MODES.br = {
     let goal = null, gl = 0; const inStorm = Math.hypot(c.x - S.x, c.y - S.y) > S.r - 3, safe = { x: S.fx || S.x, y: S.fy || S.y };
     const armed = G.inv.some(it => BR_GUNS[it.k] && it.a > 0 && it.k !== 'pistol');
     if (inStorm || (Math.hypot(c.x - S.x, c.y - S.y) > S.r * 0.85 && S.shrink > 0) || (S.shrink > 0 && Math.hypot(c.x - S.fx, c.y - S.fy) > S.fr * 0.9)) { goal = safe; gl = 0; }   // head for the next circle while the storm moves
-    if (!goal || !inStorm) { let best = null, bd = armed ? 24 : 60; const anyGun = G.inv.some(i => BR_GUNS[i.k]), lowAmmo = G.inv.some(i => BR_GUNS[i.k] && i.a < BR_GUNS[i.k].ammo * 0.4), lim = bd + 21; for (const L of g.L) { const qx = L[2] - c.x, qy = L[3] - c.y; if (qx > lim || qx < -lim || qy > lim || qy < -lim) continue;   /* (v14.2.3: far-off loot skipped first) */ if (Math.hypot(L[2] - S.x, L[3] - S.y) > S.r - 2) continue; const want = L[1] === 'card' ? 0 : L[1].startsWith('am_') ? (G.am && G.am[BR_AMMO[L[1].slice(3)].i] < BR_AMMO[L[1].slice(3)].max * 0.5 ? 2 : 0) : !BR_GUNS[L[1]] && !BR_ITEMS[L[1]] && L[1] !== 'chest' && L[1] !== 'ammo' ? 0 : L[1] === 'chest' ? (anyGun ? (G.inv.length < BR.slots ? 1.2 : 0) : 5) : L[1] === 'ammo' ? (lowAmmo ? 3 : 0) : L[1] === 'med' && G.hp < 70 ? 3 : BR_GUNS[L[1]] ? (G.inv.some(i => i.k === L[1]) ? 0.3 : G.inv.length < BR.slots ? 2 : 0) : (G.inv.length < BR.slots || G.inv.some(i => i.k === L[1] && i.a < BR_ITEMS[L[1]].stack)) ? 1 : 0; if (!want) continue; const d = Math.hypot(L[2] - c.x, L[3] - c.y) + Math.abs(L[4] - G.lv) * 2 - want * 3 - (L[4] > 0 ? 5 : 0); if (d < bd) { bd = d; best = L; } } if (best) { goal = { x: best[2], y: best[3] }; gl = best[4]; } }
+    if (!goal || !inStorm) { let best = null, bd = armed ? 24 : 60; const anyGun = G.inv.some(i => BR_GUNS[i.k]), lowAmmo = G.inv.some(i => BR_GUNS[i.k] && i.a < BR_GUNS[i.k].ammo * 0.4), lim = bd + 21; for (const L of g.L) { const qx = L[2] - c.x, qy = L[3] - c.y; if (qx > lim || qx < -lim || qy > lim || qy < -lim) continue; if (G.skipL && G.skipL.has(L[0])) continue; if (L[7] === c.k && L[6] > g.t) continue; if (BR_GUNS[L[1]]) { const own = G.inv.find(i => i.k === L[1]); if (own && own.a >= BR_GUNS[L[1]].ammo * 2) continue; }   /* (v14.3.8: loot it found no way to, loot it just dropped, or a gun it has with full ammo: it can't pick those up, so it sat on them) */   /* (v14.2.3: far-off loot skipped first) */ if (Math.hypot(L[2] - S.x, L[3] - S.y) > S.r - 2) continue; const want = L[1] === 'card' ? 0 : L[1].startsWith('am_') ? (G.am && G.am[BR_AMMO[L[1].slice(3)].i] < BR_AMMO[L[1].slice(3)].max * 0.5 ? 2 : 0) : !BR_GUNS[L[1]] && !BR_ITEMS[L[1]] && L[1] !== 'chest' && L[1] !== 'ammo' ? 0 : L[1] === 'chest' ? (anyGun ? (G.inv.length < BR.slots ? 1.2 : 0) : 5) : L[1] === 'ammo' ? (lowAmmo ? 3 : 0) : L[1] === 'med' && G.hp < 70 ? 3 : BR_GUNS[L[1]] ? (G.inv.some(i => i.k === L[1]) ? 0.3 : G.inv.length < BR.slots ? 2 : 0) : (G.inv.length < BR.slots || G.inv.some(i => i.k === L[1] && i.a < BR_ITEMS[L[1]].stack)) ? 1 : 0; if (!want) continue; const d = Math.hypot(L[2] - c.x, L[3] - c.y) + Math.abs(L[4] - G.lv) * 2 - want * 3 - (L[4] > 0 ? 5 : 0); if (d < bd) { bd = d; best = L; } } if (best) { goal = { x: best[2], y: best[3], lid: best[0] }; gl = best[4]; } }
     if (!goal) { const t = MG.live(m).filter(o => o.gs.team !== G.team).sort((a, b) => MH.dist(c, a) - MH.dist(c, b))[0]; if (t && G.inv.some(it => BR_GUNS[it.k] && it.a > 0) && (g.t > 35 || S.ph >= 1 || G.inv.length >= 2)) { goal = t; gl = t.gs.lv; } else if (!G.camp || m.simTime > G.camp.until) { const f = this.map(m).floors.filter(f => Math.hypot((f.x0 + f.x1) / 2 - S.x, (f.y0 + f.y1) / 2 - S.y) < S.r * 0.8); const h = f[Math.floor(Math.random() * f.length)]; G.camp = h && Math.random() < 0.6 ? { x: (h.x0 + h.x1) / 2, y: (h.y0 + h.y1) / 2, lv: h.lv, until: m.simTime + 20 } : { x: safe.x, y: safe.y, lv: 0, until: m.simTime + 10 }; } if (!goal) { goal = G.camp; gl = G.camp.lv; } }   // early on: loot, or take the high ground
     if (c.goTo) { goal = c.goTo; gl = c.goTo.lv; }                       // (a fixed destination: tests and demos)
     if (G.boost <= 0 && Math.hypot(goal.x - c.x, goal.y - c.y) > 18 && G.inv.some(x => x.k === 'boost') && G.cd <= 0 && G.ramp < 0) { const prev = G.sel; G.sel = G.inv.findIndex(x => x.k === 'boost'); c.wantUse = true; G.selBack = prev; }
     const Nv = c.brNav || (c.brNav = {}), moved = Nv.gx === undefined || Nv.gl !== gl || Math.hypot(goal.x - Nv.gx, goal.y - Nv.gy) > Math.max(2.5, Math.hypot(goal.x - c.x, goal.y - c.y) * 0.2);
     /* v14.2.6: re-plan when the goal has really moved (not every time a chased cart moves a metre), and only a few CPUs plan in any one step (a big map's search can take a few ms each) */
-    if (Nv.at === undefined || m.simTime - Nv.at > (Nv.path ? 2 : 1.4) || moved) {   // (a search that found nothing waits too, rather than trying again every step)
-      const B = m._rb || (m._rb = { t: -1, n: 0 }); if (B.t !== m.simTime) { B.t = m.simTime; B.n = 0; }
-      if (B.n < 1) { B.n++; Nv.path = this.route(m, c, goal.x, goal.y, gl); Nv.at = m.simTime; Nv.gx = goal.x; Nv.gy = goal.y; Nv.gl = gl; } }
-    const P = Nv.path; if (!P || !P.length) { if (G.lv > 0 && Nv.at !== undefined && !Nv.path) G.letDrop = m.simTime + 2; return MH.to(c, goal.x, goal.y, 0.8); }   // (v14.2.6: no way down found from up here: it may drive off the edge)
+    if ((Nv.at === undefined || m.simTime - Nv.at > (Nv.path ? 2 : 1.4) || moved) && !(G.ramp >= 0 && Nv.path && Nv.path.length)) {   /* (v14.3.8: not half-way along a ramp) */   // (a search that found nothing waits too, rather than trying again every step)
+      const B = m._rb || (m._rb = { t: -1, n: 0 }); if (m.simTime - B.t >= 1 / 60 - 1e-6) { B.t = m.simTime; B.n = 0; B.p0 = performance.now(); }   /* (v14.3.6: one search per 1/60 s, not one per step; v14.3.8: up to 4, within 1.5 ms: with 100 carts one wasn't enough, and CPUs waiting for a route drove straight at things) */
+      if (B.n < 4 && (B.n === 0 || performance.now() - B.p0 < 1.5)) { B.n++; Nv.path = this.route(m, c, goal.x, goal.y, gl); Nv.at = m.simTime; Nv.gx = goal.x; Nv.gy = goal.y; Nv.gl = gl; } }
+    const P = Nv.path; if (!P || !P.length) { if (G.lv > 0 && Nv.at !== undefined && !Nv.path) G.letDrop = m.simTime + 2;
+      if (Nv.at !== undefined && !Nv.path && Nv.at === m.simTime) { if (goal.lid !== undefined) (G.skipL || (G.skipL = new Set())).add(goal.lid); if (goal === G.camp) G.camp.until = 0; }   /* (v14.3.8: no way there: pick something else, don't drive at it through a wall) */
+      { const dg = Math.hypot(goal.x - c.x, goal.y - c.y); if (goal === G.camp && dg < 1.5) return { x: Math.cos(c.heading), y: Math.sin(c.heading), speed: 0 }; return MH.to(c, goal.x, goal.y, dg < 3 && gl === G.lv ? Math.max(0.3, 0.27 * dg) : 0.8); } }   // (v14.2.6: no way down found from up here: it may drive off the edge)
     while (P.length > 1 && P[0].lv === G.lv && Math.hypot(P[0].x - c.x, P[0].y - c.y) < 1) P.shift();
-    if (G.ramp >= 0) { Nv.enter = -1; const r = M.ramps[G.ramp], up = P.some(q => q.lv > r.lv), ux = [1, 0, -1, 0][r.dir] * (up ? 1 : -1), uy = [0, 1, 0, -1][r.dir] * (up ? 1 : -1); return { x: ux, y: uy, speed: 0.8 }; }   // on a ramp: straight up (or down) it
+    if (G.ramp >= 0) { Nv.enter = -1; const r = M.ramps[G.ramp], up = P[0].lv > r.lv,   /* (v14.3.8: which end it's heading for next, not whether it goes up somewhere later) */ ux = [1, 0, -1, 0][r.dir] * (up ? 1 : -1), uy = [0, 1, 0, -1][r.dir] * (up ? 1 : -1); return { x: ux, y: uy, speed: 0.8 }; }   // on a ramp: straight up (or down) it
     const i0 = P.findIndex(q => q.ramp >= 0 && q.lv !== G.lv), stop = i0 < 0 ? P.length : i0;
     if (i0 === 0 || (i0 > 0 && Math.hypot(P[i0 - 1].x - c.x, P[i0 - 1].y - c.y) < 1.6)) {   // next: a ramp. Line up in front of its foot (or top), then drive straight onto it
       const q = M.ramps[P[i0].ramp], up = P[i0].lv > G.lv, ux = [1, 0, -1, 0][q.dir] * (up ? 1 : -1), uy = [0, 1, 0, -1][q.dir] * (up ? 1 : -1), cx = (q.x0 + q.x1) / 2, cy = (q.y0 + q.y1) / 2, half = q.dir % 2 === 0 ? (q.x1 - q.x0) / 2 : (q.y1 - q.y0) / 2;
@@ -446,13 +461,14 @@ MODES.br = {
       if (side < 0.5 && along > -0.6 && along < 1.2) { Nv.enter = q.id; Nv.enterAt = m.simTime; return MH.to(c, cx + ux * half, cy + uy * half, 0.75); }
       return MH.to(c, fx, fy, Math.hypot(c.x - fx, c.y - fy) < 2 ? 0.45 : 0.85);
     }
-    let wp = P[0]; let bx0 = c.x, by0 = c.y, bx1 = c.x, by1 = c.y; for (let i = Math.min(stop - 1, 8); i > 0; i--) { const q = P[i]; if (!q) continue; bx0 = Math.min(bx0, q.x); by0 = Math.min(by0, q.y); bx1 = Math.max(bx1, q.x); by1 = Math.max(by1, q.y); } const walls = brWallsNear(M, bx0 - 1, by0 - 1, bx1 + 1, by1 + 1).filter(w => w.lv === G.lv);   // (v14.2.6: only the walls near the route ahead)
+    let wp = P[0]; let bx0 = c.x, by0 = c.y, bx1 = c.x, by1 = c.y; for (let i = Math.min(stop - 1, 8); i > 0; i--) { const q = P[i]; if (!q) continue; bx0 = Math.min(bx0, q.x); by0 = Math.min(by0, q.y); bx1 = Math.max(bx1, q.x); by1 = Math.max(by1, q.y); } const walls = brWallsNear(M, bx0 - 1, by0 - 1, bx1 + 1, by1 + 1).filter(w => w.lv === G.lv).concat(M.ramps.filter(q => (q.lv === G.lv || q.lv + 1 === G.lv) && q.x0 < bx1 + 1 && q.x1 > bx0 - 1 && q.y0 < by1 + 1 && q.y1 > by0 - 1));   /* (v14.3.8: ramps too: no short cuts across a ramp's side) */   // (v14.2.6: only the walls near the route ahead)
     for (let i = Math.min(stop - 1, 8); i > 0; i--) if (P[i].lv === G.lv && MG.clearPath(c.x, c.y, P[i].x, P[i].y, walls, 0.5)) { wp = P[i]; break; }
-    return MH.to(c, wp.x, wp.y, 0.9);
+    { const dg = Math.hypot(goal.x - c.x, goal.y - c.y); if (goal === G.camp && dg < 1.5 && gl === G.lv) return { x: Math.cos(c.heading), y: Math.sin(c.heading), speed: 0 };   /* (v14.3.8: there: wait, don't circle the spot) */
+      return MH.to(c, wp.x, wp.y, dg < 3 && gl === G.lv ? Math.max(0.3, 0.3 * dg) : 0.9); }   /* (slowing down near what it's after: at full speed it circled round it, too wide a turn to reach it) */
   },
   hud(m) {
     const S = m.gs.st, live = MG.live(m), teams = new Set(live.map(c => c.gs.team)).size, sq = m.mini.squad || 1, t = Math.ceil(S.wait > 0 ? S.wait : Math.max(0, S.shrink));
-    return { clock: S.ph >= BR_PHASES.length ? 'FINAL' : `${S.wait > 0 ? '⏳' : '🌀'} ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, a: 'VOLT ROYALE', b: sq > 1 ? `${teams} TEAMS LEFT` : `${live.length} LEFT`, mid: S.wait > 0 ? 'Storm closes in' : 'THE STORM IS MOVING', left: MG.peopleLine(m, c => c.out ? 'OUT' : `❤${Math.ceil(c.gs.hp)} 🛡${Math.ceil(c.gs.sh)} ✖${c.gs.kills}`) };
+    return { clock: S.ph >= BR_PHASES.length ? 'FINAL' : `${S.wait > 0 ? '⏳' : '🌀'} ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, a: 'VOLT ROYALE', b: sq > 1 ? `${live.length} LEFT  ·  ${teams} TEAMS` : `${live.length} LEFT`,   /* (v14.3.7: how many carts and teams are still in, as text: no team logos) */ mid: S.wait > 0 ? 'Storm closes in' : 'THE STORM IS MOVING', left: MG.peopleLine(m, c => c.out ? 'OUT' : `❤${Math.ceil(c.gs.hp)} 🛡${Math.ceil(c.gs.sh)} ✖${c.gs.kills}`) };
   },
   tag(c, m, vp) {                                                          // your team-mates' names (enemies show nothing: no tags through walls)
     const me = vp && vp.p && vp.p.chair; if (c.out) return '';
@@ -482,4 +498,4 @@ GAME_INFO.br = { name: 'Volt Royale', cat: 'sneaky', noCarts: true, blurb: 'Loot
     'Switch item: LB / RB  /  Z / R or the mouse wheel  /  [ / ]  /  touch ◀ ITEM ▶', 
     'Bag (and the map): tap D-pad ▲  /  H  /  M  /  touch BAG.  Hold it for the emote wheel', 'Aim up and down: right stick  /  I and K  /  Page Up and Page Down  /  touch AIM UP / AIM DOWN', 'When you are out: LB / RB switch whose view you watch, ▼ first / third person, Y takes over a CPU team-mate', CTRL.pause],
   opts: [{ key: 'map', label: 'Map', values: ['downtown', 'jungle', 'port', 'suburbs', 'canyon'], names: ['Downtown', 'The Jungle', 'The Port', 'The Suburbs', 'The Canyon'], def: 'downtown', hint: () => (BR_MAPS[modeOpts('br').map] || BR_MAPS.downtown).blurb },
-    { key: 'squad', label: 'Teams', values: [1, 2, 3, 4, 5], names: ['Solo', 'Duos (teams of 2)', 'Trios (teams of 3)', 'Squads (teams of 4)', 'Fives (teams of 5)'], def: 1 }, { key: 'carts', label: 'Carts', values: [6, 8, 10, 12, 16, 20, 24, 32, 40], def: 24, hint: 'Carts nobody drives are played by the CPU.' }, { key: 'music', label: 'Music', values: [0, 1], names: ['Off', 'On'], def: 0, hint: 'Game music while you play (your songs in assets/music/game/). Off by default.' }] };
+    { key: 'squad', label: 'Teams', values: [1, 2, 3, 4, 5], names: ['Solo', 'Duos (teams of 2)', 'Trios (teams of 3)', 'Squads (teams of 4)', 'Fives (teams of 5)'], def: 1 }, { key: 'carts', label: 'Carts', values: [40, 50, 60, 70, 80, 90, 100], def: 60, hint: 'Carts nobody drives are played by the CPU.' }, { key: 'music', label: 'Music', values: [0, 1], names: ['Off', 'On'], def: 0, hint: 'Game music while you play (your songs in assets/music/game/). Off by default.' }] };

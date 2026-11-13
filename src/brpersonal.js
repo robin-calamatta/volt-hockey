@@ -17,6 +17,8 @@
     if (this.noticeText && !(m.noticeLeft > 0) && m.state === 'play') { const c = mine.find(o => o.gs && o.gs.sy && t < o.gs.syT); this.noticeText.setText(c ? c.gs.sy : ''); }
     /* the stats line under the clock: only the carts on this screen (it listed every person in the match, which a 30-player public match
        couldn't fit, and on a guest's screen it ran into the storm line) */
+    for (const o of this.sbTeam || []) if (o.active && o.visible) o.setVisible(false);   /* (v14.3.6: no team logos up top in Volt Royale) */
+    if (this.nameA && this.nameA.active && this.courtCX) this.nameA.setX(this.courtCX - 450 + 18);
     if (this.shotsA && this.shotsA.active) this.shotsA.setText(mine.map(c => c.out ? 'OUT' : `✖ ${c.gs.kills || 0} ${mine.length > 1 ? m.name(c) : 'ELIMS'}`).join('   '));
     return r;
   };

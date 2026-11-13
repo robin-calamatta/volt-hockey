@@ -155,7 +155,7 @@ Object.assign(GameScene.prototype, {
       }
       if (split && vp.p) this.pooled(this.vpText, nv++, vpStyle).setOrigin(0, 0.5).setText(vp.p.name || vp.p.tag || '').setColor(teamColorHex(m.teams[vp.p.side])).setPosition(R.x + 14, R.y + top + 18).setVisible(true);
       if (m.mini && vp.p && vp.chair && !split) { /* one view: the item line is drawn by the game screen */ } else if (m.mini && vp.p && vp.chair && m.state === 'play') { const l = this.itemLine(vp.p); if (l) this.pooled(this.vpText, nv++, { ...vpStyle, fontSize: '22px' }).setOrigin(0.5).setText(l).setColor('#ffe27a').setPosition(cx, R.y + R.h - 30).setVisible(true); }
-      if (vp.benched) this.pooled(this.vpText, nv++, vpStyle).setOrigin(0.5).setText(m.mini ? 'OUT: watching from the bench' : `SIN BIN   back in ${Math.max(0, Math.ceil(vp.benchChair.binLeft))}s`).setColor('#ff7a59').setPosition(cx, R.y + R.h * 0.72).setVisible(true);
+      if (vp.benched && m.state !== 'over') this.pooled(this.vpText, nv++, vpStyle).setOrigin(0.5).setText(m.mini ? 'OUT: watching from the bench' : `SIN BIN   back in ${Math.max(0, Math.ceil(vp.benchChair.binLeft))}s`).setColor('#ff7a59').setPosition(cx, R.y + R.h * 0.72).setVisible(true);
       const toast = vp.p && this.toasts.get(vp.p);
       if (toast && this.time.now < toast.until) this.pooled(this.vpText, nv++, { ...vpStyle, fontSize: '30px' }).setOrigin(0.5).setText(toast.text).setColor('#ffe27a').setAlpha(Math.min(1, (toast.until - this.time.now) / 300)).setPosition(cx, R.y + R.h * 0.62).setVisible(true);
     }

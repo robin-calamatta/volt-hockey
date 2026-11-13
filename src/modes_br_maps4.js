@@ -128,6 +128,55 @@ if (typeof BR_FLOORS !== "undefined") BR_FLOORS.grass = 0x5f8a3e;   // (grassy h
     for (const [x, y] of [[40, 34], [40, 42], [52, 34]]) B.wall(x, y, x + 9, y + 3, 0, 'container');
   });
 
+  /* ---------------- v14.3.5 The Town: streets with street lights and fire hydrants, two-storey houses, a school and a plaza ---------------- */
+  const town = build('The Town', { width: 124, height: 100 }, { ground: 0x4f7a3a, sky: 0xa6d0f0, grass: 0x4f7a3a }, 'A real town: two streets lined with street lights and fire hydrants, two-storey houses with stairs up to the bedrooms, a two-storey school with a gym, and a plaza with shops round a fountain.', B => {
+    const STY = ['st1', 'st5', 'st6', 'st8', 'st10', 'st0', 'st4', 'st7'], dg = { n: 0, s: 0, w: 0, e: 0 }; let si = 0;
+    const walls4 = (x, y, w, h, lv, kind, doors = {}) => { B.side(x, y, x + w, y, doors.n || [], lv, kind); B.side(x, y + h, x + w, y + h, doors.s || [], lv, kind); B.side(x, y, x, y + h, doors.w || [], lv, kind); B.side(x + w, y, x + w, y + h, doors.e || [], lv, kind); };
+    /* two storeys: a front door, a ramp up along the back wall (the "stairs"), an upstairs floor round the stairwell, a roof */
+    const house2 = (x, y, w, h, door, kind = STY[si++ % STY.length], loot = true) => {
+      walls4(x, y, w, h, 0, kind, { [door]: [[0.5, 2.2]] }); walls4(x, y, w, h, 1, kind);
+      const back = door === 'n' ? y + h - 2.95 : y + 0.35, hole = { x0: x + 3, y0: back - 0.15, x1: x + 9.6, y1: back + 2.75 };
+      B.ramp(x + 3, back, x + 9.6, back + 2.6, 2, 0, 'wood');             // (rises to the west, to a landing as wide as a cart: drive in, turn, up the stairs)
+      for (const q of rectMinus({ x0: x, y0: y, x1: x + w, y1: y + h }, [hole])) B.floor(q.x0, q.y0, q.x1, q.y1, 1, 'wood');
+      B.floor(x, y, x + w, y + h, 2, 'rf' + (si % 6)); B.deco({ t: 'bldg', x, y, w, h, lv: 0, kind });
+      if (loot) { B.loot(x + w * 0.72, door === 'n' ? y + h * 0.3 : y + h * 0.7, 0); B.loot(x + w * 0.75, door === 'n' ? y + 2.2 : y + h - 2.2, 1); }
+    };
+    const shop = (x, y, w, h, door, kind) => { walls4(x, y, w, h, 0, kind, { [door]: [[0.5, 2.6]] }); B.floor(x, y, x + w, y + h, 1, 'rf' + (si++ % 6)); B.deco({ t: 'bldg', x, y, w, h, lv: 0, kind }); B.loot(x + w / 2, y + h / 2, 0); };
+    const lamp = (x, y, dx, dy) => { B.wall(x - 0.12, y - 0.12, x + 0.12, y + 0.12, 0, 'lamppost'); B.deco({ t: 'lamp', x, y, dx, dy }); };
+    const hydrant = (x, y) => B.wall(x - 0.2, y - 0.2, x + 0.2, y + 0.2, 0, 'hydrant');
+    /* the streets: Main Street (east-west) and School Avenue (north-south) */
+    B.deco({ t: 'road', x: 0, y: 46.5, w: 124, h: 7 }); B.deco({ t: 'road', x: 57.5, y: 0, w: 7, h: 100, v: 1 });
+    for (let x = 6; x < 124; x += 13) if (Math.abs(x - 61) > 6) { lamp(x, 45.2, 0, 1); lamp(x + 6.5, 54.8, 0, -1); }
+    for (let y = 6; y < 100; y += 13) if (Math.abs(y - 50) > 6) { lamp(56.2, y, 1, 0); lamp(65.8, y + 6.5, -1, 0); }
+    for (const [x, y] of [[55.8, 44.8], [66.2, 55.2], [20, 55.3], [100, 44.7], [56.3, 80], [65.7, 20]]) hydrant(x, y);
+    /* north-west: two rows of two-storey houses */
+    for (const x of [3, 21, 39]) { house2(x, 3, 14, 11, 's'); house2(x, 29, 14, 11, 's'); }
+    /* north-east: the school (two storeys, classrooms either side of the hall), the gym, a bus and a flag */
+    const sx = 68, sy = 4, sw = 52, sh = 17, sk = 'st9';
+    walls4(sx, sy, sw, sh, 0, sk, { s: [[0.3, 3], [0.7, 3]] }); walls4(sx, sy, sw, sh, 1, sk);
+    for (const lv of [0, 1]) { B.side(sx + 17, sy, sx + 17, sy + sh, [[0.75, 2.4]], lv, sk); B.side(sx + 35, sy, sx + 35, sy + sh, [[0.75, 2.4]], lv, sk); }   // classroom walls (doors near the hall)
+    B.ramp(sx + 21, sy + 0.4, sx + 31, sy + 3.6, 2, 0, 'wood');                // the main stairs, in the hall
+    for (const q of rectMinus({ x0: sx, y0: sy, x1: sx + sw, y1: sy + sh }, [{ x0: sx + 21, y0: sy + 0.2, x1: sx + 31, y1: sy + 3.8 }])) B.floor(q.x0, q.y0, q.x1, q.y1, 1, 'wood');
+    B.ramp(sx + 38, sy + 0.4, sx + 47, sy + 3.4, 0, 1, 'wood');               // (v14.3.6: and stairs on up to the roof, in the east classroom)
+    for (const q of rectMinus({ x0: sx, y0: sy, x1: sx + sw, y1: sy + sh }, [{ x0: sx + 38, y0: sy + 0.2, x1: sx + 47, y1: sy + 3.6 }])) B.floor(q.x0, q.y0, q.x1, q.y1, 2, 'rf1');
+    B.deco({ t: 'bldg', x: sx, y: sy, w: sw, h: sh, lv: 0, kind: sk }); B.deco({ t: 'sign', x: sx + sw / 2, y: sy + sh + 0.2, lv: 1, text: 'VOLT SCHOOL', col: '#1f4fa8' });
+    for (const [x, y, lv] of [[sx + 8, sy + 8, 0], [sx + 44, sy + 8, 0], [sx + 26, sy + 12, 0], [sx + 8, sy + 9, 1], [sx + 44, sy + 9, 1], [sx + 40, sy + 13, 1]]) B.loot(x, y, lv);
+    walls4(sx + 30, sy + 22, 22, 17, 0, 'st11', { w: [[0.5, 3]], s: [[0.5, 3]] }); B.floor(sx + 30, sy + 22, sx + 52, sy + 39, 1, 'rf3'); B.deco({ t: 'bldg', x: sx + 30, y: sy + 22, w: 22, h: 17, lv: 0, kind: 'st11' }); B.deco({ t: 'sign', x: sx + 41, y: sy + 39.2, lv: 0, text: 'GYM', col: '#c0392b' });
+    B.loot(sx + 41, sy + 30, 0); B.loot(sx + 36, sy + 34, 0);
+    B.wall(sx + 3, sy + 26, sx + 5.6, sy + 36, 0, 'bus'); B.wall(sx + 20, sy + 24, sx + 20.2, sy + 24.2, 0, 'flagpole'); B.deco({ t: 'flag', x: sx + 20.1, y: sy + 24.1 });
+    /* south-west: the plaza (shops down one side, a fountain, benches, planters) */
+    B.deco({ t: 'plaza', x: 19, y: 57, w: 37, h: 40 });
+    shop(3, 57, 14, 12, 'e', 'st2'); shop(3, 71, 14, 12, 'e', 'st3'); shop(3, 85, 14, 12, 'e', 'st11');
+    B.wall(35.5, 75.5, 39.5, 79.5, 0, 'fountain'); B.deco({ t: 'water', x: 37.5, y: 77.5 });
+    for (const [x0, y0, x1, y1] of [[30, 70, 33, 70.6], [42, 70, 45, 70.6], [30, 84.4, 33, 85], [42, 84.4, 45, 85]]) B.wall(x0, y0, x1, y1, 0, 'bench');
+    for (const [x, y] of [[22, 60], [53, 60], [22, 94], [53, 94]]) { B.wall(x - 1, y - 1, x + 1, y + 1, 0, 'planter'); B.tree(x, y, 0.5); }
+    for (const [x, y] of [[26, 77], [49, 77], [37.5, 64], [37.5, 91]]) B.loot(x, y, 0);
+    /* south-east: more houses and a corner store */
+    for (const x of [69, 87, 105]) house2(x, 58, 14, 11, 'n');
+    shop(69, 80, 16, 14, 'n', 'st2'); house2(89, 82, 14, 11, 'n'); house2(107, 82, 14, 11, 'n');
+    B.deco({ t: 'sign', x: 77, y: 79.8, lv: 0, text: 'CORNER STORE', col: '#2a7a3a' });
+  });
+
   /* a huge map: the places, the country between them, biomes, a few rez garages, unique buildings */
   const BIOME = { snow: { col: 0xf2f6fa, tex: 'concrete', trees: 0.25, tint: 0.12 }, desert: { col: 0xf0d098, tex: 'dirt', trees: 0, cactus: 0.12 }, volcanic: { col: 0x5a4c46, tex: 'dirt', trees: 0 },
     badlands: { col: 0xb08060, tex: 'dirt', trees: 0.04 }, urban: { col: 0xb0b0ac, tex: 'asphalt', trees: 0.03 }, coast: { col: 0xe8dcb8, tex: 'concrete', trees: 0.03 }, forest: { col: 0x8fc070, tex: 'jungle', trees: 0.5 },
@@ -139,13 +188,37 @@ if (typeof BR_FLOORS !== "undefined") BR_FLOORS.grass = 0x5f8a3e;   // (grassy h
   const rz0 = brRezGarages;
   const world = (name, theme, blurb, parts, W, H, seed, biomes) => {
     const r = Look.rnd(seed); brRezGarages = (M, w, h, n, sd) => rz0(M, w, h, Math.min(5, Math.max(3, Math.round(w * h / 45000))), sd);   // (a very few rez garages)
-    let T; try { T = brJoin(name, 'suburbs', theme, blurb, parts, W, H, seed); } finally { brRezGarages = rz0; }
+    /* v14.3.5 roads: one down every gap between columns of places, and one along every gap between rows, edge to edge. Kept clear while
+       the country is filled in (no sheds, rocks, trees or rez garages on them), then lined with street lights and fire hydrants */
+    const rects = parts.map(([M, ox, oy]) => ({ x0: ox, y0: oy, x1: ox + M.size.width, y1: oy + M.size.height })), roads = [], RW = 7;
+    const gaps = (lo, hi) => { const keys = [...new Set(rects.map(q => q[lo]))].sort((p, q) => p - q), out = [];
+      for (let i = 0; i + 1 < keys.length; i++) { const a = Math.max(...rects.filter(q => q[lo] === keys[i]).map(q => q[hi])), b = Math.min(...rects.filter(q => q[lo] === keys[i + 1]).map(q => q[lo])); if (b - a >= RW + 6) out.push((a + b) / 2); } return out; };
+    for (const cx of gaps('x0', 'x1')) roads.push({ x: cx - RW / 2, y: 2, w: RW, h: H - 4, v: 1 });
+    for (const cy of gaps('y0', 'y1')) roads.push({ x: 2, y: cy - RW / 2, w: W - 4, h: RW });
+    brJoin.pre = J => { for (const d of J.deco) if (d.t === 'road' || d.t === 'plaza') J.ramps.push({ x0: d.x, y0: d.y, x1: d.x + d.w, y1: d.y + d.h, dir: 0, lv: -9, kind: '_road', _road: 1 });   /* (a town's own streets and plaza too) */
+      for (const q of roads) J.ramps.push({ x0: q.x, y0: q.y, x1: q.x + q.w, y1: q.y + q.h, dir: 0, lv: -9, kind: '_road', _road: 1 }); };
+    let T; try { T = brJoin(name, 'suburbs', theme, blurb, parts, W, H, seed); } finally { brRezGarages = rz0; brJoin.pre = null; }
+    T.ramps = T.ramps.filter(q => !q._road); T.ramps.forEach((q, i) => { q.id = i; });
+    { const hit = (x0, y0, x1, y1) => T.walls.some(w => w.lv === 0 && w.x0 < x1 && w.x1 > x0 && w.y0 < y1 && w.y1 > y0) || T.ramps.some(q => q.lv === 0 && q.x0 < x1 && q.x1 > x0 && q.y0 < y1 && q.y1 > y0) || T.trees.some(t => Math.abs(t.x - (x0 + x1) / 2) < 1.4 && Math.abs(t.y - (y0 + y1) / 2) < 1.4) || rects.some(q => q.x0 < x1 && q.x1 > x0 && q.y0 < y1 && q.y1 > y0);
+      const onRoad = (x, y, e = 1.2) => roads.some(q => x > q.x - e && x < q.x + q.w + e && y > q.y - e && y < q.y + q.h + e);
+      T.trees = T.trees.filter(t => !onRoad(t.x, t.y)); T.loot = T.loot.filter(([x, y, lv]) => lv > 0 || !onRoad(x, y, -0.5));
+      let k = 0; T.roads = roads;
+      for (const q of roads) { T.deco.push({ t: 'road', ...q });
+        const L = q.v ? q.h : q.w;
+        for (let d = 10; d < L - 6; d += 26) { const side = (k++ % 2) ? 1 : -1, off = RW / 2 + 1.1, x = q.v ? q.x + RW / 2 + side * off : q.x + d, y = q.v ? q.y + d : q.y + RW / 2 + side * off;
+          if (onRoad(x, y, 0.3) || hit(x - 0.6, y - 0.6, x + 0.6, y + 0.6)) continue;
+          T.walls.push({ x0: x - 0.12, y0: y - 0.12, x1: x + 0.12, y1: y + 0.12, lv: 0, kind: 'lamppost' }); T.deco.push({ t: 'lamp', x, y, dx: q.v ? -side : 0, dy: q.v ? 0 : -side });
+          if (k % 3 === 0) { const hx = q.v ? x : x + 3, hy = q.v ? y + 3 : y; if (!onRoad(hx, hy, 0.3) && !hit(hx - 0.5, hy - 0.5, hx + 0.5, hy + 0.5)) T.walls.push({ x0: hx - 0.2, y0: hy - 0.2, x1: hx + 0.2, y1: hy + 0.2, lv: 0, kind: 'hydrant' }); } } }
+    }
     const at = (x, y) => (biomes.find(b => x >= b[1] && x < b[3] && y >= b[2] && y < b[4]) || [0, 0, 0, 0, 0, 'grass'])[5];
     T.pois = parts.map(([M, ox, oy, nm]) => ({ name: nm || M.name, x: ox + M.size.width / 2, y: oy + M.size.height / 2, x0: ox, y0: oy, x1: ox + M.size.width, y1: oy + M.size.height }));   // (v14.2.3: named places, for the sky labels and the map)
     T.biomes = biomes; for (const b of biomes) T.deco.push({ t: 'biome', x0: b[1], y0: b[2], x1: b[3], y1: b[4], kind: b[5] });
     const keep = []; for (const t of T.trees) { const B = BIOME[at(t.x, t.y)] || BIOME.grass;            // far fewer trees, by biome; cacti in the desert
       if (r() < B.trees) { if (B.tint) t.tint = B.tint; keep.push(t); } else if (B.cactus && r() < B.cactus) T.walls.push({ x0: t.x - 0.25, y0: t.y - 0.25, x1: t.x + 0.25, y1: t.y + 0.25, lv: 0, kind: 'cactus', h: 1.7 + r() * 0.8 }); }
     T.trees = keep;
+    /* v14.3.6: ramps that ran into walls slid to where they work, and two ramps up onto every big building's roof (src/brramps.js) */
+    BRRamps.fix(T); BRRamps.roofs(T, (T.roads || []).map(q => ({ x0: q.x - 1, y0: q.y - 1, x1: q.x + q.w + 1, y1: q.y + q.h + 1 })).concat(T.deco.filter(d => d.t === 'road' || d.t === 'plaza').map(q => ({ x0: q.x - 1, y0: q.y - 1, x1: q.x + q.w + 1, y1: q.y + q.h + 1 })))); BRRamps.bridge(T);   /* (v14.3.8) */
+    T.ramps.forEach((q, i) => { q.id = i; });
     let si = 0; for (const d of T.deco) if (d.t === 'bldg') {                                                 // every building its own colour and roof
       const st = (si++ * 7 + Math.floor(d.x * 3 + d.y * 5)) % STYLES.length, rf = (si * 5 + Math.floor(d.x + d.y)) % ROOFS.length, e = 0.45;
       for (const w of T.walls) if (w.lv === d.lv && ['bldg', 'house', 'mall', 'hut', 'warehouse'].includes(w.kind) && w.x0 >= d.x - e && w.x1 <= d.x + d.w + e && w.y0 >= d.y - e && w.y1 <= d.y + d.h + e && (Math.abs(w.x0 - d.x) < e || Math.abs(w.x1 - d.x - d.w) < e || Math.abs(w.y0 - d.y) < e || Math.abs(w.y1 - d.y - d.h) < e)) w.kind = 'st' + st;
@@ -156,10 +229,10 @@ if (typeof BR_FLOORS !== "undefined") BR_FLOORS.grass = 0x5f8a3e;   // (grassy h
   };
   const P = globalThis.BR_POI || {}, BB = BR_BASE;
   BR_MAPS.valley = world('Volt Valley', { ground: 0x4f7a3a, sky: 0xa6d0f0, grass: 0x4f7a3a }, 'A massive valley, 760 x 520 m, with twenty named places to land and seven biomes: city, badlands, coast, volcanic ash, forest, farmland and desert. Underground: The Mines, Mount Ember\'s lava tube, Bunker Hill, the Crystal Caves and the Hidden Lab.',
-    [[P.city, 14, 14, 'Volt City'], [BB.downtown, 166, 14, 'Old Town'], [mines, 318, 14, 'The Mines'], [BB.port, 470, 14, 'Harbor Point'], [P.factory, 622, 14, 'Steelworks'], [P.stadium, 14, 142, 'Volt Arena'], [volcano, 166, 142, 'Mount Ember'], [BB.suburbs, 318, 142, 'Maple Grove'], [P.airfield, 470, 142, 'Skyfield'], [P.castle, 622, 142, 'Castle Hill'], [farm, 14, 270, 'Sunny Acres'], [bunker, 166, 270, 'Bunker Hill'], [BB.canyon, 318, 270, 'Dust Canyon'], [truck, 470, 270, 'Last Chance Stop'], [BB.jungle, 622, 270, 'Wildwood'], [lumber, 14, 398, 'Timber Mill'], [caves, 166, 398, 'Crystal Caves'], [mesas, 318, 398, 'Red Mesas'], [lab, 470, 398, 'The Hidden Lab'], [P.park, 622, 398, 'Thrill Park']], 760, 520, 14201,
+    [[P.city, 14, 14, 'Volt City'], [BB.downtown, 166, 14, 'Old Town'], [mines, 318, 14, 'The Mines'], [BB.port, 470, 14, 'Harbor Point'], [P.factory, 622, 14, 'Steelworks'], [P.stadium, 14, 142, 'Volt Arena'], [volcano, 166, 142, 'Mount Ember'], [town, 318, 142, 'Maple Grove'], [P.airfield, 470, 142, 'Skyfield'], [P.castle, 622, 142, 'Castle Hill'], [farm, 14, 270, 'Sunny Acres'], [bunker, 166, 270, 'Bunker Hill'], [BB.canyon, 318, 270, 'Dust Canyon'], [truck, 470, 270, 'Last Chance Stop'], [BB.jungle, 622, 270, 'Wildwood'], [lumber, 14, 398, 'Timber Mill'], [caves, 166, 398, 'Crystal Caves'], [mesas, 318, 398, 'Red Mesas'], [lab, 470, 398, 'The Hidden Lab'], [P.park, 622, 398, 'Thrill Park']], 760, 520, 14201,
     [[0, 0, 0, 304, 128, 'urban'], [0, 304, 0, 456, 128, 'badlands'], [0, 456, 0, 760, 128, 'coast'], [0, 152, 128, 304, 256, 'volcanic'], [0, 608, 128, 760, 520, 'forest'], [0, 0, 256, 304, 384, 'farm'], [0, 304, 256, 608, 384, 'desert'], [0, 0, 384, 152, 520, 'forest'], [0, 152, 384, 456, 520, 'badlands']]);
   BR_MAPS.frost = world('Frostfall Wilds', { ground: 0x5a7a3a, sky: 0xb4d0ec, grass: 0x5a7a3a }, 'Massive wild country, 760 x 520 m, with twenty named places: a snowfield across the north, forest, red desert, farmland, a city, badlands and an ash mountain. Underground: Glacier Caves, the Black Site, the Iron Mines, Ash Mountain and Fort Hollow.',
-    [[P.peak, 14, 14, 'Frost Peak'], [caves, 166, 14, 'Glacier Caves'], [lumber, 318, 14, 'Pine Mill'], [P.castle, 470, 14, 'Winterhold'], [BB.suburbs, 622, 14, 'Snowdrift'], [P.park, 14, 142, 'Frostfall Fair'], [mesas, 166, 142, 'Copper Mesas'], [BB.canyon, 318, 142, 'Red Gulch'], [lab, 470, 142, 'Black Site'], [BB.port, 622, 142, 'Ice Harbor'], [BB.jungle, 14, 270, 'Deepwood'], [farm, 166, 270, 'Meadow Farm'], [BB.downtown, 318, 270, 'Frostfall City'], [P.airfield, 470, 270, 'Northfield'], [truck, 622, 270, 'Junction Nine'], [mines, 14, 398, 'Iron Mines'], [volcano, 166, 398, 'Ash Mountain'], [bunker, 318, 398, 'Fort Hollow'], [P.stadium, 470, 398, 'Frostfall Arena'], [P.factory, 622, 398, 'Old Factory']], 760, 520, 14202,
+    [[P.peak, 14, 14, 'Frost Peak'], [caves, 166, 14, 'Glacier Caves'], [lumber, 318, 14, 'Pine Mill'], [P.castle, 470, 14, 'Winterhold'], [town, 622, 14, 'Snowdrift'], [P.park, 14, 142, 'Frostfall Fair'], [mesas, 166, 142, 'Copper Mesas'], [BB.canyon, 318, 142, 'Red Gulch'], [lab, 470, 142, 'Black Site'], [BB.port, 622, 142, 'Ice Harbor'], [BB.jungle, 14, 270, 'Deepwood'], [farm, 166, 270, 'Meadow Farm'], [BB.downtown, 318, 270, 'Frostfall City'], [P.airfield, 470, 270, 'Northfield'], [truck, 622, 270, 'Junction Nine'], [mines, 14, 398, 'Iron Mines'], [volcano, 166, 398, 'Ash Mountain'], [bunker, 318, 398, 'Fort Hollow'], [P.stadium, 470, 398, 'Frostfall Arena'], [P.factory, 622, 398, 'Old Factory']], 760, 520, 14202,
     [[0, 0, 0, 760, 128, 'snow'], [0, 0, 128, 152, 384, 'forest'], [0, 152, 128, 456, 256, 'desert'], [0, 152, 256, 304, 384, 'farm'], [0, 304, 256, 456, 384, 'urban'], [0, 0, 384, 152, 520, 'badlands'], [0, 152, 384, 304, 520, 'volcanic']]);
   /* the menu: just the two big maps (and Random) */
   BR_MAP_KEYS.length = 0; BR_MAP_KEYS.push('valley', 'frost');

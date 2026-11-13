@@ -13,6 +13,7 @@ const BRMAP = {
     c.fillStyle = hex(M.theme.ground); c.fillRect(0, 0, cv.width, cv.height);
     const BC = { snow: '#e8eef2', desert: '#d8b878', volcanic: '#4a3f3a', badlands: '#a07858', urban: '#7a7d80', coast: '#d4c8a0', forest: '#3f6a34', farm: '#9ab35a' };
     for (const d of M.deco) if (d.t === 'biome' && BC[d.kind]) { c.fillStyle = BC[d.kind]; c.fillRect(d.x0 * s, d.y0 * s, (d.x1 - d.x0) * s, (d.y1 - d.y0) * s); }
+    for (const d of M.deco) if (d.t === 'road' || d.t === 'plaza') { c.fillStyle = d.t === 'road' ? '#55595e' : '#b9b4aa'; c.fillRect(d.x * s, d.y * s, d.w * s, d.h * s); }   /* (v14.3.5: roads and the plaza) */
     c.fillStyle = 'rgba(30,60,25,0.55)'; for (const t of M.trees) { c.beginPath(); c.arc(t.x * s, t.y * s, Math.max(1, 1.8 * s), 0, 7); c.fill(); }
     for (const f of M.floors) { if (f.lv < 1) continue; c.fillStyle = f.lv >= 2 ? 'rgba(200,205,210,0.9)' : 'rgba(150,156,162,0.85)'; c.fillRect(f.x0 * s, f.y0 * s, (f.x1 - f.x0) * s, (f.y1 - f.y0) * s); }
     c.fillStyle = '#2b2f34'; for (const w of M.walls) if (w.lv === 0 && w.kind !== 'door') c.fillRect(w.x0 * s, w.y0 * s, Math.max(1, (w.x1 - w.x0) * s), Math.max(1, (w.y1 - w.y0) * s));
@@ -101,8 +102,8 @@ class BRMapScene extends Phaser.Scene {
 
 /* v14.2.6: game-wide switches set in the admin page (Game tab). brThird: third person (and the broadcast view) allowed in Volt Royale */
 const GameCfg = {
-  brThird: true,
-  async load() { try { if (typeof Account === 'undefined' || !Account.available()) return; const r = await Account.req('GET', '/game'); if (r && r.game) Object.assign(this, { brThird: r.game.brThird !== false }); } catch (e) { /* (offline: keep what we had) */ } }
+  brThird: true, off: {},   /* off: v14.3.3 game modes turned off in the admin page */
+  async load() { try { if (typeof Account === 'undefined' || !Account.available()) return; const r = await Account.req('GET', '/game'); if (r && r.game) { const before = JSON.stringify(this.off || {}); Object.assign(this, { brThird: r.game.brThird !== false, off: r.game.off && typeof r.game.off === 'object' ? r.game.off : {} }); if (JSON.stringify(this.off) !== before && this.onChange) this.onChange(); } } catch (e) { /* (offline: keep what we had) */ } }
 };
 setTimeout(() => GameCfg.load(), 1500);
 { const P = GameScene.prototype, cr = P.create, mo = P.modeOf;

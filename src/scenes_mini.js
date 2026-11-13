@@ -60,7 +60,7 @@ class MinigamesScene extends ListMenuScene {                          // the cat
   constructor() { super('Minigames'); }
   create() {
     this.buildMenu('MINIGAMES', [
-      ...GAME_CATS.map(c => ({ label: () => `${c.name}   (${MINI_KINDS().filter(k => GAME_INFO[k].cat === c.id).length})`, hint: c.blurb, select: () => this.scene.start('MiniList', { cat: c.id }) })),
+      ...GAME_CATS.map(c => ({ label: () => `${c.name}   (${MINI_KINDS().filter(gameOn).filter(k => GAME_INFO[k].cat === c.id).length})`, hint: c.blurb, select: () => this.scene.start('MiniList', { cat: c.id }) })),
       { label: () => 'How to play Volt Hockey', hint: 'The rules and controls of hockey, with a demo', select: () => this.scene.start('HowTo', { kind: 'hockey', back: { scene: 'Minigames' } }) },
       { label: () => 'Back', select: () => this.scene.start('Main') }
     ]);
@@ -74,7 +74,7 @@ class MiniListScene extends ListMenuScene {                            // the ga
     const C = GAME_CATS.find(c => c.id === this.cat) || GAME_CATS[0];
     sideTitle(this, C.name);
     this.buildMenu('', [
-      ...MINI_KINDS().filter(k => GAME_INFO[k].cat === C.id).map(k => ({ kind: k, label: () => GAME_INFO[k].name, hint: GAME_INFO[k].blurb, select: () => this.scene.start('MiniSetup', { kind: k }) })),
+      ...MINI_KINDS().filter(gameOn).filter(k => GAME_INFO[k].cat === C.id).map(k => ({ kind: k, label: () => GAME_INFO[k].name, hint: GAME_INFO[k].blurb, select: () => this.scene.start('MiniSetup', { kind: k }) })),
       { label: () => 'Back', select: () => this.scene.start('Minigames') }
     ], 120, MENU_SIDE);
     this.onBack = () => this.scene.start('Minigames');

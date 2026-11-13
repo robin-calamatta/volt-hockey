@@ -103,7 +103,7 @@ const Account = {
   changed() { if (!this.loggedIn || this.applying || this.pushTimer) return; this.pushTimer = setTimeout(() => { this.pushTimer = null; this.pushPrefs(); this.pushProgress(); }, 1500); },   // (at most one push every 1.5 s: before, saving often kept putting the push off, so it might never happen)
   flush() { if (!this.loggedIn) return; clearTimeout(this.pushTimer); this.pushTimer = null; this.pushPrefs(true); this.pushProgress(false, true); },   // leaving the page: send now   // called by Settings.save and Season.save
   async pushPrefs(keep) { if (!this.loggedIn) return; if (keep) return this.beacon('/prefs', { prefs: this.prefsNow() }); try { await this.req('PUT', '/prefs', { prefs: this.prefsNow() }); } catch (e) { this.lastError = e.message; } },
-  beacon(path, body) { try { fetch(this.base() + '/api' + path, { method: 'PUT', keepalive: true, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + this.token }, body: JSON.stringify(body) }); } catch (e) { /* closing anyway */ } },
+  beacon(path, body) { try { fetch(this.base() + '/api' + path, { method: 'PUT', keepalive: true, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + this.token }, body: JSON.stringify(body) }).catch(() => { /* offline or closing: the next save tries again */ }); } catch (e) { /* closing anyway */ } },
   async pushProgress(force, keep) {
     if (!this.loggedIn) return; const p = this.progressNow(), json = JSON.stringify(p); if (!force && json === this.lastProgress) return; if (keep) { this.lastProgress = json; return this.beacon('/progress', p); }
     try { await this.req('PUT', '/progress', p); this.lastProgress = json; } catch (e) { this.lastError = e.message; }

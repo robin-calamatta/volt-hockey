@@ -64,7 +64,7 @@ function brBig(key, M, pad, look, seed) {                                  // an
   brFill(T, W, H, look, seed); brRezGarages(T, W, H, Math.max(3, Math.round(W * H / 3500)), seed + 1); return T;
 }
 function brJoin(name, look, theme, blurb, parts, W, H, seed) {             // districts side by side, with country in between
-  const T = { walls: [], floors: [], ramps: [], trees: [], loot: [], deco: [] }; for (const [M, ox, oy] of parts) brCopy(M, ox, oy, T);
+  const T = { walls: [], floors: [], ramps: [], trees: [], loot: [], deco: [] }; for (const [M, ox, oy] of parts) brCopy(M, ox, oy, T); if (brJoin.pre) brJoin.pre(T);   /* (v14.3.5: the roads are kept clear before the country is filled in) */
   Object.assign(T, { name, size: { width: W, height: H }, theme, blurb, look }); brFill(T, W, H, look, seed); brRezGarages(T, W, H, Math.max(4, Math.round(W * H / 3500)), seed + 1); return T;
 }
 { const O = { ...BR_MAPS }, P = 22; globalThis.BR_BASE = O;   /* (the original compact maps, for building bigger ones: modes_br_maps.js) */

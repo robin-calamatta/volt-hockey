@@ -186,7 +186,7 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
     num(m, c, by, sh, hp, head, blocked) { MG.add(m, { t: 'dn', x: MG.r2(c.x), y: MG.r2(c.y), z: MG.r2(c.gs.z || 0), s: Math.round(sh), h: Math.round(hp), hd: head, bl: blocked ? Math.round(blocked) : 0, by: by.k, life: 1.0 }); },
     /* bullets: as before, plus doors, bubbles and headshots */
     bullet(m, o, h) {
-      const M = this.map(m), n = 4, g = m.gs; let hit = false, lv = 0; const top = brTop(M), bubs = MG.all(m, 'bub');
+      const M = this.map(m), n = h > 1 / 200 ? 8 : 4, g = m.gs; let hit = false, lv = 0; const top = brTop(M), bubs = MG.all(m, 'bub');
       for (let s = 0; s < n && !hit; s++) {
         const hz0 = o.z + 0.55, px = o.x, py = o.y; o.x += o.vx * h / n; o.y += o.vy * h / n; o.z += (o.vz || 0) * h / n; const hz = o.z + 0.55; lv = Math.max(0, Math.floor(hz / BR.H));
         if (o.x < 0 || o.y < 0 || o.x > m.width || o.y > m.height || hz < 0.02 || hz > (top + 2) * BR.H) { hit = true; break; }

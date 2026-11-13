@@ -85,7 +85,7 @@ const TouchPad = {
     if (!this.built) return;
     if (this.editing && Controls.list().some(x => x.raw && (x.raw.pressed.b || x.raw.pressed.start))) this.action('lock');   // B / Start / Esc: done adjusting
     const show = !!Settings.touch; if (show !== this.shown) { this.shown = show; this.root.style.display = show ? 'block' : 'none'; if (show) this.place(); else this.clear(); }
-    const sc = window.voltGame && voltGame.scene, inGame = !!(sc && sc.isActive('Game') && !sc.isActive('Pause') && !sc.isActive('JoinMenu') && !sc.isActive('Settings') && !sc.isActive('SettingsPage') && !sc.isActive('CameraPage'));   // the online pause menu sits over a running match
+    const sc = window.voltGame && voltGame.scene, inGame = !!(sc && sc.isActive('Game') && !sc.isActive('Pause') && !sc.isActive('BRInv') && !sc.isActive('BRMap') && !sc.isActive('JoinMenu') && !sc.isActive('Settings') && !sc.isActive('SettingsPage') && !sc.isActive('CameraPage'));   // the online pause menu sits over a running match
     if (inGame !== this.inGame || this.editing !== this.wasEditing) {
       this.inGame = inGame; this.wasEditing = this.editing;
       // only in a match (or while adjusting them): every menu can be tapped, and the buttons would cover its rows
@@ -153,13 +153,15 @@ const TouchPad = {
     const m = g && g.match; if (!m) return null; const k = m.mini ? m.mini.kind : 'hockey', common = ['stick', 'a', 'b', 'start', 'camera', 'quick'];
     if (k === 'br') return { key: 'br', show: [...common, 'spinCW', 'rstick', 'halfCW', 'halfCCW', 'x', 'y', 'speedUp', 'speedDown'],   /* (v14.2.18: the right stick aims and looks, and holding it aims down the sights: it replaces AIM, AIM UP and AIM DOWN) */ press: {}, labels: typeof BR_TOUCH !== 'undefined' ? BR_TOUCH : {} };
     const spin = { spinCW: 'halfCW', spinCCW: 'halfCCW' }, spinL = { spinCW: ['↻', 'SPIN'], spinCCW: ['↺', 'SPIN'], b: ['💨', 'DRIFT'], a: ['A', 'OK'] };
-    if (k === 'hockey') return { key: 'hockey', show: [...common, 'spinCW', 'spinCCW', 'halfCW', 'halfCCW', 'x', 'y'], press: {}, labels: { ...spinL, spinCW: ['↻', '90° TURN'], spinCCW: ['↺', '90° TURN'], halfCW: ['↻', 'HALF'], halfCCW: ['↺', 'HALF'], x: ['X', 'PRESS'], y: ['⇄', 'CART'] } };   // (v14.2.17: the big buttons turn 90 degrees like the triggers, the small ones half turn like the bumpers)
+    if (k === 'hockey') return { key: 'hockey', show: [...common.filter(x => x !== 'a'), 'spinCW', 'spinCCW', 'halfCW', 'halfCCW', 'x', 'y'], press: {}, labels: { ...spinL, spinCW: ['↻', '90° TURN'], spinCCW: ['↺', '90° TURN'], halfCW: ['↻', 'HALF'], halfCCW: ['↺', 'HALF'], x: ['X', 'PRESS'], y: ['⇄', 'CART'] } };   // (v14.2.17: the big buttons turn 90 degrees like the triggers, the small ones half turn like the bumpers)
     const lines = ((GAME_INFO[k] || {}).controls || []).join(' '), act = /Zap/.test(lines) ? ['⚡', 'ZAP'] : /Fire:/.test(lines) ? ['🎯', 'FIRE'] : lines.includes(CTRL.item) ? ['★', 'USE'] : null;
-    return { key: 'mini:' + k, show: [...common, 'spinCW', 'spinCCW', ...(act ? ['x'] : [])], press: { ...spin, x: 'spinCW' }, labels: { ...spinL, ...(act ? { x: act } : {}) } };   // (the touch USE / FIRE / ZAP button presses RT)
+    const useA = lines.includes(CTRL.item);   /* (v14.3.4: A is only on screen in a match when it does something: a power-up) */
+    return { key: 'mini:' + k, show: [...common.filter(x => x !== 'a' || useA), 'spinCW', 'spinCCW', ...(act ? ['x'] : [])], press: { ...spin, x: 'spinCW' }, labels: { ...spinL, ...(useA ? { a: ['★', 'USE'] } : {}), ...(act ? { x: act } : {}) } };   // (the touch USE / FIRE / ZAP button presses RT)
   },
   applyProfile(g) {
     const P = this.profile(g); if (!P) return; const m = g.match, wait = m.state === 'over' || !!m.readyText;
     if (m.state === 'over') { P.key += ':over'; P.show = ['a', 'b', 'start']; }   /* (v14.2.17: the match is over: just AGAIN, LOBBY and pause, nothing covering the results) */
+    if (wait && !P.show.includes('a')) { P.show = [...P.show, 'a']; P.key += ':wait'; }   /* (the ready screen needs A) */
     if (wait) P.labels = { ...P.labels, a: ['A', m.state === 'over' ? 'AGAIN' : 'READY'], ...(m.state === 'over' ? { b: ['B', 'HOLD: LOBBY'] } : {}) };   /* (the result and ready screens) */
     if (P.key !== this.profKey) { this.profKey = P.key; this.press = P.press; this.posProfile = TOUCH.profilePos[P.key.split(':')[0]] ? P.key.split(':')[0] : null; this.place(); for (const id of Object.keys(TOUCH.controls)) this.els[id].style.display = P.show.includes(id) ? 'flex' : 'none'; this.clear(); }
     this.relabel(P.labels);

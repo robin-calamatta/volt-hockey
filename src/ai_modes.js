@@ -44,14 +44,14 @@ const cpuDiffOf = (c, m) => c.cpuDiff || m.difficulty || {};
       const [, sh, f] = brPhases(m)[S.ph], nr = f ? Math.max(1.5, Math.min(m.width, m.height) * f) : 0, rSafe = Math.max(nr * 0.4, nr - 0.6 * Math.max(0, S.r - nr));
       const d0 = Math.hypot(c.x - S.x, c.y - S.y), need = d0 - rSafe * 0.85; if (need <= 0) return null;
       const t = need / sp, left = S.wait + sh * 0.4, p = deep(S.x, S.y, rSafe * 0.6);
-      if (t > left - 8) return { ...p, urgent: true };                                                              // cutting it fine: drop everything
-      if (t > left - 30) return { ...p, urgent: false };                                                            // time to start heading in
+      if (t > left - 15) return { ...p, urgent: true };   /* (v14.3.8: more to spare, with the shorter stages) */                                                              // cutting it fine: drop everything
+      if (t > left - 45) return { ...p, urgent: false };                                                            // time to start heading in
       return null;
     }
     if (S.shrink > 0 && S.fx !== undefined) {                                                                       // closing in: get well inside the final circle, never let the edge reach us
       const dFin = Math.hypot(c.x - S.fx, c.y - S.fy) - S.fr * 0.7, p = deep(S.fx, S.fy, S.fr * 0.5); if (dFin <= 0) return null;
       const edgeV = Math.max(0.5, (S.sr - S.fr) / Math.max(1, S.st) + Math.hypot(S.fx - S.sx, S.fy - S.sy) / Math.max(1, S.st)), catchT = -dNow / edgeV;
-      if (catchT < 8 || dFin / sp > S.shrink - 3) return { ...p, urgent: true };
+      if (catchT < 12 || dFin / sp > S.shrink - 3) return { ...p, urgent: true };
       return { ...p, urgent: false };
     }
     return null;

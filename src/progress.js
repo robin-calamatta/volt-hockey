@@ -59,7 +59,7 @@ const DAILY_Q = [
   { id: 'd_paint', type: 'mini:paintball', n: 1, xp: 400, text: 'Play a game of Paintball' }, { id: 'd_emoji', type: 'emoji', n: 5, xp: 300, text: 'Do 5 emotes during matches' },
   { id: 'd_top3', type: 'brTop3', n: 1, xp: 600, text: 'Finish in the top 3 of a Volt Royale' }, { id: 'd_sgame', type: 'seasonGame', n: 1, xp: 400, text: 'Play a Season game' },
   { id: 'd_race', type: 'mini:race', n: 1, xp: 300, text: 'Finish a Race' }, { id: 'd_revive', type: 'revive', n: 1, xp: 500, text: 'Revive a team-mate in Volt Royale' },
-  { id: 'd_healm', type: 'healMate', n: 1, xp: 400, text: 'Heal a team-mate in Volt Royale' }, { id: 'd_drift', type: 'driftBoost', n: 10, xp: 400, text: 'Get 10 drift boosts (hold A while turning)' }
+  { id: 'd_healm', type: 'healMate', n: 1, xp: 400, text: 'Heal a team-mate in Volt Royale' }, { id: 'd_drift', type: 'driftBoost', n: 10, xp: 400, text: 'Get 10 drift boosts (drift while turning)' }
 ];
 const WEEKLY_Q = [
   { id: 'w_brwin', type: 'brWin', n: 1, xp: 2000, text: 'Win a Volt Royale' }, { id: 'w_br5', type: 'br', n: 5, xp: 1500, text: 'Play 5 Volt Royales' },

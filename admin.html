@@ -2,6 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
 <title>Volt Hockey Admin</title>
 <style>
+  .gm { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:4px 14px; margin:4px 0 10px 28px; } .gm label, .gg { display:flex; gap:8px; align-items:center; } .gg { font-weight:700; margin-top:10px; }
   :root { --bg:#0d151b; --panel:#13212b; --line:#2a4252; --text:#e8eef2; --dim:#9fb2bf; --accent:#19c3ff; --warn:#ff7a59; --ok:#3dff9a; }
   * { box-sizing: border-box; } body { margin:0; background:var(--bg); color:var(--text); font:15px system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
   header { display:flex; align-items:center; gap:16px; padding:12px 20px; border-bottom:1px solid var(--line); background:#0f1a22; position:sticky; top:0; }
@@ -35,6 +36,9 @@
     <section data-panel="reports" hidden><div class="card"><table><thead><tr><th>When</th><th>By</th><th>About</th><th>Where</th><th>Message</th><th></th></tr></thead><tbody id="rlist"></tbody></table></div></section>
     <section data-panel="game" hidden><div class="card"><h3 style="margin-top:0">Game switches</h3>
       <label class="row" style="gap:10px"><input type="checkbox" id="gBrThird"> <span><b>Third person in Volt Royale</b><br><span class="dim">Off: everyone plays Volt Royale in first person (third person and the broadcast view are not offered). Takes effect in new matches.</span></span></label>
+      <h3>Game modes</h3>
+      <p class="dim" style="margin-top:0">Ticked: players see it and can play it. Unticked: it's hidden everywhere (the lobby, playlists, online rooms, matchmaking). A group's box turns all of its games on or off at once. Players' games pick this up within a minute (and at every match).</p>
+      <div id="gModes"></div>
       <div class="row"><button class="go" id="gSave">Save</button><span id="gMsg"></span></div></div></section>
     <section data-panel="data" hidden>
       <div class="card"><div class="row"><select id="pfx"><option value="">everything</option><option value="u/">players (u/)</option><option value="r/">reports (r/)</option><option value="dm/">messages (dm/)</option><option value="lb">leaderboard (lb)</option><option value="names">username index</option><option value="s/">logins (s/)</option><option value="e/">emails (e/)</option><option value="pr/">reset links (pr/)</option></select><button id="kgo">List</button><span class="dim" id="kcount"></span></div>
@@ -60,8 +64,28 @@ async function login() { $('#lerr').textContent = ''; try { const r = await api(
 $('#lgo').onclick = login; $('#lp').onkeydown = e => { if (e.key === 'Enter') login(); }; $('#out').onclick = logout;
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => { document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('[data-panel]').forEach(p => p.hidden = p.dataset.panel !== b.dataset.tab); if (b.dataset.tab === 'reports') reports(); if (b.dataset.tab === 'data') keys(); });
 async function start() { $('#login').hidden = true; $('#app').hidden = false; try { const s = await api('GET', '/admin/stats'); $('#stats').innerHTML = `<div class="stat"><b>${s.players}</b>players</div><div class="stat"><b>${s.leaderboard}</b>on the leaderboard</div><div class="stat"><b>${s.reports}</b>reports</div>`; } catch (e) { $('#stats').textContent = e.message; } search(); }
-async function loadGame() { try { const r = await api('GET', '/admin/game'); $('#gBrThird').checked = !!r.game.brThird; $('#gMsg').textContent = ''; } catch (e) { $('#gMsg').textContent = e.message; } }
-$('#gSave').onclick = async () => { $('#gMsg').textContent = 'Saving...'; try { const r = await api('POST', '/admin/game', { brThird: $('#gBrThird').checked }); $('#gBrThird').checked = !!r.game.brThird; $('#gMsg').textContent = 'Saved.'; } catch (e) { $('#gMsg').textContent = e.message; } };
+/* v14.3.3 game modes: ids the game uses (src/modes.js GAME_INFO). A new minigame needs a line here too. */
+const GM_TOP = [['hockey', 'Volt Hockey (matches, quick match online, hockey rooms)'], ['season', 'Season (seasons, playoffs, World Cup)'], ['practice', 'Practice arena'], ['br', 'Volt Royale']];
+const GM_CATS = [['party', 'Party chaos', [['balloons', 'Balloon Bash'], ['hunt', 'Manhunt'], ['bomb', 'Hot Potato Bomb'], ['hill', 'King of the Hill'], ['sumo', 'Sumo Ring'], ['lava', 'Floor Is Lava'], ['trails', 'Light Trails']]],
+  ['ball', 'Ball games', [['multiball', 'Multiball Madness'], ['giant', 'Giant Ball'], ['bowling', 'Cart Bowling']]],
+  ['racing', 'Racing and driving', [['race', 'Race'], ['stunt', 'Stunt Arena'], ['slalom', 'Slalom Time Trial'], ['delivery', 'Delivery Rush']]],
+  ['sneaky', 'Battles and sneaky', [['paintball', 'Paintball'], ['ctf', 'Capture the Flag'], ['imposter', 'Imposter Carts'], ['night', 'Infection Night']]]];
+function drawModes(off) {
+  const cb = (id, label, cls = '') => `<label class="${cls}"><input type="checkbox" data-gm="${id}" ${off[id] ? '' : 'checked'}> <span>${label}</span></label>`;
+  let h = GM_TOP.map(([id, l]) => `<div class="gg">${cb(id, l)}</div>`).join('');
+  h += `<div class="gg">${cb('mini', 'Minigames (all of them, and the Minigame Mix playlist)')}</div>`;
+  for (const [cid, cn, list] of GM_CATS) h += `<div class="gm" style="grid-column:1/-1;display:block;margin-bottom:0"><label class="gg" style="margin-top:4px"><input type="checkbox" data-cat="${cid}"> <span>${cn}</span></label></div><div class="gm">${list.map(([id, l]) => cb(id, l)).join('')}</div>`;
+  $('#gModes').innerHTML = h; syncCats();
+  $('#gModes').querySelectorAll('[data-cat]').forEach(c => c.onchange = () => { const L = GM_CATS.find(x => x[0] === c.dataset.cat)[2]; for (const [id] of L) $(`[data-gm="${id}"]`).checked = c.checked; syncCats(); });
+  $('#gModes').querySelectorAll('[data-gm]').forEach(c => c.addEventListener('change', syncCats));
+}
+function syncCats() {   /* a group box: ticked when all its games are on, half when some are; minigames greyed out when Minigames is off */
+  for (const [cid, , L] of GM_CATS) { const c = $(`[data-cat="${cid}"]`), on = L.filter(([id]) => $(`[data-gm="${id}"]`).checked).length; c.checked = on === L.length; c.indeterminate = on > 0 && on < L.length; }
+  const all = $('[data-gm="mini"]').checked; $('#gModes').querySelectorAll('.gm').forEach(d => { d.style.opacity = all ? 1 : 0.45; });
+}
+function readModes() { const off = {}; $('#gModes').querySelectorAll('[data-gm]').forEach(c => { if (!c.checked) off[c.dataset.gm] = true; }); return off; }
+async function loadGame() { try { const r = await api('GET', '/admin/game'); $('#gBrThird').checked = !!r.game.brThird; drawModes(r.game.off || {}); $('#gMsg').textContent = ''; } catch (e) { $('#gMsg').textContent = e.message; } }
+$('#gSave').onclick = async () => { $('#gMsg').textContent = 'Saving...'; try { const r = await api('POST', '/admin/game', { brThird: $('#gBrThird').checked, off: readModes() }); $('#gBrThird').checked = !!r.game.brThird; drawModes(r.game.off || {}); $('#gMsg').textContent = 'Saved.'; } catch (e) { $('#gMsg').textContent = e.message; } };
 document.querySelector('nav [data-tab=game]').addEventListener('click', loadGame);
 async function search() {
   try {

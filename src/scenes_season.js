@@ -101,7 +101,7 @@ class SeasonHubScene extends ListMenuScene {
     this.buildMenu('SEASON ' + s.year, items, 240, { x: 330, size: 32 });
     this.onBack = () => { Season.save(s); Season.cur = null; this.scene.start('SeasonMenu'); };
     this.info(s, mine, played, done, today);
-    if (this.flash) { const t = this.add.text(CX, 690, this.flash, { ...STYLE.hint, fontSize: '28px', color: '#ffe27a' }).setOrigin(0.5).setDepth(5); this.tweens.add({ targets: t, alpha: 0, delay: 2500, duration: 600 }); }
+    if (this.flash) { const t = this.add.text(330, 192, this.flash, { ...STYLE.hint, fontSize: '28px', color: '#ffe27a', backgroundColor: '#0d151bdd', padding: { x: 14, y: 6 } }).setOrigin(0.5).setDepth(5);   /* (v14.3.4: was on top of the button hints) */ this.tweens.add({ targets: t, alpha: 0, delay: 2500, duration: 600 }); }
   }
   play(fx) {
     const s = this.s; Season.fx = fx; const side = fx.h === s.team ? 0 : 1, levels = [Season.levelFor(s, fx.h), Season.levelFor(s, fx.a)];
@@ -170,7 +170,7 @@ class GamesScene extends Phaser.Scene {
   constructor() { super('Games'); }
   create() {
     const s = Season.cur; menuBackdrop(this); this.top = 0; this.list = [];
-    s.rounds.forEach((rd, i) => rd.forEach(f => { if (f.h === s.team || f.a === s.team) this.list.push({ tag: 'MD' + (i + 1), f }); }));
+    s.rounds.forEach((rd, i) => { const f = rd.find(x => x.h === s.team || x.a === s.team); this.list.push(f ? { tag: 'MD' + (i + 1), f } : { tag: 'MD' + (i + 1), bye: true, f: { done: rd.every(x => x.done) } }); });   /* (v14.3.4: a matchday you sit out says so, instead of a gap in the numbers) */
     if (s.playoffs) s.playoffs.rounds.forEach((rd, r) => rd.forEach(ser => { if (ser.a === s.team || ser.b === s.team) ser.games.forEach((g, k) => this.list.push({ tag: Season.roundName(r, s.playoffs.total).slice(0, 5).toUpperCase() + (k + 1), f: { ...g, done: true } })); }));
     this.add.text(CX, 44, 'YOUR GAMES', { ...STYLE.title, fontSize: '52px' }).setOrigin(0.5); this.add.rectangle(CX, 82, 130, 4, THEME.gold, 0.95);
     panel(this, 330, 108, 620, 560, { depth: -40 });
@@ -186,6 +186,7 @@ class GamesScene extends Phaser.Scene {
     const s = Season.cur;
     this.rows.forEach((t, i) => {
       const it = this.list[this.top + i]; if (!it) return t.setText('');
+      if (it.bye) { t.setText(`${it.tag.padEnd(6)} no game (bye week)`).setColor('#6f8796'); return; }
       const f = it.f, home = f.h === s.team, opp = home ? f.a : f.h, mine = home ? f.hs : f.as, theirs = home ? f.as : f.hs;
       t.setText(`${it.tag.padEnd(6)} ${(home ? 'vs' : '@ ')} ${TEAMS[opp].name.padEnd(10)} ${f.done ? (mine > theirs ? 'W' : 'L') + ` ${mine}-${theirs}${f.ot ? ' OT' : ''}` : '-'}`);
       t.setColor(!f.done ? '#8fa8b8' : mine > theirs ? '#7fe28f' : '#ff9a9a');

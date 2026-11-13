@@ -158,7 +158,8 @@ class LeaderboardScene extends Phaser.Scene {
     this.add.text(CX, 44, 'LEADERBOARD', { ...STYLE.title, fontSize: '52px' }).setOrigin(0.5); this.add.rectangle(CX, 82, 130, 4, THEME.gold, 0.95);
     this.tabText = this.add.text(CX, 118, '', { ...STYLE.hud, fontSize: '28px' }).setOrigin(0.5);
     panel(this, 190, 145, 900, 515, { depth: -40 });
-    this.rows = Array.from({ length: 15 }, (_, i) => this.add.text(230, 162 + i * 32, '', { ...MONO_LB, color: '#e8eef2' }));
+    this.head = this.add.text(230, 156, '', { ...MONO_LB, color: '#9fb2bf' });   /* (v14.3.4: what each column is) */
+    this.rows = Array.from({ length: 14 }, (_, i) => this.add.text(230, 190 + i * 32, '', { ...MONO_LB, color: '#e8eef2' }));
     this.note = this.add.text(CX, 400, '', { ...STYLE.hint, fontSize: '24px', color: '#9fb2bf', align: 'center', wordWrap: { width: 820 } }).setOrigin(0.5);
     this.add.text(CX - 60, 696, '◀ ▶  category        B  back' + (Account.loggedIn ? '' : '        log in from Friends and party to get on the board'), { ...STYLE.hint, fontSize: '19px', color: '#9fb2bf' }).setOrigin(0.5);
     const z = this.add.zone(CX, 118, 700, 50).setInteractive({ useHandCursor: true }); z.on('pointerdown', p => { this.tab = (this.tab + (p.x < CX ? 3 : 1)) % 4; this.draw(); });
@@ -171,6 +172,7 @@ class LeaderboardScene extends Phaser.Scene {
   draw() {
     const [name, key, val] = this.tabs[this.tab]; this.tabText.setText(this.tabs.map((t, i) => i === this.tab ? `▶ ${t[0]} ◀` : t[0]).join('     '));
     const list = this.data ? this.data[key] || [] : [];
+    this.head.setText(list.length ? `${'#'.padStart(3)}  ${'PLAYER'.padEnd(17)} ${name.toUpperCase().slice(0, 10).padStart(6)}     PLAYED` : '');
     this.note.setText(this.error || (!this.data ? 'Loading...' : !list.length ? (key === 'winPct' ? 'Win % needs 10 games played.' : 'Nobody on the board yet. Log in and play!') : ''));
     this.rows.forEach((t, i) => {
       const r = list[i]; if (!r) return t.setText('');

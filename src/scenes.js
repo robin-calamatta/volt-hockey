@@ -56,10 +56,10 @@ const lockCartItem = () => ({ rule: true, label: () => `Switch carts with Y   �
    'Camera and graphics' is its own scene (CameraPageScene) with a live picture of the game behind it. */
 const SETTINGS_PAGES = {
   'Player': () => [
-    { label: () => 'Account, friends and party: in the menu (Start on a gamepad, in a match too), or the ` key. In Volt Royale, Select (View) opens the map' },
+    { label: () => 'Account, friends and party', hint: 'Also in the menu: Start on a gamepad (in a match too), the ` key, or ☰ MENU. In Volt Royale, Select (View) opens the map', select: () => { if (typeof FriendsBar !== 'undefined') FriendsBar.toggle(true); } },   /* (v14.3.4: was one long line squeezed to an unreadable size) */
     nameItem(), { label: () => `Career:  ${(Settings.career || {}).games || 0} matches   ${(Settings.career || {}).wins || 0} wins   ${(Settings.career || {}).goals || 0} goals   ${(Settings.career || {}).shots || 0} shots on net` }],
   'Sound and commentary': () => [slider('Music volume', 'musicVolume', pct), slider('Effects volume', 'sfxVolume', pct), slider('Crowd volume', 'crowdVolume', pct),
-    toggle('Cart driving sound', 'cartSound'), slider('Cart driving volume', 'cartVolume', pct),
+    toggle('3D sound (headphones)', 'spatial'), toggle('Cart driving sound', 'cartSound'), slider('Cart driving volume', 'cartVolume', pct),
     { label: () => `Commentator   ◀ ${{ full: 'Voice and captions', voice: 'Voice only', captions: 'Captions only', off: 'Off' }[Settings.commentaryMode || 'full']} ▶`, change: d => Commentator.cycleMode(d), select: () => Commentator.cycleMode(1) },
     slider('Commentary volume', 'commentVolume', pct),
     { label: () => 'Hear the play-by-play caller', select: () => sampleCall('goalLead') },
@@ -69,7 +69,7 @@ const SETTINGS_PAGES = {
     lockCartItem(),
     toggle('Cart collisions', 'collisions'), toggle('Penalties', 'penalties'),
     slider('Penalty time (in the sin bin)', 'penaltySeconds', v => `${v} s`),
-    { rule: true, label: () => `Penalties carry over after a goal   ◀ ${Settings.penaltyCarry ? 'On' : 'Off'} ▶`, change: () => Settings.toggle('penaltyCarry'), select: () => Settings.toggle('penaltyCarry'), hint: 'On: a penalty keeps running after a goal and into the next period. If the team that is short gets scored on, all its penalties end.' }],
+    { rule: true, label: () => `Penalties carry over after a goal   ◀ ${Settings.penaltyCarry ? 'On' : 'Off'} ▶`, change: () => Settings.toggle('penaltyCarry'), select: () => Settings.toggle('penaltyCarry'), hint: 'On: a penalty keeps running after a goal and into the next period. If the team that is short gets scored on, one player comes back (the one with the least time left).' }],
   'Ball and carts': () => [
     slider('Cart turning speed', 'turnSpeed', times), slider('Stick length', 'stickLength', v => Math.round(v * 100) + ' cm'),
     slider('Ball bounce off carts', 'ballBounce', pct), slider('Ball grip', 'ballGrip', v => String(Math.round(v))), slider('Ball friction (higher = slows sooner)', 'ballFriction', v => v.toFixed(1))],
@@ -365,7 +365,7 @@ class ControlsGuideScene extends Phaser.Scene {                    // what every
       const x = x0 + (i % cols) * (w + gx), y = y0 + Math.floor(i / cols) * (h + 16);
       panel(this, x, y, w, h, { depth: -50, accent: THEME.accent });
       this.add.text(x + 26, y + 14, title, { ...STYLE.hint, fontSize: '26px', color: THEME.gold_css });
-      this.add.text(x + 26, y + 48, lines.join('\n'), { fontFamily: FONT, fontSize: '18px', color: '#dbe7ee', lineSpacing: 1 });
+      { const tx = this.add.text(x + 26, y + 48, lines.join('\n'), { fontFamily: FONT, fontSize: '18px', color: '#dbe7ee', lineSpacing: 1 }), k = Math.min(1, (w - 44) / tx.width, (h - 58) / tx.height); if (k < 1) tx.setScale(k); }   /* (v14.3.4: a card's lines always fit inside it) */
     });
     const back = () => { Sound.play('back'); if (this.page) this.scene.start('SettingsPage', { page: this.page, ctx: this.ctx }); else this.scene.start('Settings', this.ctx); };
     tapButton(this, CX, V.height - 26, 220, 'Back  (B)', back);
@@ -562,7 +562,7 @@ class GameScene extends Phaser.Scene {
       if (m.state === 'over' && o.session.seasonFx && !this.filed) { this.filed = true; Season.record(Season.cur, o.session.seasonFx, m.score[0], m.score[1], m.overtime); Season.save(Season.cur); }   // a party season game counts in the leader's season
       const tapA = this.resultTap === 'a' && this.resultReady(), tapB = this.resultTap === 'b' && this.resultReady(); if (this.resultTap && this.resultReady()) this.resultTap = null;
       if (m.state === 'over' && o.session.seasonFx && this.resultReady() && (Controls.menu().a || tapA) && !menuOpen) { Controls.owner = null; Controls.claimed.clear(); o.session.close('party_done'); Sound.playMusic('menu'); this.scene.start('SeasonHub'); return; }
-      if (m.state === 'over' && this.resultReady() && (Controls.menu().a || tapA) && !menuOpen) { o.session.backToLobby(); if (o.session.cfg.mini) o.session.setConfig({ mini: randomMapFor(o.session.cfg.mini) }); this.scene.start('Room', { role: 'host', session: o.session, again: true }); return; }   /* (play again: straight back in, a new map) */
+      if (m.state === 'over' && this.resultReady() && (Controls.menu().a || tapA) && !menuOpen) { o.session.backToLobby(); if (o.session.cfg.mini) { if (!(typeof mixNext === 'function' && mixNext(o.session))) o.session.setConfig({ mini: randomMapFor(o.session.cfg.mini) }); } this.scene.start('Room', { role: 'host', session: o.session, again: true }); return; }   /* (play again: straight back in, a new map) */
       if (m.state === 'over' && this.resultReady() && (this.holdBack() || tapB) && !menuOpen) { o.session.backToLobby(); this.scene.start('Room', { role: 'host', session: o.session }); return; }
     } else {
       this.pre3d(dt); o.sim.frame(dt, [{ id: o.session.myId, input: menuOpen ? idle : Controls.mine }, ...guests.map(([id, src]) => ({ id, input: menuOpen ? idle : src }))]);
@@ -578,8 +578,8 @@ class GameScene extends Phaser.Scene {
     panel(this, cx - barW / 2, y, barW, h, { depth: 20, alpha: 0.92, radius: 12 });
     [0, 1].forEach(s => {
       const dir = s ? 1 : -1, edge = cx + dir * barW / 2, hex = Phaser.Display.Color.HexStringToColor(teamColorHex(m.teams[s])).color;
-      this.add.rectangle(edge - dir * 5, y + h / 2, 10, h - 6, hex).setDepth(21);                    // team colour block at the outer end
-      this.add.image(edge - dir * 38, y + h / 2, 'logo-' + TEAMS[m.teams[s]].id).setDisplaySize(32, 32).setDepth(22);
+      (this.sbTeam = this.sbTeam && this.sbTeam[0] && this.sbTeam[0].scene === this ? this.sbTeam : []).push(this.add.rectangle(edge - dir * 5, y + h / 2, 10, h - 6, hex).setDepth(21),   // team colour block at the outer end
+        this.add.image(edge - dir * 38, y + h / 2, 'logo-' + TEAMS[m.teams[s]].id).setDisplaySize(32, 32).setDepth(22));   /* (sbTeam: v14.3.6, hidden in Volt Royale) */
     });
     const small = { ...STYLE.hud, fontSize: '20px' };
     this.nameA = this.add.text(cx - barW / 2 + 62, y + h / 2, '', small).setOrigin(0, 0.5).setDepth(22);
@@ -973,7 +973,7 @@ class GameScene extends Phaser.Scene {
     const m = this.match, q = m.heard; this.capLeft -= dt;
     if (q && q.length) {
       const t = Commentary.parse(q.splice(0).pop()), mode = Settings.commentaryMode || 'full';
-      if (mode === 'full' || mode === 'captions') { this.cap.setText(t.text || '').setColor(t.mood >= 3 ? '#ffe45c' : '#ffffff').setFontSize(t.mood >= 3 ? 30 : 24).setVisible(!!(t.text && t.text.trim())).setY(this.match && this.match.kind === 'br' ? CONFIG.view.height - 190 : CONFIG.view.height - 40); this.capLeft = 3 + t.text.length * 0.05; }
+      if (mode === 'full' || mode === 'captions') { this.cap.setText(t.text || '').setColor(t.mood >= 3 ? '#ffe45c' : '#ffffff').setFontSize(t.mood >= 3 ? 30 : 24).setVisible(!!(t.text && t.text.trim())).setY(this.match && this.match.kind === 'br' ? CONFIG.view.height - 190 : Settings.touch ? CONFIG.view.height - 150 : CONFIG.view.height - 40);   /* (v14.3.4: clear of the touch buttons along the bottom) */ this.capLeft = 3 + t.text.length * 0.05; }
       if (mode === 'full' || mode === 'voice') Commentator.speak(t);
     }
     if (this.capLeft <= 0 && this.cap.visible) this.cap.setVisible(false);
@@ -1020,7 +1020,7 @@ class GameScene extends Phaser.Scene {
     this.lastScore = m.score.slice();
     this.updateStrip(m);
     }
-    this.noticeText.setText(m.noticeLeft > 0 ? m.notice : '');
+    this.noticeText.setText(m.noticeLeft > 0 && m.state !== 'over' ? m.notice : '');   /* (v14.3.4: not over the results) */
     if (m.state === 'over') { this.banner.setText(''); if (!this.demo) { if (m.mini) this.showMiniResult(); else this.showResult(); if (this.resultHint && this.resultHint.active) this.resultHint.setAlpha(this.resultReady() ? 0.72 + 0.28 * Math.sin(this.time.now / 220) : 0); } }
     else if (m.state === 'countdown') this.banner.setText(m.readyText ? '' : String(Math.ceil(m.timer))).setFontSize(110);
     else this.banner.setText(m.bannerLeft > 0 ? m.banner : '').setFontSize(56);
@@ -1119,7 +1119,7 @@ class PauseScene extends ListMenuScene {
       { label: () => 'Resume', select: resume },
       camItem,
       ...(this.gameScene.setup.season || m.mini ? [] : this.gameScene.setup.players).map(p => ({
-        label: () => `${p.name || p.tag}  ${p.src.label}:   ◀ ${TEAMS[m.teams[p.side]].name} ▶`, change: switchTeam(p), select: switchTeam(p) })),
+        label: () => `${p.name || p.tag}${this.gameScene.setup.players.length > 1 && p.src.label && p.src.label !== 'You' ? ` (${p.src.label})` : ''}'s team   ◀ ${TEAMS[m.teams[p.side]].name} ▶`, change: switchTeam(p), select: switchTeam(p) })),
       ...(m.practice && !m.mini ? [{ label: () => 'Reset score and kickoff', select: () => { m.score = [0, 0]; m.kickoff(); resume(); } }] : []),
       ...(Sound.playlist ? [{ label: () => 'Next song', select: () => Sound.nextTrack() }] : []),
       toSettings, social,

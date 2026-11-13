@@ -2,23 +2,23 @@
    you're in the queue for that team size. The screen shows how many people are queued and who. A match starts:
      - as soon as EVERYONE queued has pressed START (so two friends, or even one person, can go straight away),
      - or when the first person in the queue has waited 5 minutes,
-     - or when the queue fills a match (as many people as it has carts: 32, or 30 in Trios and Fives).
+     - or when the queue fills a match (as many people as it has carts: 100, or 99 in Trios).
    CPU carts fill the empty spots. The first person queued hosts: their game opens an online room and the server hands the code to everyone
    else, whose games join it on their own. (Server side: /mm/poll, /mm/code, /mm/done in server/core.mjs.) */
 const BRQ = {
   sizes: [1, 2, 3, 4, 5], names: { 1: 'Solos', 2: 'Duos', 3: 'Trios', 4: 'Squads (4)', 5: 'Fives' },
-  carts: { 1: 32, 2: 32, 3: 30, 4: 32, 5: 30 },   // (v14.2.24: bigger matches)                       // (a whole number of teams)
+  carts: { 1: 100, 2: 100, 3: 99, 4: 100, 5: 100 },   /* (v14.3.7: about 100) */   // (v14.2.24: bigger matches)                       // (a whole number of teams)
   preset(sq, n) {
     const carts = this.carts[sq] || 20, mini = { ...miniCfg('br'), squad: sq, carts };
     return { mini, sizes: miniSizes(carts), teamA: Settings.teamA, teamB: Settings.teamB, difficulty: Settings.difficulty, practice: true, autoStart: Math.max(1, n) };
   },
   /* v14.3: the other online playlists */
   modes: { br: { name: 'VOLT ROYALE', sub: 'PUBLIC MATCH', col: '#c44dff' }, hockey: { name: 'VOLT HOCKEY', sub: 'QUICK MATCH  ·  3 V 3', col: '#19c3ff' }, mini: { name: 'MINIGAME MIX', sub: 'A DIFFERENT MINIGAME EACH MATCH', col: '#ff9a3c' } },
-  mixKinds() { return MINI_KINDS().filter(k => !['br', 'timetrial'].includes(k) && GAME_INFO[k]); },
+  mixKinds() { return MINI_KINDS().filter(gameOn).filter(k => !['br', 'timetrial'].includes(k) && GAME_INFO[k]); },
   presetFor(mode, M) {
     const n = Math.max(1, (M && M.accts) || (M && M.members && M.members.length) || 1), base = { teamA: Settings.teamA, teamB: Settings.teamB, difficulty: Settings.difficulty, autoStart: n };
     if (mode === 'hockey') return { ...base, practice: false, sizes: [3, 3] };
-    if (mode === 'mini') { const ks = this.mixKinds(), k = ks[Math.floor(Math.random() * ks.length)] || 'race'; return { ...base, practice: true, mini: miniCfg(k), sizes: miniSizes(cartsFor(k)) }; }
+    if (mode === 'mini') { const ks = this.mixKinds(), k = ks[Math.floor(Math.random() * ks.length)] || 'race'; return { ...base, practice: true, mix: 1, mini: miniCfg(k), sizes: miniSizes(cartsFor(k)) }; }
     return this.preset(M.squad || 1, n);
   },
   /* how many spots you take: you, the players on your screen, and your party (if you lead one) */
@@ -27,7 +27,7 @@ const BRQ = {
 };
 class BRQueueScene extends Phaser.Scene {
   constructor() { super('BRQueue'); }
-  init(data) { this.mode = (data && data.mode) || 'br'; this.squad = (data && data.squad) || (modeOpts('br') || {}).squad || 1; this.go = false; this.view = null; this.busy = false; this.lastPoll = 0; this.err = ''; this.leaving = false; this.matchSeen = 0; }
+  init(data) { this.polled = false; this.started = false; this.stopped = false; this.again = false; this.mode = (data && data.mode) || 'br'; this.squad = (data && data.squad) || (modeOpts('br') || {}).squad || 1; this.go = false; this.view = null; this.busy = false; this.lastPoll = 0; this.err = ''; this.leaving = false; this.matchSeen = 0; }
   create() {
     const V = CONFIG.view, cx = V.width / 2, T = (y, s, o = {}) => this.add.text(cx, y, s, { fontFamily: FONT, fontSize: '26px', color: '#ffffff', align: 'center', ...o }).setOrigin(0.5);
     this.cameras.main.setBackgroundColor('#0b141b');
@@ -60,7 +60,7 @@ class BRQueueScene extends Phaser.Scene {
   async poll(now) {
     if (this.err || this.stopped || this.leaving) return; if (this.busy) { if (now) this.again = true; return; } if (!now && this.time.now - this.lastPoll < 2000) return;
     this.busy = true; this.lastPoll = this.time.now;
-    try { const r = await Account.req('POST', '/mm/poll', { squad: this.squad, go: this.go, mode: this.mode, nofill: !!Settings.mmNoFill, dev: (window.matchMedia && matchMedia('(pointer: coarse)').matches) ? 'mobile' : 'desktop', n: BRQ.people(), accts: BRQ.accts() }); if (this.stopped || this.leaving) return; this.view = r; this.offset = r.now ? r.now - Date.now() : 0; if (r.match) this.onMatch(r.match); }
+    try { const r = await Account.req('POST', '/mm/poll', { squad: this.squad, go: this.go, mode: this.mode, fresh: !this.polled, nofill: !!Settings.mmNoFill, dev: (window.matchMedia && matchMedia('(pointer: coarse)').matches) ? 'mobile' : 'desktop', n: BRQ.people(), accts: BRQ.accts() }); this.polled = true; if (this.stopped || this.leaving) return; this.view = r; this.offset = r.now ? r.now - Date.now() : 0; if (r.match) this.onMatch(r.match); }
     catch (e) { this.err = (e && e.message) || 'Could not reach the server.'; }
     finally { this.busy = false; this.draw(); if (this.again) { this.again = false; this.poll(true); } }
   }
@@ -72,6 +72,7 @@ class BRQueueScene extends Phaser.Scene {
     if (this.time.now - this.matchSeen > 45000) { Account.req('POST', '/mm/done', {}).catch(() => {}); this.matchSeen = 0; this.go = false; Toasts.show('The host didn\'t open the match. Back in the queue.', [], 4000); }
   }
   draw() {
+    if (this.stopped || !this.sizeT || !this.sizeT.active) return;   /* (v14.3.2: a poll that finished after the screen closed) */
     const v = this.view, sq = this.squad, fs = this.fillShown();
     if (this.fillB) { this.fillB.t.setText(Settings.mmNoFill ? 'NO FILL' : 'FILL'); [this.fillB, this.fillB.t, this.fillB.bg, this.fillHint].forEach(o => o && o.setVisible && o.setVisible(fs)); if (this.fillHint) this.fillHint.setText(Settings.mmNoFill ? 'Only your party on your team' : 'Team up with other players').setVisible(fs); }
     this.sizeT.setText(this.mode === 'br' ? `Teams:  ${BRQ.names[sq]}` : (BRQ.modes[this.mode] || {}).sub || '');
@@ -100,12 +101,20 @@ class BRQueueScene extends Phaser.Scene {
     if (this.view && !this.matchSeen) this.draw();
   }
 }
+/* v14.3.2 the Minigame Mix: "play again" picks a different minigame (one the people in the room fit into) */
+function mixNext(S) {
+  const pre = S && S.preset; if (!pre || !pre.mix) return false; const n = S.roster.length, cur = S.cfg.mini && S.cfg.mini.kind;
+  const ks = BRQ.mixKinds().filter(k => k !== cur && (() => { const z = miniSizes(cartsFor(k)); return z[0] + z[1] >= n; })()); if (!ks.length) return false;
+  const k = ks[Math.floor(Math.random() * ks.length)], sz = miniSizes(cartsFor(k));
+  let a = 0; for (const r of S.roster) { if (a < sz[0]) { r.side = 0; a++; } else r.side = 1; }   /* (everyone fits the new game's sides before the switch) */
+  S.cfg.sizesRoom = sz; S.setConfig({ mini: miniCfg(k), sizes: sz }); return true;
+}
 /* the host's room: post its code for the others, then tell the server we're under way */
 { const P = RoomScene.prototype, up = P.update;
   P.update = function (...a) {
     const r = up.apply(this, a), mm = this.preset && this.preset.mm;
     if (mm && this.session) this.session.mmFill = true;   // (public match: the people fill squads together, like Fortnite's fill; CPUs make up the rest)
-    if (mm && !this.mmPosted && this.session && this.session.code) { this.mmPosted = true; Account.req('POST', '/mm/code', { code: this.session.code }).catch(() => {}); setTimeout(() => Account.req('POST', '/mm/done', {}).catch(() => {}), 60000); }
+    if (mm && this.mmPosted !== mm.id && this.session && this.session.code) { this.mmPosted = mm.id;   /* (v14.3.2: per match: the room screen is reused, so a true from the last match stopped the next code going out) */ Account.req('POST', '/mm/code', { code: this.session.code }).catch(() => {}); setTimeout(() => Account.req('POST', '/mm/done', {}).catch(() => {}), 60000); }
     return r;
   };
 }
@@ -120,3 +129,6 @@ class BRQueueScene extends Phaser.Scene {
     return cr.apply(this, a);
   };
 }
+/* v14.3.2: the room screen is one object used again and again: what the last room did (started by itself, the time it began waiting) is
+   forgotten when it opens, or a second public match / party game never started on its own */
+{ const P = RoomScene.prototype, ini = P.init; P.init = function (...a) { this.autoDone = false; this.autoAt = 0; return ini.apply(this, a); }; }

@@ -43,11 +43,15 @@ const GAME_CATS = [
   { id: 'sneaky', name: 'Battles and sneaky', blurb: 'Paintball, capture the flag, hiding among the CPUs' }
 ];
 const MINI_KINDS = () => Object.keys(GAME_INFO).filter(k => k !== 'hockey');
+/* v14.3.3: game modes the admin turned off (admin page, Game tab) don't show. ids: hockey, season, practice, br, mini (every minigame), or one minigame */
+function gameOn(k) { const o = (typeof GameCfg !== 'undefined' && GameCfg.off) || {}; if (k === null || k === undefined) k = 'hockey'; return !o[k] && !(o.mini && k !== 'hockey' && k !== 'br' && k !== 'season' && k !== 'practice'); }
 const modeOf = m => m && MODES[m.kind];
 
 /* Options for the new games live in Settings.mg[kind] ({ key: value }); each GAME_INFO entry may list them in `opts`:
    { key, label, min, max, step?, def, fmt? } numbers, or { key, label, values: [...], names?, def } choices. */
 function modeOpts(kind) { const I = GAME_INFO[kind] || {}, saved = (Settings.mg && Settings.mg[kind]) || {}, out = {}; for (const o of I.opts || []) out[o.key] = saved[o.key] !== undefined ? saved[o.key] : o.def; return out; }
+/* v14.3.7: Volt Royale has 40 to 100 carts, in tens (older saves snap to the nearest) */
+{ const mo = modeOpts; modeOpts = function (kind) { const o = mo(kind); if (kind === 'br' && o.carts !== undefined) o.carts = Math.max(40, Math.min(100, Math.round((+o.carts || 60) / 10) * 10)); return o; }; }
 function modeSave(kind, patch) { Settings.mg = { ...miniOpts(), [kind]: { ...modeOpts(kind), ...patch } }; Settings.save(); }
 { const base = miniCfg; miniCfg = kind => MODES[kind] ? { kind, mode: GAME_INFO[kind].teams ? 'teams' : 'ffa', items: miniOpts().items[kind] !== undefined ? !!miniOpts().items[kind] : !!GAME_INFO[kind].itemsOn, minutes: modeOpts(kind).minutes || GAME_INFO[kind].minutes || 3, ...modeOpts(kind) } : base(kind); }
 { const base2 = miniCfg; miniCfg = kind => ({ ...base2(kind), noCpu: !!((miniOpts().nocpu || {})[kind]) }); }   // every minigame: CPU carts on or off
@@ -84,7 +88,7 @@ function fitSizes(mini, players, sizes) {
     if (d < 2 * R + 0.12 && M.contact) M.contact(this, a, b, d);
     if (d >= 2 * R || d === 0) return;
     const K = CONFIG.chair, closing = Physics.circles(a, R, K.mass * (a.massMul || 1), b, R, K.mass * (b.massMul || 1), K.chairBounce); crashSlow(a, b, closing);
-    if (closing > CONFIG.foul.bumpSoundSpeed) this.sfx('bump');
+    if (closing > CONFIG.foul.bumpSoundSpeed) this.sfx('bump', 0, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: ((a.gs && a.gs.z) || 0) + 0.4 });
     if (M.bump) M.bump(this, a, b, closing);
   };
   P.useItem = function (c) { const M = modeOf(this); if (M && M.use) { if (!c.out && this.state === 'play') M.use(c, this); return; } return o.useItem.call(this, c); };   // A / X: the mode's own action (Imposter's zap)

@@ -132,7 +132,7 @@ const CONFIG = {
     shake:   { seconds: 0.35, metres: 0.08 }, maxFov: 92
   },
   // Starting values of the settings that can also be changed in the menus.
-  defaults: { brCamDist: 2.75, cartSound: true, cartVolume: 1, penaltySeconds: 10, penaltyCarry: false, masterVolume: 1, voiceVolume: 1, micVolume: 1, micMonitor: false, voiceMode: 'open', lockCart: false, invertLook: false, lookH: 0.7, lookV: 1, camMode: 'first', allowThird: false, allowBroadcast: false, fov3d: 74, chaseDist: 2, speedLevel: 5, speedCap: 5, ballBounce: 0.1, ballGrip: 30, stickLength: 0.26, ballFriction: 1.6, adapt: true, sizeA: 3, sizeB: 3, collisions: true, penalties: true },
+  defaults: { brCamDist: 2.75, spatial: true, cartSound: true, cartVolume: 1, penaltySeconds: 15, penaltyCarry: true, masterVolume: 1, voiceVolume: 1, micVolume: 1, micMonitor: false, voiceMode: 'open', lockCart: false, invertLook: false, lookH: 0.7, lookV: 1, camMode: 'first', allowThird: false, allowBroadcast: false, fov3d: 74, chaseDist: 2, speedLevel: 5, speedCap: 5, ballBounce: 0.1, ballGrip: 30, stickLength: 0.26, ballFriction: 1.6, adapt: true, sizeA: 3, sizeB: 3, collisions: true, penalties: true },
 
   // Slider limits used by the settings menus.
   ranges:  { masterVolume: { min: 0, max: 1, step: 0.05 }, voiceVolume: { min: 0, max: 1, step: 0.05 }, micVolume: { min: 0, max: 2, step: 0.1 }, musicVolume: { min: 0, max: 1, step: 0.05 }, sfxVolume: { min: 0, max: 1, step: 0.05 },

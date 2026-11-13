@@ -12,7 +12,7 @@ const teamsMatter = cfg => !!cfg && (!cfg.mini || cfg.mini.mode === 'teams');
 
   /* the settings: the room (host only), then the rules one level in */
   P.roomItems = function () {
-    const S = this.session, cfg = () => S.cfg, names = Object.keys(CONFIG.difficulties), GAMES = [null, ...MINI_KINDS().filter(k => k !== 'br')]   /* (v14.2.22: Volt Royale online is public matchmaking only) */ ;
+    const S = this.session, cfg = () => S.cfg, names = Object.keys(CONFIG.difficulties), GAMES = [...(gameOn('hockey') ? [null] : []), ...MINI_KINDS().filter(k => k !== 'br' && gameOn(k))]   /* (v14.2.22: Volt Royale online is public matchmaking only) */ ;
     const cycleGame = d => { const i = GAMES.indexOf(cfg().mini ? cfg().mini.kind : null), k = GAMES[(i + d + GAMES.length) % GAMES.length]; S.setConfig(k ? { mini: miniCfg(k), practice: true } : { mini: null, practice: false }); };
     const size = (side, d) => { const sizes = [...cfg().sizes]; sizes[side] = clamp(sizes[side] + d, 1, CONFIG.match.chairsPerTeam); S.setConfig({ sizes }); };
     return [

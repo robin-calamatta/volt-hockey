@@ -14,10 +14,10 @@ const MenuPad = {
     const css = document.createElement('style');
     css.textContent = `
       #menupad{position:fixed;inset:0;z-index:7;pointer-events:none;display:none;font-family:"Barlow Condensed",Arial,sans-serif;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-      #menupad .grp{position:absolute;bottom:max(64px,calc(env(safe-area-inset-bottom) + 64px));width:132px;height:132px}
+      #menupad .grp{position:absolute;bottom:max(64px,calc(env(safe-area-inset-bottom) + 64px));width:120px;height:120px}
       #menupad .grp.d{left:max(10px,env(safe-area-inset-left))} #menupad .grp.f{right:max(10px,env(safe-area-inset-right))}
-      #menupad .k{position:absolute;width:42px;height:42px;pointer-events:auto;touch-action:none;display:flex;flex-direction:column;align-items:center;justify-content:center;box-sizing:border-box;
-        color:#fff;font-weight:800;font-size:19px;line-height:1;text-shadow:0 2px 3px #000a;background:rgba(14,32,46,.55);border:2px solid rgba(25,195,255,.75);border-radius:12px;box-shadow:0 3px 10px #0008}
+      #menupad .k{position:absolute;width:38px;height:38px;pointer-events:auto;touch-action:none;display:flex;flex-direction:column;align-items:center;justify-content:center;box-sizing:border-box;
+        color:#fff;font-weight:800;font-size:17px;line-height:1;text-shadow:0 2px 3px #000a;background:rgba(14,32,46,.55);border:2px solid rgba(25,195,255,.75);border-radius:12px;box-shadow:0 3px 10px #0008}
       #menupad .f .k{border-radius:50%}
       #menupad .k .s{font-size:9px;letter-spacing:.06em;opacity:.9;margin-top:2px;font-weight:700}
       #menupad .k.down{background:rgba(25,195,255,.6);border-color:#fff;transform:scale(.94)}
@@ -28,7 +28,7 @@ const MenuPad = {
     for (const k of this.keys) {
       const el = document.createElement('div'); el.className = 'k' + (k.g === 's' ? ' st' : ''); el.innerHTML = `<span>${k.l}</span>${k.s ? `<span class="s">${k.s}</span>` : ''}`;
       if (k.c) el.style.borderColor = k.c;
-      if (k.g !== 's') { el.style.left = (k.x * 45) + 'px'; el.style.top = (k.y * 45) + 'px'; grp[k.g].append(el); } else root.append(el);
+      if (k.g !== 's') { el.style.left = (k.x * 41) + 'px'; el.style.top = (k.y * 41) + 'px'; grp[k.g].append(el); } else root.append(el);
       const T = () => TouchPad.state;
       const down = e => { e.preventDefault(); e.stopPropagation(); if (!Controls.sources.touch) Controls.sources.touch = Controls.touchSrc || (Controls.touchSrc = new Source('touch', 'Touch controls')); T().held[k.id] = true; T().tapped[k.id] = true; el.classList.add('down'); try { el.setPointerCapture(e.pointerId); } catch (er) { /* fine */ } };
       const up = e => { T().held[k.id] = false; el.classList.remove('down'); };

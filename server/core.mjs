@@ -53,12 +53,13 @@ export function createApi(store, opts = {}) {
   const saveUser = u => store.set(key(u.name), u);
   const online = u => !!u && now() - (u.lastSeen || 0) < LIMITS.onlineMs;
   const me = u => ({ name: u.name, adult: !!u.adult, br: canBR(u), created: u.created, email: u.email ? maskEmail(u.email) : '' });
-  const GAME_DEFAULTS = { brThird: true };
+  const GAME_DEFAULTS = { brThird: true, off: {} };   /* off: v14.3.3 game modes turned off (hockey, season, practice, br, mini, or one minigame's id) */
+  const gameCfg = async () => { const g = { ...GAME_DEFAULTS, ...((await store.get('cfg/game')) || {}) }; g.off = g.off && typeof g.off === 'object' ? g.off : {}; return g; };
   /* v14.2.22 Volt Royale public matchmaking. One queue per team size (1 to 5). Queued players poll every couple of seconds; a match forms when
      everyone queued has pressed START, when the first one has waited 5 minutes, or when the queue fills a match (as many people as it has carts; CPUs fill any spots left). The first one queued hosts: their game opens an online room
      and posts its code here; the others see the code and join. Matches live under their own keys (and each player gets a pointer to theirs),
      so two polls writing the queue at the same moment can't lose a match. */
-  const MM_WAIT = 5 * 60e3, MM_GONE = 15e3, MM_KEEP = 3 * 60e3, MM_SPOTS = { 1: 32, 2: 32, 3: 30, 4: 32, 5: 30 };   // (v14.2.23: a match takes as many people as it has carts)
+  const MM_WAIT = 5 * 60e3, MM_GONE = 15e3, MM_KEEP = 3 * 60e3, MM_SPOTS = { 1: 100, 2: 100, 3: 99, 4: 100, 5: 100 };   /* (v14.3.7: about 100) */   // (v14.2.23: a match takes as many people as it has carts)
   /* v14.3: other playlists queue too: Volt Hockey quick match (3 v 3) and the minigame mix (up to 8). They start sooner (1 minute). */
   const MM_MODES = { hockey: { spots: 6, wait: 60e3 }, mini: { spots: 8, wait: 60e3 } };
   const mmSquad = b => { const q = Number(b && b.squad); return q >= 1 && q <= 5 ? Math.floor(q) : 1; };
@@ -72,9 +73,13 @@ export function createApi(store, opts = {}) {
   const mmView = (u, Q, M) => { const list = Object.values(Q.players).sort((a, b) => a.at - b.at), first = list[0], cnt = list.reduce((k, p) => k + mmN(p), 0);
     return { count: cnt, ready: list.filter(p => p.go).reduce((k, p) => k + mmN(p), 0), you: { go: !!(Q.players[u.name.toLowerCase()] || {}).go }, since: first ? first.at : null, startsAt: first ? first.at + mmWait(Q) : null, cap: mmCap(Q), mode: Q.mode || 'br', now: now(),   /* (v14.2.23: counts, not a list of names) */
       match: M ? { id: M.id, host: M.host, you: M.host === u.name ? 'host' : 'guest', members: M.members, people: M.people || M.members.length, accts: M.accts || M.members.length, code: M.code || null, squad: M.squad, mode: M.mode || 'br' } : null }; };
+  /* v14.3.2: a new search forgets the last match. Leaving a match early left it on file for 3 minutes, so the next search "found" it again and
+     waited on a room that was gone: the matchmaking screen hung */
+  async function mmForget(u) { await store.del('mm/u/' + u.name.toLowerCase()); return null; }
   async function mmPoll(u, b) {
     const mode = mmMode(b); if (mode === 'br' && !canBR(u)) bad('Volt Royale is for players 16 and over.', 403);
-    const nf = !!(b && b.nofill), sq = mmSquad(b), t = now(), M0 = await mmMine(u), Q = await mmLoad(sq, mode, nf), qk = mmKey(mode, sq, Q.nf);
+    { const off = (await gameCfg()).off; if (off[mode] || (mode === 'mini' && off.mini)) bad('That playlist is turned off right now.', 403); }   /* (v14.3.3) */
+    const nf = !!(b && b.nofill), sq = mmSquad(b), t = now(), M0 = b && b.fresh ? await mmForget(u) : await mmMine(u), Q = await mmLoad(sq, mode, nf), qk = mmKey(mode, sq, Q.nf);
     for (const [k, p] of Object.entries(Q.players)) if (t - p.seen > MM_GONE) delete Q.players[k];
     const key = u.name.toLowerCase();
     if (M0) { if (Q.players[key]) { delete Q.players[key]; await store.set(qk, Q); } return mmView(u, Q, M0); }   // already in a match: show it
@@ -359,8 +364,9 @@ export function createApi(store, opts = {}) {
     'PUT /admin/raw': async (b) => { const k = str(b.key, 300); if (!k) bad('No key.'); await store.set(k, b.value); return { ok: true }; },
     'POST /admin/raw/delete': async (b) => { await store.del(str(b.key, 300)); return { ok: true }; },
     /* v14.2.6: game-wide switches (the Game tab). brThird: third person allowed in Volt Royale */
-    'GET /admin/game': async () => ({ game: { ...GAME_DEFAULTS, ...((await store.get('cfg/game')) || {}) } }),
-    'POST /admin/game': async (b) => { const cur = { ...GAME_DEFAULTS, ...((await store.get('cfg/game')) || {}) }; for (const k of Object.keys(GAME_DEFAULTS)) if (typeof b[k] === 'boolean') cur[k] = b[k]; await store.set('cfg/game', cur); return { game: cur }; }
+    'GET /admin/game': async () => ({ game: await gameCfg() }),
+    'POST /admin/game': async (b) => { const cur = await gameCfg(); for (const k of Object.keys(GAME_DEFAULTS)) if (typeof b[k] === 'boolean') cur[k] = b[k];
+      if (b.off && typeof b.off === 'object') { const off = {}; for (const [k, v] of Object.entries(b.off).slice(0, 80)) if (/^[a-z]{2,16}$/.test(k) && v === true) off[k] = true; cur.off = off; } await store.set('cfg/game', cur); return { game: cur }; }
   };
 
   /* ---- routing ---- */
@@ -374,7 +380,7 @@ export function createApi(store, opts = {}) {
     'POST /reset/request': (b) => requestReset(b), 'POST /reset/confirm': (b) => confirmReset(b),
     'PUT /prefs': async (b, q, h) => putPrefs((await auth(h)).u, b), 'PUT /progress': async (b, q, h) => putProgress((await auth(h)).u, b),
     'GET /ice': async () => ({ iceServers: [...(iceServers() || []), ...(await turnCredentials())] }),
-    'GET /game': async () => ({ game: { ...GAME_DEFAULTS, ...((await store.get('cfg/game')) || {}) } }),   // (v14.2.6: game-wide switches the admin sets)
+    'GET /game': async () => ({ game: await gameCfg() }),   // (v14.2.6: game-wide switches the admin sets)
     'GET /leaderboard': () => leaderboard(), 'GET /profile': (b, q) => profile(q.name), 'GET /search': async (b, q, h) => search((await auth(h)).u, q),
     'POST /sync': async (b, q, h) => sync((await auth(h)).u, b),
     'POST /friends/request': async (b, q, h) => friendRequest((await auth(h)).u, b), 'POST /friends/accept': async (b, q, h) => acceptFriend((await auth(h)).u, b),

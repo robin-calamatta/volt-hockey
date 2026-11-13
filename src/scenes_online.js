@@ -9,8 +9,8 @@ class OnlineMenuScene extends ListMenuScene {
     const rj = typeof Rejoin !== 'undefined' && Rejoin.get();
     this.buildMenu('ONLINE', [
       ...(rj && ok ? [{ label: () => `▶ Back into your game (room ${rj.code})`, hint: 'Your connection dropped: rejoin the game that is still going, in your own cart', select: () => joinRoomByCode(this, rj.code, t => this.note && this.note.active && this.note.setText(t), () => {}, rj.token) }] : []),
-      { label: () => 'Create room', select: () => (ok ? this.scene.start('Room', { role: 'host' }) : blocked()) },
-      { label: () => 'Create a minigame room', hint: 'Balloon Bash, Race or Manhunt online (or switch any room with its Game row)', select: () => this.scene.start('Minigames') },
+      ...(gameOn('hockey') ? [{ label: () => 'Create room', select: () => (ok ? this.scene.start('Room', { role: 'host' }) : blocked()) }] : []),   /* (v14.3.3: hidden when the admin turned the game off) */
+      ...(MINI_KINDS().filter(k => k !== 'br' && gameOn(k)).length ? [{ label: () => 'Create a minigame room', hint: 'Balloon Bash, Race or Manhunt online (or switch any room with its Game row)', select: () => this.scene.start('Minigames') }] : []),
       { label: () => 'Browse public rooms', select: () => (ok ? this.scene.start('Browse') : blocked()) },
       { label: () => 'Join with a code', select: () => (ok ? this.scene.start('JoinCode') : blocked()) },
       { label: () => 'Back', select: () => this.scene.start('Main') }
@@ -176,7 +176,7 @@ class RoomScene extends ListMenuScene {
     const names = Object.keys(CONFIG.difficulties), me = () => this.session.roster.find(r => r.id === this.session.myId);
     const flip = () => { const side = me() ? 1 - me().side : 0; if (host) this.session.setSide(1, side); else this.session.setSide(side); };
     const cfg = () => this.session.cfg, teamName = i => TEAMS[i].name;
-    const GAMES = [null, ...MINI_KINDS().filter(k => k !== 'br')]   /* (v14.2.22: Volt Royale online is public matchmaking only) */ , cycleGame = d => {           // hockey or a minigame (its options come from the host's Minigames settings)
+    const GAMES = [...(gameOn('hockey') ? [null] : []), ...MINI_KINDS().filter(k => k !== 'br' && gameOn(k))]   /* (v14.2.22: Volt Royale online is public matchmaking only) */ , cycleGame = d => {           // hockey or a minigame (its options come from the host's Minigames settings)
       const i = GAMES.indexOf(cfg().mini ? cfg().mini.kind : null), k = GAMES[(i + d + GAMES.length) % GAMES.length];
       this.session.setConfig(k ? { mini: miniCfg(k), practice: true } : { mini: null, practice: false });
     };

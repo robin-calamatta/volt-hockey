@@ -3,6 +3,162 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.3.9: 3D sound: hear where shots and carts are coming from
+
+- **Sounds come from where they happen**, best with headphones. Gunshots, rockets, bumps, doors, chests, healing, reloading, swings, shields and revives are placed:
+  - **Direction:** left or right, in front or behind, above or below, using the browser's HRTF panner (the same technique 3D games use). Direction is relative to where your camera is facing.
+  - **Distance:** quieter and duller the further away, with more of the echo left at a distance.
+  - **Your own sounds** stay in the middle.
+- **You can hear carts coming.** In Volt Royale, the 6 closest moving carts within 40 m each have their own motor and tyre sound, louder and higher the faster they go, placed where the cart is.
+- **Online:** each sound carries its position to the other players, so everyone hears it from where it happened on their own screen.
+- **Two or more players on one screen:** sounds get quieter with distance (from whichever of you is closest) but aren't placed left or right, since there's no single direction to hear from.
+- **New setting:** Settings > Sound and commentary > "3D sound (headphones)" (on by default). Off keeps the distance effect but stops placing sounds left, right, in front or behind. "Cart driving sound" and "Cart driving volume" control the other carts' motors too.
+- Code: `src/spatial.js`. Match sounds can now take a position (`m.sfx(name, playerId, { x, y, z })`). A Volt Royale cart's own actions use the cart's position automatically.
+
+## v14.3.8: faster storm, CPUs that don't get stuck at houses and ramps
+
+- **The storm moves faster:** each stage waits and closes about half as long as before, so a whole match is about 8 minutes of storm instead of 16. CPUs leave for the safe zone a little earlier to match. In test games, about one CPU a game is caught by the storm.
+
+  | Stage | Waits | Closes over | Circle left |
+  | --- | --- | --- | --- |
+  | 1 | 1:15 | 1:00 | 62% of the map |
+  | 2 | 0:55 | 0:45 | 42% |
+  | 3 | 0:45 | 0:40 | 26% |
+  | 4 | 0:35 | 0:30 | 13% |
+  | 5 | 0:25 | 0:25 | 6% |
+  | 6 | 0:20 | 0:20 | 2% |
+  | 7 | 0:15 | 0:15 | nothing |
+
+- **CPUs no longer get stuck in and around buildings.** In 5-minute test games with 60 carts, CPUs pushing against something for 9 seconds or more dropped from about 35 to about 5. The causes and fixes:
+  - **Doorways:** the CPU's driving map left no room to drive through a doorway, so most small buildings had no way in or out. CPUs drove straight at loot inside and stopped against the wall. Every door and gap a cart fits through now has a lane through it, and every building on both maps can be reached.
+  - **Pressed against a wall:** a CPU's route could start on the other side of the wall it was touching. Routes now start and end at a spot the CPU can drive straight to.
+  - **Ramps:**
+    - Half-way down a ramp, a CPU re-planned from the top level, turned round, and see-sawed. Now it finishes the ramp first, and goes the right way along it.
+    - A CPU on the landing at the top of the house stairs couldn't drive onto the stairs. It can now.
+    - CPUs cut corners across the side of a ramp and stopped against it. They now go round.
+    - A ramp that stopped short of the catwalk it led to (a small gap) has the gap floored over, so CPUs stopped there and players fell through.
+  - **Loot it can't take:** CPUs no longer go for loot they can't pick up (a gun they already have with full ammo, something they just dropped), or loot they found no way to.
+  - **Circling:** CPUs slow down as they reach what they're after instead of circling round it, and stop when they reach a camping spot.
+  - **More routes:** CPUs can now plan up to 4 routes a frame (within 1.5 ms), not 1. With 100 carts, CPUs waiting for a route drove straight at their target and got stuck.
+  - **Stuck anyway:** a CPU still stuck after 3 seconds backs off at an angle, drops its route and gives up on loot nearby.
+
+## v14.3.7: 100-cart Volt Royale, players-left counter, no more floating over stairwells
+
+- **Players left, back in the top bar.** Volt Royale's top bar shows how many are left, and in team modes how many teams too (for example "16 LEFT · 8 TEAMS"). The team logos stay hidden.
+- **No more driving on thin air over a stairwell.** Where a ramp comes up through a floor, the floor has a hole, as drawn. Before, you could only drop in from the side of the ramp. From the other side you drove straight across the hole as if the floor were still there. Now you fall through onto the ramp from any side.
+- **About 100 carts online.** Public Volt Royale matches have 100 carts: Solos, Duos, Squads and Fives have 100, and Trios has 99 (a whole number of teams). People fill them first and CPUs take the rest.
+- **40 to 100 carts on this screen.** In Volt Royale's settings, Carts goes from 40 to 100 in steps of 10. The default is 60. Saved settings from before snap to the nearest step, and anything under 40 becomes 40.
+- **Kept smooth at 100.**
+  - Collision checks between carts only look at their neighbours (sorted along the map).
+  - Far-away CPUs think less often while gliding in, as well as on the ground.
+  - Dropped loot is added to the loot grid instead of the grid being rebuilt.
+
+## v14.3.6: smoother 64-cart Volt Royale, drop through any gap, roof ramps, red dot sight, hockey rules
+
+- **Smoother with lots of CPUs.** With 64 carts, the game now takes about 2 ms per frame to run on a desktop CPU, down from about 5 ms.
+  - **The simulation** steps 120 times a second instead of 240, so there is half the work. Bullets take smaller steps, so they don't pass through walls.
+  - **Ramps** are found from an 8 m grid. Before, every cart checked every ramp on the map several times a step, which was the biggest single cost.
+  - **Walls** are only checked when a cart actually touches them, and carts far apart skip the full collision check.
+  - **Loot:** the list of loot is kept between steps until it changes.
+  - **Route planning:** CPUs plan routes at most once every 1/60 s.
+  - **Far-away CPUs:** CPUs more than 110 m from every player (past the fog) think a third as often. Near anyone, they think every step.
+  - **Drawing:** carts more than 125 m from your camera (hidden by the fog anyway) aren't drawn.
+  - **After a hitch,** the game catches up a little instead of all at once.
+- **Drop down any gap.** Driving off a floor over the side of a ramp, or into a stairwell, now drops you onto the ramp. Before, an invisible wall pushed you back. You can also drive off the side of a ramp. CPUs still keep to the rails unless they mean to drop.
+- **Ramps that ran into walls:**
+  - **Slid or turned round:** each one is moved along its length, or turned round, to where both ends are open.
+  - **Removed:** a ramp with a wall right across one end went nowhere, so it's gone.
+  - **The Town:** the house stairs end on a landing wide enough to turn on.
+- **Two ramps up onto every big roof.** Every big building (180 m² or more, or 18 m long) has at least two ways onto its roof. Where there weren't enough, ramps were added outside, running straight out from a wall without a door: one 7 m ramp per storey, clear of roads, doors and other buildings. Volt School also has stairs inside, from the top floor up to the roof.
+- **The assault rifle has a red dot sight** when you aim: a dark housing, a faintly tinted lens and a glowing red dot.
+- **Top bar in Volt Royale:** the team logos and the players-left count are gone.
+- **Lobby games menu:** ▲ on the top row goes back to the lobby, just like B.
+- **Hockey rules:**
+  - **New defaults:** penalties carry over after a goal (on), penalty time 15 s, game clock 3x. Players still on the old defaults are switched over once; anyone who changed them keeps their own values.
+  - **Scored on while short-handed:** the team gets **one** player back (the one with the least time left), like a minor penalty in real hockey. Before, all its penalties ended.
+- **Fixed:** an "Unhandled promise: Failed to fetch" error when the page closed or went into the background while offline (saving your settings on the way out).
+
+## v14.3.5: twice the carts in Volt Royale, and roads and a real town on both maps
+
+- **Twice the carts.** CPUs fill every spot nobody is playing.
+  | Match | Carts before | Carts now |
+  | --- | --- | --- |
+  | Public: Solos, Duos, Squads | 32 | **64** |
+  | Public: Trios, Fives | 30 | **60** |
+  | Played on this screen (default) | 24 | **48** |
+
+  Played on this screen, the Carts setting now goes 6, 8, 10, 12, 16, 20, 24, 32, 40, 48, 64 or 80. A public room takes up to 64 people.
+  - **Measured on a desktop CPU** with 64 carts: the game takes about 5 ms per step to run (2.5 ms with 32), and a guest gets about 9 KB per update (5 KB with 32).
+  - **Phones:** a phone host would struggle at this size. Public matches already pick a computer to host when one is in the match.
+- **Roads.** Volt Valley and Frostfall Wilds have a road down every gap between the places to land, and along every gap between the rows, edge to edge.
+  - **Look:** asphalt, white edge lines and a dashed yellow centre line.
+  - **On the maps:** the roads show on the full map and in the bag.
+  - **Kept clear:** no sheds, rocks, trees, loot or rez garages land on them.
+- **Street lights and fire hydrants** line every road: about 190 lights and 58 hydrants per map. The lights have an arm out over the road and a glowing lamp. Both are solid, so you can crash into them.
+- **The Town**, a new place to land on both maps. It is Maple Grove on Volt Valley and Snowdrift on Frostfall Wilds, where the suburbs were.
+  - **Streets:** Main Street and School Avenue, with street lights and hydrants.
+  - **Two-storey houses** (11 of them): drive in the front door, then up the stairs along the back wall to the bedrooms. There's loot on both floors and a roof on top.
+  - **Volt School:** two storeys of classrooms either side of a hall, with a wide staircase, a VOLT SCHOOL sign, a gym, a school bus and a flag.
+  - **The plaza:** paving, a fountain, benches and trees in planters, with three shops down one side.
+  - **A corner store**, with its sign.
+- Tested: the stairs in both kinds of house take a cart from the ground floor up to the bedrooms. A 64-cart match runs on Volt Valley, and an online guest still gets the same loot as the host.
+
+## v14.3.4: full play-through and polish pass
+
+I went through the whole game:
+- every screen, on a desktop and on a phone-sized touch screen
+- every settings page, with every value changed and changed back
+- every game mode (Volt Hockey, Season, Practice, Volt Royale and all 18 minigames): played to the end, then played again
+- hockey with each camera (first person, third person, broadcast, 2D), each graphics level, split screen for 2 and 3 players, touch controls, and commentary off with a faster clock
+- the pause menu, and settings opened from it, in hockey, a minigame and Volt Royale
+- online: matchmaking for each playlist, "play again" in the Minigame Mix, a Volt Royale guest, voice chat, a real party (computer leader, and phone leader handing hosting to a computer), the admin page and the server tests
+
+No errors came up anywhere. Fixed along the way:
+- **The phone leader's handoff gave up too soon.** A phone party leader stopped waiting for the computer's room after 12 s and hosted itself. The wait is now 25 s, so a slow connection doesn't send the game back to the phone.
+- **Results screens:** a round notice ("SPARKY WINS ROUND 3") and "OUT: watching from the bench" no longer show on top of the results.
+- **Touch, Volt Royale:** the game buttons step aside while the bag or the full map is open, and the menu buttons take over.
+- **Touch, Volt Hockey:** the A button only shows when it does something (on the ready and results screens, and for a minigame's power-up, where it now says USE).
+- **Touch captions:** commentary captions sit above the touch buttons instead of under them.
+- **Bag map text:** the map info in the Volt Royale bag stays inside the map's width instead of running onto the bag.
+- **Controls guide:** each card's lines always fit inside it (the gamepad card ran into the keyboard card).
+- **Settings > Player:** the first row was a long sentence squeezed to an unreadable size. It's now "Account, friends and party" (it opens Friends and party), and the details are its hint.
+- **Daily quests:** a long quest stays on one line instead of running into its progress bar. The drift quest no longer says "hold A" (drift is B, or R3 on the tactical layout).
+- **Leaderboard:** a header row names the columns.
+- **Season:**
+  - "Your games" shows your bye week ("no game (bye week)") instead of skipping a matchday number.
+  - The "SEASON 1: VOLTS" banner no longer sits on the button hints.
+- **Pause menu:** the team row reads "Robin's team ◀ Volts ▶" instead of "Robin You: ◀ Volts ▶".
+- **Menu buttons on touch screens** are a little smaller, so they cover less of the menus.
+- **DEPLOY.md:** the relay (TURN) section now recommends ExpressTURN's free plan through `ICE_SERVERS`, with Metered as the other option.
+
+## v14.3.3: turn game modes on and off from the admin page
+
+- **Admin page, Game tab: "Game modes".** Each mode has a box: ticked means players see it and can play it, unticked means it's hidden.
+  - **The modes:** Volt Hockey (matches, quick match online and hockey rooms), Season, Practice arena, Volt Royale, and Minigames (all of them, including the Minigame Mix).
+  - **Minigames** has one box per minigame, grouped by category.
+  - **A category's box** (Party chaos, Ball games, Racing and driving, Battles and sneaky) turns all of its games on or off at once. It shows a dash when only some are on.
+  - **Save** applies the changes. Players' games pick them up within a minute in the lobby, and again at every match.
+- **A mode that's off is gone everywhere:**
+  - the lobby's modes (ONLINE and THIS SCREEN)
+  - the minigame row and the Minigame Mix
+  - online rooms' game lists, and the online menu's "Create room" / "Create a minigame room"
+  - The server also refuses matchmaking for a playlist that's off, so an older copy of the game can't queue for it.
+  - A saved choice for a mode that's off falls back to the first mode still on.
+- **Server:** `GET /game` and `GET/POST /admin/game` carry `off`: the ids of the modes that are off (`hockey`, `season`, `practice`, `br`, `mini`, or one minigame's id, such as `race`).
+- **Adding a minigame later?** Add a line for it in admin.html (`GM_CATS`) so it gets its own box.
+
+## v14.3.2: a second online match no longer hangs; the Minigame Mix changes game on "play again"
+
+- **Matchmaking hung on your second search.**
+  - **The search screen** is reused each time you open it, and kept the last search's "this screen has closed" and "match already started" flags. So the second search never polled the server, or ignored the match it found. It now starts clean every time.
+  - **The room screen** had the same problem. A host's second public match never sent its room code to the others, and a second party or public room never started by itself. Both are fixed.
+  - **The server** used to keep your last match for 3 minutes, so a new search could "find" a room that was gone. Now a new search forgets the last match.
+  - **A crash** when a search finished just as the screen closed is fixed.
+- **Minigame Mix: "play again"** (A on the results) now picks a different minigame, one everyone in the room fits into. Before, it replayed the same game on a new map. Games on this screen still replay the minigame you picked.
+- **Tested:** two accounts, with the same pages throughout:
+  - a Minigame Mix match, then "play again" twice (Paintball, then Floor Is Lava, then Multiball)
+  - leaving the match, then a Volt Hockey quick match, which started normally
+
 ## v14.3.1: no fill, phones don't host, snappier guests, touch fixes
 
 - **FILL / NO FILL** on the matchmaking screen (tap it, or press Y). It shows for Duos and up in Volt Royale, and always in Volt Hockey and the Minigame Mix.

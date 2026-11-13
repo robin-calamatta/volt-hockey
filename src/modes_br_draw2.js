@@ -173,7 +173,7 @@ Object.assign(GameScene.prototype, {
     cr.call(this); this.mapS = null; const V = CONFIG.view; this.help.setText('◀ ▶ choose     A: move / swap     Y: hold this     X: drop     ▼ ammo     B or ▲: close').setY(this.cy - 150);
     this.ammoT = AMMO_KEYS.map((k, i) => this.add.text(this.cx - 330 + i * 165, this.cy + 134, '', { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#ffffff', align: 'center' }).setOrigin(0.5));
     this.ammoI = AMMO_KEYS.map((k, i) => this.add.image(this.cx - 330 + i * 165, this.cy + 98, this.d.game.brIcon('am_' + k)).setDisplaySize(68, 38));   // v14.1.8: a picture of the rounds over each ammo count
-    this.ammoCur = -1; this.mapG = this.add.graphics(); this.mapT = this.add.text(V.width - 16, 16, '', { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#ffd23f', align: 'right' }).setOrigin(1, 0);
+    this.ammoCur = -1; this.mapG = this.add.graphics(); this.mapT = this.add.text(V.width - 16, 16, '', { fontFamily: FONT, fontSize: '14px', fontStyle: 'bold', color: '#ffd23f', align: 'right', wordWrap: { width: 196 } }).setOrigin(1, 0);   /* (v14.3.4: kept to the map's width, off the bag) */
   };
   P.press = function (k) {
     if (this.ammoCur >= 0) { if (k === 'x') { this.d.act({ op: 'ammo', a: this.ammoCur }); Sound.play('back'); return; } if (k === 'a' || k === 'y') return; }
@@ -197,6 +197,6 @@ Object.assign(GameScene.prototype, {
     g.lineStyle(3, 0x9b4dff, 1).strokeCircle(x0 + S.x * s, y0 + S.y * s, S.r * s); if (S.wait > 0 || S.shrink > 0) g.lineStyle(2, 0xffffff, 0.9).strokeCircle(x0 + S.fx * s, y0 + S.fy * s, S.fr * s);
     const me = this.d.chair; for (const o of m.chairs) if (!o.out && o.gs.team === me.gs.team) g.fillStyle(o === me ? 0xffd23f : 0x3dd6ff, 1).fillCircle(x0 + o.x * s, y0 + o.y * s, o === me ? 5 : 4);
     g.lineStyle(2, 0xffd23f, 1).lineBetween(x0 + me.x * s, y0 + me.y * s, x0 + (me.x + Math.cos(me.heading) * 6) * s, y0 + (me.y + Math.sin(me.heading) * 6) * s);
-    this.mapT.setText(`${M.name.toUpperCase()}\nSTORM STAGE ${Math.min(6, S.ph + 1)}${S.wait > 0 ? `: ${Math.ceil(S.wait)} s` : ': MOVING'}\n■ rez garage   ○ next circle`).setPosition(V.width - 14, y0 + m.height * s + 10);
+    this.mapT.setText(`${M.name.toUpperCase()}\nSTORM STAGE ${Math.min(6, S.ph + 1)}${S.wait > 0 ? `: ${Math.ceil(S.wait)} s` : ': MOVING'}\n■ rez garage  ○ next circle`).setPosition(V.width - 14, y0 + m.height * s + 10);
   };
 }

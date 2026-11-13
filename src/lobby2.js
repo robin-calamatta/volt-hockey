@@ -148,7 +148,7 @@ Object.assign(Party, {
   P.drawPlay = function () {
     const V = CONFIG.view, Q = Progress.quests(), R = Progress.untilReset(), g = LobbyPick.shown(), member = Party.role === 'member', leader = Party.role === 'leader';
     this.box(28, 104, 340, 330); this.T(46, 116, 'DAILY QUESTS', 24, '#ffd23f'); this.T(352, 120, R.daily, 17, '#9fb2bf', { ox: 1 });
-    Q.daily.forEach((q, i) => { const y = 156 + i * 82; this.T(46, y, (q.done ? '✓ ' : '') + q.text, 19, q.done ? '#7dff6a' : '#ffffff', { wrap: 300, bold: false }); this.bar(46, y + 48, 230, 10, q.got / q.n, q.done ? 0x7dff6a : 0xffd23f); this.T(352, y + 42, `${q.got}/${q.n}   +${q.xp}`, 16, '#9fb2bf', { ox: 1 }); });
+    Q.daily.forEach((q, i) => { const y = 156 + i * 82; { const qt = this.T(46, y, (q.done ? '✓ ' : '') + q.text, 19, q.done ? '#7dff6a' : '#ffffff', { bold: false }); if (qt.width > 300) { qt.setScale(300 / qt.width); } }   /* (v14.3.4: one line, so a long quest doesn't run into its bar) */ this.bar(46, y + 48, 230, 10, q.got / q.n, q.done ? 0x7dff6a : 0xffd23f); this.T(352, y + 42, `${q.got}/${q.n}   +${q.xp}`, 16, '#9fb2bf', { ox: 1 }); });
     this.T(46, 400, `WEEKLY: ${Q.weekly.filter(q => q.done).length} / ${Q.weekly.length} done`, 18, '#c9d6df'); this.tap(28, 104, 340, 330, () => this.setTab(3));
     /* the game you've picked: bottom left */
     const x = 28, y = 478, w = 430, h = 198; this.box(x, y, w, h, 0x0c1424, 0.9, g.col || 0x2d5068);
@@ -179,7 +179,7 @@ Object.assign(Party, {
     this.overlay = 'modes'; this.modeSlide = 0; this.modeClosing = false; this.gameRow = row; this.mcur = Math.max(0, LOBBY_MODES.indexOf(this.mode()));
     const ks = this.miniKinds(); this.mmCur = Math.max(0, ks.indexOf(Settings.lobbyMini)); Sound.play('select'); this.redraw();
   };
-  P.miniKinds = function () { const order = GAME_CATS.map(c => c.id); return MINI_KINDS().filter(k => k !== 'br' && GAME_INFO[k]).sort((a, b) => order.indexOf(GAME_INFO[a].cat) - order.indexOf(GAME_INFO[b].cat)); };
+  P.miniKinds = function () { const order = GAME_CATS.map(c => c.id); return MINI_KINDS().filter(gameOn).filter(k => k !== 'br' && GAME_INFO[k]).sort((a, b) => order.indexOf(GAME_INFO[a].cat) - order.indexOf(GAME_INFO[b].cat)); };
   P.closeModes = function () { if (this.overlay !== 'modes') return; this.modeClosing = true; Sound.play('back'); };
   P.drawModes = function () {
     const V = CONFIG.view, top = 300, C = this.add.container(0, 0).setDepth(30); this.ui.push(C); this.modesC = C;
@@ -216,7 +216,7 @@ Object.assign(Party, {
       if (this.modesC && this.modesC.active) { const V = CONFIG.view, e3 = 1 - Math.pow(1 - this.modeSlide, 3); this.modesC.y = (1 - e3) * (V.height - 300 + 40); }
       if (!this.modeClosing && !(typeof PadNav !== 'undefined' && PadNav.prune().some(x => x.modal))) {
         const ks = this.miniKinds();
-        if (this.gameRow === 0) { const n = LOBBY_MODES.length; if (e.left) { this.mcur = (this.mcur + n - 1) % n; this.redrawSoon(); } if (e.right) { this.mcur = (this.mcur + 1) % n; this.redrawSoon(); } if (e.down) { this.gameRow = 1; this.redrawSoon(); } if (e.a) this.pickRow0(); }
+        if (this.gameRow === 0) { const n = LOBBY_MODES.length; if (e.left) { this.mcur = (this.mcur + n - 1) % n; this.redrawSoon(); } if (e.right) { this.mcur = (this.mcur + 1) % n; this.redrawSoon(); } if (e.down && ks.length) { this.gameRow = 1; this.redrawSoon(); } if (e.up) { this.closeModes(); return; } if (e.a) this.pickRow0(); }   /* (v14.3.6: ▲ from the top row goes back to the lobby, like B) */
         else { const n = ks.length; if (e.left) { this.mmCur = (this.mmCur + n - 1) % n; this.redrawSoon(); } if (e.right) { this.mmCur = (this.mmCur + 1) % n; this.redrawSoon(); } if (e.up) { this.gameRow = 0; this.redrawSoon(); } if (e.a) this.pickRow1(); }
         if (e.b || e.start) this.closeModes();
       }

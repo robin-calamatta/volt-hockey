@@ -1,7 +1,7 @@
 /* Player-adjustable settings, saved in the browser. */
 const Settings = {
   storageKey: 'voltHockeySettings',
-  musicVolume: 0.35, sfxVolume: 0.7, turnSpeed: 1, timeSpeed: 1,
+  musicVolume: 0.35, sfxVolume: 0.7, turnSpeed: 1, timeSpeed: 3,
   difficulty: 'Normal', teamA: 0, teamB: 1, vertical: true, zoomPct: 100, tiltDeg: 40, commentVolume: 1, crowdVolume: 0.8, crowd: true, court: 0, commentaryMode: 'full', view: 'nhl', seasonTeam: 0, seasonPeriod: 300, seasonDouble: false, seasonDifficulty: 'Normal', playerName: '', career: { games: 0, wins: 0, goals: 0, shots: 0 },
   autoFullscreen: true, touchScale: 1, touchOpacity: 0.6, touchLayout: null,          // on-screen controller (touch.js); `touch` itself starts undefined = on for phones and tablets
   ...CONFIG.defaults,            // speedLevel, ballBounce, ballGrip, stickLength, collisions, penalties
@@ -9,9 +9,12 @@ const Settings = {
   load() { let saved = {}; try { saved = JSON.parse(localStorage.getItem(this.storageKey) || '{}'); Object.assign(this, saved); } catch (e) {} if (!saved.view) this.view = saved.vertical === false ? 'side' : 'nhl'; this.vertical = this.view === 'nhl'; this.collisions = CONFIG.defaults.collisions;   // cart collisions always start on
     this.migrate(saved); this.fixCam(); this.adapt = true; },   // the CPU always keeps learning (no off switch since v10)
   migrate(saved) {                                    // older saves (this device's or the account's): v9.2 starts carts at full power (5), third person off until turned on
-    const v = saved.settingsVer | 0; if (v >= 3) return;
+    const v = saved.settingsVer | 0; if (v >= 4) return;
+    if (v === 3) {   /* v14.3.6: new defaults: penalties carry over after a goal, 15 s in the box, the game clock at 3x (only where the old defaults were still set) */
+      if (saved.penaltyCarry === undefined || saved.penaltyCarry === false) this.penaltyCarry = true; if (saved.penaltySeconds === undefined || saved.penaltySeconds === 10) this.penaltySeconds = 15; if (saved.timeSpeed === undefined || saved.timeSpeed === 1) this.timeSpeed = 3;
+      this.settingsVer = 4; this.save(); return; }
     if (v < 2) { this.speedLevel = CONFIG.defaults.speedLevel; this.allowThird = false; }
-    this.allowBroadcast = false; this.settingsVer = 3; this.fixCam(); this.save();             // v9.3: broadcast off by default too
+    this.allowBroadcast = false; this.settingsVer = 4; this.fixCam(); this.save();             // v9.3: broadcast off by default too
   },
   camAllowed(m) { return (m !== 'third' || this.allowThird) && (m !== 'broadcast' || this.allowBroadcast); },
   camCycle() { return CONFIG.view3d.cycle.filter(m => this.camAllowed(m)); },                          // the views the camera button steps through

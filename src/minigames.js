@@ -145,7 +145,7 @@ class MiniMatch extends Match {
     }
     const live = this.chairs.filter(c => !c.out);
     for (const c of live) this.chairObstacles(c);
-    for (let i = 0; i < live.length; i++) for (let j = i + 1; j < live.length; j++) this.chairHit(live[i], live[j]);
+    { const L = live.length > 24 ? live.slice().sort((p, q) => p.x - q.x) : live, sorted = L !== live; for (let i = 0; i < L.length; i++) { const a = L[i]; for (let j = i + 1; j < L.length; j++) { const b = L[j]; if (sorted && b.x - a.x > 2.4) break; if (Math.abs(a.x - b.x) > 2.4 || Math.abs(a.y - b.y) > 2.4) continue; this.chairHit(a, b); } } }   /* (v14.3.6: carts far apart skip the full check; v14.3.7: with lots of carts, sorted by x so each one only looks at its neighbours) */
     for (const c of live) this.chairObstacles(c);
     if (this.mini.items) this.stepItems(h, live);
     if (this.kind === 'race') this.stepRace(live);
@@ -167,7 +167,7 @@ class MiniMatch extends Match {
     if (this.kind === 'balloons') for (const [att, vic] of [[a, b], [b, a]]) this.tryPop(att, vic);
     if (d >= 2 * R || d === 0) return;
     const closing = Physics.circles(a, R, CONFIG.chair.mass, b, R, CONFIG.chair.mass, CONFIG.chair.chairBounce); crashSlow(a, b, closing);
-    if (closing > CONFIG.foul.bumpSoundSpeed) this.sfx('bump');
+    if (closing > CONFIG.foul.bumpSoundSpeed) this.sfx('bump', 0, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: ((a.gs && a.gs.z) || 0) + 0.4 });
   }
   enemies(a, b) { return a !== b && !a.out && !b.out && (this.mini.mode !== 'teams' || a.side !== b.side); }
   tryPop(att, vic) {

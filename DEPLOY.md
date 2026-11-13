@@ -54,15 +54,18 @@ The game finds the services on the site it was loaded from. If it is shown insid
 
 ## TURN relay (fixes "could not connect" between computers)
 
-A relay passes the traffic along when a direct connection is blocked. Free with Metered's Open Relay (20 GB a month, plenty for
-parties, chat and game data; voice uses more):
-1. Sign up free at **metered.ca** (Open Relay / TURN server). In the dashboard, create an app and copy its **TURN credentials API URL**.
-   It looks like `https://<yourapp>.metered.live/api/v1/turn/credentials?apiKey=<key>`.
-2. In Netlify: *Site configuration > Environment variables*, add `TURN_CREDENTIALS_URL` = that URL. Redeploy.
-3. Check: `https://<your-site>/api/ice` should list `turn:` servers. Reload the game on both computers.
+A relay passes the traffic along when a direct connection is blocked. It is only used when two devices can't connect directly.
 
-The server fetches fresh credentials itself (the key never goes in the game files). Any other TURN service works too: put its servers in
-`ICE_SERVERS` as JSON, e.g. `[{"urls":"turn:<host>:443?transport=tcp","username":"<user>","credential":"<password>"}]`.
+**Recommended: ExpressTURN's free plan (1 TB a month)**
+1. Sign up free at **expressturn.com**. Its dashboard gives you a **username** and a **password** for `free.expressturn.com:3478`.
+2. In Netlify: *Site configuration > Environment variables*, add `ICE_SERVERS` with this value (your username and password filled in):
+   `[{"urls":"stun:free.expressturn.com:3478"},{"urls":["turn:free.expressturn.com:3478?transport=udp","turn:free.expressturn.com:3478?transport=tcp"],"username":"<username>","credential":"<password>"}]`
+3. Delete `TURN_CREDENTIALS_URL` if you set it before (it is only for Metered). Redeploy.
+4. Check: `https://<your-site>/api/ice` should list the `turn:` servers. Reload the game on every device.
+
+**Or Metered's Open Relay** (20 GB a month): sign up at **metered.ca**, create an app, copy its **TURN credentials API URL**
+(`https://<yourapp>.metered.live/api/v1/turn/credentials?apiKey=<key>`) and put it in `TURN_CREDENTIALS_URL`. The server fetches fresh
+credentials itself, so the key never goes in the game files.
 
 If joining still fails with a relay set up, check the matchmaking server: open `https://0.peerjs.com/` in a browser; it should show a
 short line of text mentioning PeerJS. If it does not load, the free public server is down; try again later.
