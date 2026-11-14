@@ -8,7 +8,7 @@
      placed by distance only (from whichever of you is closest).
    - Settings > Sound and commentary: "3D sound (headphones)" turns the direction part off (sounds are then only quieter with distance). */
 const Spatial = {
-  ear: null, live: 0, voices: new Map(),
+  ear: null, live: 0, voices: new Map(), phone: !!(window.matchMedia && matchMedia('(pointer: coarse)').matches),
   on() { return Settings.spatial !== false; },
   gain(d) { return 1 / (1 + Math.max(0, d - 3) / 10); },
   rel(E, p) {                                   // where p is from the ear: [right, up, forward, distance]
@@ -18,7 +18,7 @@ const Spatial = {
   /* the chain one sound plays through: gain (distance) -> lowpass (air) -> panner (direction) */
   chain(c, E, p) {
     const [rx, ry, rf, d] = this.rel(E, p), k = this.gain(d), g = c.createGain(), lp = c.createBiquadFilter(); g.gain.value = k; lp.type = 'lowpass'; lp.frequency.value = Math.max(1400, 19000 * Math.exp(-d / 40)); g.connect(lp);
-    let tail = lp; if (E.solo && this.on() && d > 1.2) { const pn = c.createPanner(); pn.panningModel = this.live < 24 ? 'HRTF' : 'equalpower'; pn.distanceModel = 'linear'; pn.rolloffFactor = 0;
+    let tail = lp; if (E.solo && this.on() && d > 1.2) { const pn = c.createPanner(); pn.panningModel = this.live < 24 && !Spatial.phone ? 'HRTF' : 'equalpower';   /* (v14.3.10: the cheaper panner on a phone) */ pn.distanceModel = 'linear'; pn.rolloffFactor = 0;
       const n = Math.max(1, Math.hypot(rx, ry, rf)); this.setPos(pn, c, rx / n * 2, ry / n * 2, -rf / n * 2); lp.connect(pn); tail = pn; }
     return { g, tail, k, d };
   },
@@ -39,7 +39,7 @@ const Spatial = {
       for (const ch of m.chairs) { if (mine.has(ch) || ch.out || !ch.gs || ch.gs.plane || ch.gs.glide) continue;
         const sp = ch._spd = (ch._spd || 0) * 0.8 + 0.2 * (ch._lx === undefined || !dt ? 0 : Math.min(15, Math.hypot(ch.x - ch._lx, ch.y - ch._ly) / dt)); ch._lx = ch.x; ch._ly = ch.y;
         if (sp < 0.6) continue; const [, , , d] = this.rel(E, { x: ch.x, y: ch.y, z: ch.gs.z || 0 }); if (d < 40) cand.push([d, ch, sp]); }
-      cand.sort((a, b) => a[0] - b[0]); for (const [d, ch, sp] of cand.slice(0, 6)) want.set(ch, [d, sp]);
+      cand.sort((a, b) => a[0] - b[0]); for (const [d, ch, sp] of cand.slice(0, Spatial.phone ? 3 : 6)) want.set(ch, [d, sp]);
     } else if (m) for (const ch of m.chairs) { ch._lx = ch.x; ch._ly = ch.y; }
     for (const [ch, V] of this.voices) if (!want.has(ch)) { this.stopVoice(V); this.voices.delete(ch); }
     if (!c) return; const vol = (Settings.cartVolume === undefined ? 1 : Settings.cartVolume), t = c.currentTime;
@@ -47,7 +47,7 @@ const Spatial = {
       let V = this.voices.get(ch);
       if (!V) { const o = c.createOscillator(), o2 = c.createOscillator(), f = c.createBiquadFilter(), nz = c.createBufferSource(), nf = c.createBiquadFilter(), g = c.createGain(), lp = c.createBiquadFilter(), pn = c.createPanner();
         o.type = 'sawtooth'; o2.type = 'triangle'; f.type = 'lowpass'; f.Q.value = 2; nz.buffer = Sound.noiseBuffer; nz.loop = true; nf.type = 'bandpass'; nf.Q.value = 0.8; lp.type = 'lowpass'; g.gain.value = 0;
-        pn.panningModel = 'HRTF'; pn.distanceModel = 'linear'; pn.rolloffFactor = 0;
+        pn.panningModel = Spatial.phone ? 'equalpower' : 'HRTF'; pn.distanceModel = 'linear'; pn.rolloffFactor = 0;
         const og = c.createGain(); og.gain.value = 0.55; o.connect(f); o2.connect(f); f.connect(og); og.connect(g); nz.connect(nf); nf.connect(g); g.connect(lp); lp.connect(pn); pn.connect(Sound.sfxBus);
         o.start(); o2.start(); nz.start(0, Math.random()); V = { o, o2, f, nz, nf, g, lp, pn }; this.voices.set(ch, V); }
       const [rx, ry, rf] = this.rel(E, { x: ch.x, y: ch.y, z: ch.gs.z || 0 }), k = Math.min(1, sp / CONFIG.chair.maxSpeed), n = Math.max(1, Math.hypot(rx, ry, rf));

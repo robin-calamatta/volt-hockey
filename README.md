@@ -3,6 +3,27 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.3.10: Volt Royale runs much better on phones; a quieter, lighter kill feed
+
+- **Phones were running at the computer's top graphics setting.** "Auto" graphics checks for a touch screen, but phones leave that setting unset until you change it, so Auto picked High: double resolution, full shadows and every tree. Now Auto is:
+  - High on a computer.
+  - Medium on a phone or tablet.
+  - Low on a phone or tablet in Volt Royale.
+
+  The settings menu says so ("Auto (Medium; Low in Volt Royale)").
+- **Far-away things aren't drawn or updated.** (Measured in a test browser on a computer, 100-cart match.)
+  - **The scene's root group:** the whole 3D scene was re-positioned every frame (23,000 objects), because the root group forced every object under it to update. Now only things that move are. That step went from 8 ms to under 1 ms.
+  - **Loot:** loot beyond 60 m (45 m on a phone or with Low graphics) isn't drawn or animated. All 1,300 pieces were drawn every frame.
+  - **Doors:** doors beyond 75 m (55 m) aren't drawn. There were 500.
+  - **Carts:** carts beyond the fog (125 m; 85 m on a phone or with Low graphics) aren't updated at all. Carts beyond 35 m animate every third frame. Outfits are checked twice a second instead of every frame.
+  - **Result:** the 3D view's work per frame went from about 14 ms to about 5 ms, and drawing from about 29 ms to about 16 ms.
+- **A phone that hosts a public Volt Royale match has 40 carts**, not 100 (or as many as there are people, if more). That only happens when nobody in the match is on a computer: a computer always hosts when there is one. On a phone or tablet, Carts in Volt Royale's settings defaults to 40.
+- **3D sound on a phone** uses the cheaper stereo panner and gives motor sounds to the 3 closest carts (6 on a computer).
+- **Kill feed:**
+  - Smaller text (13 px, was 16) and a see-through background.
+  - 4 lines instead of 6; older lines fade more.
+  - The elimination and knock-down sound only plays for the players involved, not for everyone every time.
+
 ## v14.3.9: 3D sound: hear where shots and carts are coming from
 
 - **Sounds come from where they happen**, best with headphones. Gunshots, rockets, bumps, doors, chests, healing, reloading, swings, shields and revives are placed:

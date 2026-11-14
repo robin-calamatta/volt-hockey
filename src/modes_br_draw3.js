@@ -61,7 +61,7 @@ Object.assign(BR_COLS, { seat: 0x2f5fa8, stone: 0x9a948a, hangar: 0xc8ced4, silo
     const eyes = (sc.setup.players || []).map(p => p.chair).filter(Boolean); if (sc.online && sc.brMyChair) { const c = sc.brMyChair(); if (c) eyes.push(c); }
     const me = eyes[0], myTeam = me && me.gs ? me.gs.team : -9;
     for (const L of g.L || []) {
-      const mesh = this.brLoot && this.brLoot.get(L[0]); if (!mesh) continue; const U = mesh.userData, base = L[4] * BR.H;
+      const mesh = this.brLoot && this.brLoot.get(L[0]); if (!mesh) continue; const U = mesh.userData, base = L[4] * BR.H; if (U.culled) continue;   /* (v14.3.10) */
       if (U.box) { mesh.position.set(L[2], base, L[3]); const open = L[1] === 'chestO' || L[1] === 'ammoO', k = open ? Math.min(1, (g.t - (L[9] || 0)) / 0.35) : 0, e = 1 - Math.pow(1 - k, 3);
         U.hinge.rotation.x = -e * (U.box === 'chest' ? 1.9 : 1.2) + (open && k < 1 ? Math.sin(k * 20) * 0.05 : 0);
         if (U.glow) { U.glow.material.opacity = open ? Math.max(0, 0.6 - (g.t - L[9]) * 0.5) : 0.45 + 0.15 * Math.sin(t * 3 + L[0]); const sh = open ? Math.max(0, 1 - (g.t - L[9]) * 1.2) : 0; U.shine.visible = sh > 0; U.shine.material.opacity = sh; } }

@@ -22,7 +22,7 @@ const Render3D = {
     } catch (e) { console.warn('3D view not available, using the 2D view', e); this.ok = false; }
     return this.ok;
   },
-  quality() { const Q = CONFIG.view3d.quality; return Q[Settings.gfx] || (Settings.touch ? Q.Medium : Q.High); },
+  quality() { const Q = CONFIG.view3d.quality; return Q[Settings.gfx] || Q[gfxAuto(this.curM)]; },   /* (v14.3.10: Auto on a phone was High: phones leave Settings.touch unset, so it read as a computer. Volt Royale on a phone: Low) */
   show(on) { if (this.canvas) this.canvas.style.display = on ? 'block' : 'none'; },
   sync() {                                                     // lie exactly under the Phaser canvas (which letterboxes itself to fit the window)
     const gc = window.voltGame && voltGame.canvas; if (!gc || !this.r) return null;
@@ -105,7 +105,7 @@ class CanvasPen {
 /* ----- the view ----- */
 class View3D {
   constructor(scene) {
-    this.sc = scene; this.m = scene.match; this.win = (scene.setup && scene.setup.win) || null;   // a demo on a menu: drawn into its window
+    this.sc = scene; this.m = scene.match; if (!(scene.setup && scene.setup.win)) Render3D.curM = scene.match; this.win = (scene.setup && scene.setup.win) || null;   // a demo on a menu: drawn into its window
     this.mats = {}; this.cams = new Map(); this.shakeLeft = 0; this.fanAcc = 1;
     const A = CONFIG.view3d.arena;
     this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(A.fog); this.scene.fog = new THREE.Fog(A.fog, A.fogNear, A.fogFar);

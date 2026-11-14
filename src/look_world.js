@@ -108,7 +108,7 @@ const LookWorld = {
   },
   /* the big picture round a Volt Royale map */
   dressBR(v3, group, mapKey, T, W, D) {
-    const hi = Settings.gfx !== 'Low', many = Settings.gfx === 'High' || !Settings.gfx, cx = W / 2, cy = D / 2, Rm = Math.max(W, D) / 2, r = Look.rnd(W * 13 + D);
+    const GQ = Settings.gfx || gfxAuto(v3.m), hi = GQ !== 'Low', many = GQ === 'High', cx = W / 2, cy = D / 2, Rm = Math.max(W, D) / 2, r = Look.rnd(W * 13 + D);
     const sky = this.sky(T.sky, mapKey.length); v3.scene.background = sky; v3.scene.fog = new THREE.FogExp2(this.haze(T.sky), 0.0074);   // (v14.2.2: a touch thicker, so the camera's 220 m limit is never seen)
     const at = (mesh) => { mesh.position.x += cx; mesh.position.z += cy; group.add(mesh); return mesh; };
     const land = { downtown: 0x6c7a6a, port: 0x6f7c84, suburbs: 0x5d7f48, jungle: 0x3f6a3a, canyon: 0xb36a40 }[mapKey] || 0x6a7a5a, far = { canyon: 0xc08a6a }[mapKey] || 0x8a9aa8;

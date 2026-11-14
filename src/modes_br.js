@@ -316,7 +316,7 @@ MODES.br = {
     if (!storm) { const s = Math.min(G.sh, dmg); G.sh -= s; dmg -= s; } G.hp -= dmg; G.hitT = 0.25; if (by && by !== c) { by.gs.dmg += dmg; by.gs.hm = MG.r2(m.gs.t); }
     G.sh = Math.round(G.sh * 10) / 10; G.hp = Math.round(G.hp * 10) / 10;
     if (G.hp > 0) return;
-    MH.out(m, c); G.hp = 0; m.gs.dead.push(c.k); m.sfx('foul');                 // eliminated: drop everything
+    MH.out(m, c); G.hp = 0; m.gs.dead.push(c.k); for (const q of new Set([c, by])) if (q && q.player && this.psfx) this.psfx(m, q, 'foul');   /* (v14.3.10: only for the players in it, not everyone every time) */                 // eliminated: drop everything
     G.inv.forEach((it, i) => this.drop(m, c.x + Math.cos(i * 1.3) * 0.9, c.y + Math.sin(i * 1.3) * 0.9, G.lv, it.k, it.a)); G.inv = [];
     const feed = m.gs.feed || (m.gs.feed = []); feed.push([by && by !== c ? m.name(by) : '', m.name(c), by && by !== c && by.gs.inv[by.gs.sel] ? by.gs.inv[by.gs.sel].k : 'storm', MG.r2(m.gs.t), by ? by.gs.team : -1, c.gs.team]); if (feed.length > 5) feed.shift();
     c.gs.by = by && by !== c ? by.k : -1;

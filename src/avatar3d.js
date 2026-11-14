@@ -91,11 +91,11 @@ const Avatar = {
   P.buildCarts = function () { build.call(this); const keys = Object.keys(this.cartGeometry().parts); for (const c of this.carts || []) { c.cosKey = null; let i = 0; for (const ch of c.group.children) if (ch.isMesh && i < keys.length) ch.userData.part = keys[i++]; } };
   P.update = function (dt) {
     const r = upd.call(this, dt);
-    for (const c of this.carts || []) { const look = Avatar.lookFor(c.ch, this.sc), hockey = !this.m.mini, key = look ? JSON.stringify(look) + (hockey ? 'h' + c.ch.side : 'm') : '';
+    const nowL = performance.now(); for (const c of this.carts || []) { if (this.m.kind === 'br' && c.lkT && nowL - c.lkT < 500) continue; c.lkT = nowL;   /* (v14.3.10: Volt Royale: twice a second) */ const look = Avatar.lookFor(c.ch, this.sc), hockey = !this.m.mini, key = look ? JSON.stringify(look) + (hockey ? 'h' + c.ch.side : 'm') : '';
       if (key === c.cosKey) continue; c.cosKey = key;
       if (look) Avatar.dress(c.group, look, { layer: c.layer, shirt: hockey ? '#' + new THREE.Color(this.teamColor(c.ch.side)).getHexString() : undefined });   // (Volt Hockey: your shirt is in your team's colour)
       else { const old = c.group.getObjectByName('cosmetics'); if (old) c.group.remove(old); } }
-    if (typeof Rig !== 'undefined') { const now = performance.now() / 1000; for (const c of this.carts || []) { const p = Avatar.poseFor(c.ch, this.m, now); Rig.update(c.group, p.name, p.t, { layer: c.layer, item: p.item, pitch: p.pitch, sleeves: c.group.userData.sleeves, hide: c.ch.out }); const pr = c.group.getObjectByName('propeller'); if (pr) pr.rotation.y = now * 14; } }   // the arms (and a propeller cap) move
+    if (typeof Rig !== 'undefined') { const now = performance.now() / 1000; const fr = this.lodFrame || 0; for (const c of this.carts || []) { if (c.lod === 1 && (fr + (c.ch.k || c.ch.index || 0)) % 3) continue;   /* (v14.3.10: far carts every third frame) */ const p = Avatar.poseFor(c.ch, this.m, now); Rig.update(c.group, p.name, p.t, { layer: c.layer, item: p.item, pitch: p.pitch, sleeves: c.group.userData.sleeves, hide: c.ch.out }); if (c.propKey !== c.cosKey) { c.propKey = c.cosKey; c.prop = c.group.getObjectByName('propeller'); } if (c.prop) c.prop.rotation.y = now * 14; } }   // the arms (and a propeller cap) move
     return r;
   };
 }

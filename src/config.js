@@ -157,3 +157,7 @@ const CONFIG = {
     Legend:    { brain: 1, brainNoise: 0, bombard: 1, crash: 1, adapt: 1, speed: 1.00, turnBoost: 1.65, reaction: 0.02, aimError: 0.004, passWill: 1.00, shootWill: 1.00, setup: 1.00, lead: 0.85, pressure: 1.00, laneMargin: 0.05 }
   }
 };
+
+/* v14.3.10 what "Auto" graphics means: High on a computer; Medium on a phone or tablet, and Low there in Volt Royale (a big world, lots of carts) */
+const gfxPhone = () => !!Settings.touch || (Settings.touch === undefined && !!(window.matchMedia && matchMedia('(pointer: coarse)').matches));
+function gfxAuto(m) { return !gfxPhone() ? 'High' : m && m.kind === 'br' ? 'Low' : 'Medium'; }

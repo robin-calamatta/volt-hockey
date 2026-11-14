@@ -498,7 +498,9 @@ const Skins = {
     group.add(X);
   },
   tick(group, t, v = 0, boost = false, dt = 0.016) {
-    const X = group.getObjectByName('cartskin'), G = group.getObjectByName('cosmetics');
+    const U = group.userData, ok = (o, n) => o && o.parent === group && o.name === n;   /* (v14.3.10: found once, not searched for every frame) */
+    if (!ok(U.skX, 'cartskin') && (U.skXt || 0) < t) { U.skX = group.getObjectByName('cartskin'); U.skXt = t + 0.5; } if (!ok(U.skG, 'cosmetics') && (U.skGt || 0) < t) { U.skG = group.getObjectByName('cosmetics'); U.skGt = t + 0.5; }
+    const X = ok(U.skX, 'cartskin') ? U.skX : null, G = ok(U.skG, 'cosmetics') ? U.skG : null;
     if (X && X.userData.ticks) for (const f of X.userData.ticks) f(t, v, boost, dt);
     if (G && G.userData.ticks) for (const f of G.userData.ticks) f(t, v, boost, dt);
   }
@@ -516,7 +518,7 @@ const Skins = {
 
 /* every frame: animate the skins (tails, flames, smoke, scarves, Lil Bro's wave) */
 { const P = View3D.prototype, upd = P.update;
-  P.update = function (dt) { const r = upd.call(this, dt), t = performance.now() / 1000; for (const c of this.carts || []) { const ch = c.ch, v = Math.hypot(ch.vx || 0, ch.vy || 0), boost = (ch.dr && ch.dr.boost > 0) || ch.boostLeft > 0 || (ch.gs && ch.gs.boost > 0); Skins.tick(c.group, t, v, boost, dt); } return r; };
+  P.update = function (dt) { const r = upd.call(this, dt), t = performance.now() / 1000; for (const c of this.carts || []) { if (c.lod === 1 && ((this.lodFrame || 0) + (c.ch.k || c.ch.index || 0)) % 3) continue; const ch = c.ch, v = Math.hypot(ch.vx || 0, ch.vy || 0), boost = (ch.dr && ch.dr.boost > 0) || ch.boostLeft > 0 || (ch.gs && ch.gs.boost > 0); Skins.tick(c.group, t, v, boost, dt); } return r; };
   const S = LobbyStage.prototype, rd = S.render;
   S.render = function (dt, frame) { const t = performance.now() / 1000; if (this.cart) Skins.tick(this.cart, t, 0, false, dt); if (this.mates) for (const M of this.mates.values()) Skins.tick(M.cart, t, 0, false, dt); return rd.call(this, dt, frame); };
 }

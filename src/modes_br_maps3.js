@@ -92,7 +92,7 @@ BR_MAPS.world = brJoin('Volt World', 'suburbs', { ground: 0x4f7a3a, sky: 0xa6d0f
   [[ZOO, 14, 14], [LAND, 250, 10], [BR_BASE.downtown, 30, 214], [BR_BASE.port, 130, 220], [BR_BASE.jungle, 260, 220], [BR_BASE.canyon, 370, 216]], 486, 320, 8080);
 BR_MAP_KEYS.length = 0; BR_MAP_KEYS.push(...Object.keys(BR_MAPS));
 { const o = GAME_INFO.br.opts.find(x => x.key === 'map'); o.values = ['random', ...BR_MAP_KEYS]; o.names = ['Random (a new map each game)', ...BR_MAP_KEYS.map(k => `${BR_MAPS[k].name} (${BR_MAPS[k].size.width} x ${BR_MAPS[k].size.height} m)`)];
-  const c = GAME_INFO.br.opts.find(x => x.key === 'carts'); if (c) { c.values = [40, 50, 60, 70, 80, 90, 100]; c.def = 60; c.hint = 'Carts nobody drives are played by the CPU (40 to 100).'; } }
+  const c = GAME_INFO.br.opts.find(x => x.key === 'carts'); if (c) { c.values = [40, 50, 60, 70, 80, 90, 100]; c.def = window.matchMedia && matchMedia('(pointer: coarse)').matches ? 40 : 60;   /* (v14.3.10: 40 on a phone or tablet) */ c.hint = 'Carts nobody drives are played by the CPU (40 to 100).'; } }
 
 /* ---------------- grinding ---------------- */
 const Rails = {

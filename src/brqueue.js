@@ -9,7 +9,7 @@ const BRQ = {
   sizes: [1, 2, 3, 4, 5], names: { 1: 'Solos', 2: 'Duos', 3: 'Trios', 4: 'Squads (4)', 5: 'Fives' },
   carts: { 1: 100, 2: 100, 3: 99, 4: 100, 5: 100 },   /* (v14.3.7: about 100) */   // (v14.2.24: bigger matches)                       // (a whole number of teams)
   preset(sq, n) {
-    const carts = this.carts[sq] || 20, mini = { ...miniCfg('br'), squad: sq, carts };
+    const full = this.carts[sq] || 20, carts = typeof isMobileDevice === 'function' && isMobileDevice() ? Math.min(full, Math.ceil(Math.max(40, n || 1) / sq) * sq) : full,   /* (v14.3.10: a phone hosting (nobody on a computer in the match) runs 40, not 100: it can't keep up with more) */ mini = { ...miniCfg('br'), squad: sq, carts };
     return { mini, sizes: miniSizes(carts), teamA: Settings.teamA, teamB: Settings.teamB, difficulty: Settings.difficulty, practice: true, autoStart: Math.max(1, n) };
   },
   /* v14.3: the other online playlists */

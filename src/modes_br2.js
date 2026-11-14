@@ -225,7 +225,7 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
       const standing = mates(m, c).filter(o => !o.gs.down);
       if ((m.mini.squad || 1) > 1 && standing.length) {                   // DOWN: crawl, can't fire or use things; a team-mate can revive you (hold B); bleed out in 30 s
         Object.assign(G, { down: 1, dhp: BR.downHp, hp: 0, sh: 0, use: null, rl: 0, rv: 0, rvk: -1, hol: 1, kb: by && by !== c ? by.k : -1 }); G.last = G.sel; c.wantUse = false;
-        m.sfx('foul'); MG.notice(m, by && by !== c ? `${MG.up(m.name(by))} KNOCKED DOWN ${MG.up(m.name(c))}` : `${MG.up(m.name(c))} IS DOWN`, 1.8);
+        for (const q of new Set([c, by])) if (q && q.player && this.psfx) this.psfx(m, q, 'foul');   /* (v14.3.10: only for the players in it) */ MG.notice(m, by && by !== c ? `${MG.up(m.name(by))} KNOCKED DOWN ${MG.up(m.name(c))}` : `${MG.up(m.name(c))} IS DOWN`, 1.8);
         const feed = m.gs.feed || (m.gs.feed = []); feed.push([by && by !== c ? m.name(by) : '', m.name(c), 'down', MG.r2(m.gs.t), by ? by.gs.team : -1, G.team]); if (feed.length > 5) feed.shift();
         return;
       }

@@ -41,7 +41,7 @@ const solveHomography = (pts) => {            // pts: [[u, v, x, y] x4] -> the 8
 };
 const VIEW_NAMES = { nhl: 'Upright, follows the puck (NHL)', side: 'Sideways, follows the puck', classic: 'Whole rink (classic)' };
 const cycleCamMode = d => { const c = Settings.camCycle(), i = Math.max(0, c.indexOf(Settings.camMode)); Settings.camMode = c[(i + (d || 1) + c.length) % c.length]; Settings.save(); };
-const GFX = [undefined, 'Low', 'Medium', 'High'], gfxLabel = () => Settings.gfx ? Settings.gfx : `Auto (${Settings.touch ? 'Medium' : 'High'})`;
+const GFX = [undefined, 'Low', 'Medium', 'High'], gfxLabel = () => Settings.gfx ? Settings.gfx : `Auto (${gfxAuto() === 'High' ? 'High' : 'Medium; Low in Volt Royale'})`;
 const cycleGfx = d => { const i = Math.max(0, GFX.indexOf(Settings.gfx)); Settings.gfx = GFX[(i + (d || 1) + GFX.length) % GFX.length]; Settings.save(); };
 const cycleView = d => { const v = ['nhl', 'side', 'classic'], i = Math.max(0, v.indexOf(Settings.view || 'nhl')); Settings.setView(v[(i + (d || 1) + 3) % 3]); };
 const toggle = (name, key) => ({ rule: Settings.rulesKeys.includes(key), label: () => `${name}   ◀ ${Settings[key] ? 'On' : 'Off'} ▶`, change: () => Settings.toggle(key), select: () => Settings.toggle(key) });
