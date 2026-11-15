@@ -3,6 +3,30 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.3.11: online play rebuilt for real connections (smooth as a guest, up to 6 players)
+
+Tested with two to six browsers on an emulated connection: 30 to 80 ms each way, ±20 to 30 ms of jitter, and 1 to 3% of packets lost. Figures are how far a guest's own cart had to be corrected by each snapshot from the host. With 6 players:
+
+| Situation | Before (99th percentile) | Now (99th percentile) |
+| --- | --- | --- |
+| Driving freely | 40–80 cm | 2–5 cm |
+| Bumping other carts | 40–57 cm | 6–10 cm |
+
+There are no more freezes after a lost packet. All six players held 60 frames per second (in a test browser with drawing switched off, so this measures the netcode, not graphics).
+
+- **A fast lane for the game.** Everything used to go through one reliable, in-order channel. One lost packet held up everything behind it until it was sent again: the game paused, then caught up in a rush, which made the guest always feel behind. Now snapshots and stick input go on a second channel that is unordered and never resent.
+  - A lost snapshot is skipped; the next one, a 60th of a second later, has everything.
+  - Each input message repeats the last few inputs, and every button press until the host confirms it, so nothing is lost.
+  - Sounds, commentary and emotes still go the reliable way.
+  - Volt Royale keeps its snapshots on the reliable channel, because they build on each other; its input uses the fast lane.
+- **Steady input on the host.** The host used to apply each guest input the moment it arrived, for however long it lasted until the next one. Inputs arrive bunched up, so the guest's prediction and the host disagreed constantly. Now each input lasts exactly as long as it did on the guest's screen, played out from a small cushion (4 to 10 hundredths of a second) that speeds up after a hiccup and holds the last stick if it runs dry.
+- **The guest's prediction matches the host:**
+  - It uses the host's physics step (240 a second in hockey; it was 120).
+  - It includes cart-to-cart bumps. Before, your cart drove through other carts until the host said otherwise, then snapped back.
+  - The snapshot's acknowledgement now says which input the host has actually played, not just received.
+- **Less work on the guest:** a new snapshot no longer runs the prediction twice, and the ball skips carts too far away to reach it (on the host too). A guest's prediction now takes under 1 ms a frame on a computer.
+- **Version check:** this is network protocol 3. Everyone in a room needs this version; an older copy is told to reload.
+
 ## v14.3.10: Volt Royale runs much better on phones; a quieter, lighter kill feed
 
 - **Phones were running at the computer's top graphics setting.** "Auto" graphics checks for a touch screen, but phones leave that setting unset until you change it, so Auto picked High: double resolution, full shadows and every tree. Now Auto is:

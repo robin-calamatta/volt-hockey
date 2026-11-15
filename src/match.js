@@ -223,7 +223,9 @@ class Match {
      on a copy of the ball to predict what its own cart does to it (see ClientSim). */
   stepBall(b, h, live) {
     const K = CONFIG.chair, B = CONFIG.ball, prevX = b.x, prevY = b.y;
+    const reach = 1.6 + (Settings.stickLength || 0) + B.radius;   /* v14.3.11: a cart further away than its stick reaches can't touch the ball: skipped (this is run hundreds of times a frame by an online guest's prediction) */
     for (const c of live) {                         // ball against the chair body and against the cup
+      if (Math.abs(b.x - c.x) > reach || Math.abs(b.y - c.y) > reach) continue;
       Physics.circles(b, B.radius, B.mass, c, K.ballHitRadius, Infinity, Settings.ballBounce);
       if (Math.hypot(b.x - c.x, b.y - c.y) < B.radius + K.ballHitRadius + B.gripMargin) this.lastTouch = c.side, this.lastChair = c, this.touched = true;           // last cart to touch the ball (for shot stats)
       for (const q of c.cupColliders()) {

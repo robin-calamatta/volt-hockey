@@ -27,7 +27,17 @@ class PeerTransport {
     const w = { onMessage: null, onClose: null, send: o => { try { let str = null; try { str = JSON.stringify(o); } catch (e) { return; } if (str.length <= CK) { conn.send(o); return; }
         const k = ++ckN, n = Math.ceil(str.length / CK); for (let i = 0; i < n; i++) conn.send({ t: '_ck', k, i, n, d: str.slice(i * CK, (i + 1) * CK) }); } catch (e) { /* closed */ } },
       backlog: () => { try { return ((conn.dataChannel && conn.dataChannel.bufferedAmount) || 0) + (conn.bufferSize || 0) * 4000; } catch (e) { return 0; } },   // (bytes still waiting to go out)
-      close: () => { try { conn.close(); } catch (e) {} if (peer) peer.destroy(); } };
+      close: () => { try { if (w.fastDC) w.fastDC.close(); } catch (e) {} try { conn.close(); } catch (e) {} if (peer) peer.destroy(); },
+      /* v14.3.11 the fast lane: snapshots and stick input go on a second channel that is unordered and never resent. On the main
+         (reliable, in-order) channel one lost packet held up everything behind it until it was sent again: the game froze for a moment,
+         then everything arrived at once, and the guest was always catching up. Now a lost snapshot is simply skipped (the next one,
+         a 60th of a second later, has everything) and each input message carries the last few inputs again, so nothing is missed. */
+      fastOpen: () => !!(w.fastDC && w.fastDC.readyState === 'open'),
+      fastBacklog: () => { try { return w.fastDC ? w.fastDC.bufferedAmount : 0; } catch (e) { return 0; } },
+      sendFast: o => { if (w.fastOpen()) { let s = null; try { s = JSON.stringify(o); } catch (e) { return; } if (s.length < 15000) { try { w.fastDC.send(s); return; } catch (e) { /* fall back */ } } } w.send(o); } };
+    const mkFast = () => { if (w.fastDC) return; try { const pc = conn.peerConnection; if (!pc || pc.signalingState === 'closed') return; const dc = pc.createDataChannel('vfast', { negotiated: true, id: 101, ordered: false, maxRetransmits: 0 });
+        dc.onmessage = e => { let o = null; try { o = JSON.parse(e.data); } catch (x) { return; } if (o && w.onMessage) w.onMessage(o); }; w.fastDC = dc; } catch (e) { /* no fast lane: everything goes the reliable way */ } };
+    if (conn.open) mkFast(); else conn.on('open', mkFast);
     conn.on('data', d => { if (d && d.t === '_ck') { let P = parts.get(d.k); if (!P) { P = { got: 0, a: new Array(d.n | 0) }; parts.set(d.k, P); if (parts.size > 20) parts.delete(parts.keys().next().value); }
         if (P.a[d.i] === undefined && typeof d.d === 'string') { P.a[d.i] = d.d; P.got++; } if (P.got === P.a.length) { parts.delete(d.k); let o = null; try { o = JSON.parse(P.a.join('')); } catch (e) { return; } if (w.onMessage) w.onMessage(o); } return; }
       if (w.onMessage) w.onMessage(d); }); conn.on('close', () => w.onClose && w.onClose()); conn.on('error', e => { console.warn('[net] connection error:', e && (e.type || e.message) || e); w.onClose && w.onClose(); });
@@ -328,14 +338,22 @@ class HostSession {
   }
   applyInput(entry, msg) {                                       // a player's stick and button events (plus those of their local guests, in msg.g)
     if (!entry.players || !this.match) return;
-    if (!(msg.q > entry.seq)) return; entry.seq = msg.q;
+    if (!(msg.q > entry.seq)) return;
+    if (Array.isArray(msg.s)) {                                   /* v14.3.11: [[q, seconds, [[id, x, y], ...]], ...] (the newest few) and events [[q, id, ev], ...] */
+      const prev = entry.seq; entry.seq = msg.q;
+      for (const row of msg.s.slice(-6)) { if (!Array.isArray(row) || !(row[0] > (entry.qq || 0))) continue; entry.qq = row[0];
+        for (const st of (Array.isArray(row[2]) ? row[2] : []).slice(0, 1 + CONFIG.online.maxGuests)) { const p = entry.players.get(st[0]); if (p) InPlay.push(p, row[0], +st[1] || 0, +st[2] || 0, +row[1] || 0); } }
+      const evs = new Map(); for (const e of (Array.isArray(msg.e) ? msg.e : []).slice(0, 64)) { if (!Array.isArray(e) || !(e[0] > prev)) continue; const p = entry.players.get(e[1]); if (!p) continue; (evs.get(p) || evs.set(p, []).get(p)).push(e[2]); }
+      for (const [p, ev] of evs) this.applyTo(p, null, null, ev);
+      return;
+    }
+    entry.seq = msg.q;
     this.applyTo(entry.players.get(entry.id), msg.x, msg.y, msg.ev);
     if (Array.isArray(msg.g)) for (const row of msg.g.slice(0, CONFIG.online.maxGuests)) if (Array.isArray(row)) this.applyTo(entry.players.get(row[0]), row[1], row[2], row[3]);
   }
   applyTo(p, x, y, events) {
     if (!p) return;
-    x = +x || 0; y = +y || 0; const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
-    p.src.ax = x; p.src.ay = y;
+    if (x !== null) { x = +x || 0; y = +y || 0; const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; } p.src.ax = x; p.src.ay = y; }
     for (const ev of Array.isArray(events) ? events.slice(0, 8) : []) {
       if (ev === 'cw') p.spinQueued = 1; else if (ev === 'ccw') p.spinQueued = -1; else if (ev === 'hcw') p.spinQueued = 0.5; else if (ev === 'hccw') p.spinQueued = -0.5;
       else if (ev === 'x') this.match.togglePress(p.side);
@@ -377,8 +395,12 @@ class HostSession {
   sendSnapshots() { const snap = this.snapshot();
     for (const e of this.entries.values()) { if (!e.id) continue; const bl = e.conn.backlog ? e.conn.backlog() : 0;
       if (bl > 64000) { e.skipped = (e.skipped || 0) + 1; const P = e.pend || (e.pend = { sf: [], cm: [], em: [] }); P.sf.push(...(snap.sf || [])); P.cm.push(...(snap.cm || [])); P.em.push(...(snap.em || [])); continue; }
-      let out = { ...snap, a: e.seq }; if (e.pend) { out.sf = e.pend.sf.concat(snap.sf || []).slice(-60); out.cm = e.pend.cm.concat(snap.cm || []).slice(-20); const em = e.pend.em.concat(snap.em || []); out.em = em.length ? em.slice(-20) : undefined; e.pend = null; }
-      e.conn.send(out); } }
+      let out = { ...snap, a: InPlay.ack(e) }; if (e.pend) { out.sf = e.pend.sf.concat(snap.sf || []).slice(-60); out.cm = e.pend.cm.concat(snap.cm || []).slice(-20); const em = e.pend.em.concat(snap.em || []); out.em = em.length ? em.slice(-20) : undefined; e.pend = null; }
+      if (this.match && this.match.kind !== 'br' && e.conn.fastOpen && e.conn.fastOpen()) {
+        if (e.conn.fastBacklog() > 32000) { e.skipped = (e.skipped || 0) + 1; const P = e.pend || (e.pend = { sf: [], cm: [], em: [] }); P.sf.push(...(out.sf || [])); P.cm.push(...(out.cm || [])); P.em.push(...(out.em || [])); continue; }
+        if ((out.sf && out.sf.length) || (out.cm && out.cm.length) || (out.em && out.em.length)) e.conn.send({ t: 'fx', sf: out.sf, cm: out.cm, em: out.em });   // (these happen once: they must arrive)
+        e.conn.sendFast({ ...out, sf: [], cm: [], em: undefined });
+      } else e.conn.send(out); } }
   backToLobby() { this.state = 'lobby'; this.match = null; this.ghosts = new Map(); this.startMsg = null; for (const e of this.entries.values()) e.players = null; this.broadcast({ t: 'lobby' }); this.sendRoster(); }
   close(reason = 'host_left') {
     if (this.closed) return; this.closed = true; Online.clear(this);
@@ -415,6 +437,7 @@ class ClientSession {
       case 'roster': this.roster = msg.roster; this.cfg = msg.cfg; this.matchGuests(); if (this.onRoster) this.onRoster(); Voice.refresh(); break;
       case 'start': this.state = 'playing'; if (this.onStart) this.onStart(msg); else this.pendingStart = msg; break;   // (a rejoin's start can arrive before the room screen is up)
       case 'snap': if (this.onSnapshot) this.onSnapshot(msg); break;
+      case 'fx': if (this.onFx) this.onFx(msg); break;   /* (v14.3.11: a snapshot's sounds, calls and emotes, sent the reliable way) */
       case 'rules': Settings.applyRules(msg.rules || {}); break;
       case 'away': if (typeof Toasts !== 'undefined') Toasts.show(msg.on ? 'The host\'s screen turned off (or they switched apps), so the game is on hold until they come back.' : 'The host is back.', [], msg.on ? 6000 : 2500); this.lastHeard = performance.now() + (msg.on ? 60000 : 0); break;   /* (v14.3.1) */
       case 'lobby': this.state = 'lobby'; if (this.onLobby) this.onLobby(); break;
@@ -435,6 +458,7 @@ class ClientSession {
     for (const r of this.roster) if (r.own === this.myId && r.k && this.pendingGuests.has(r.k)) { this.guestSrc.set(r.id, this.pendingGuests.get(r.k).src); this.pendingGuests.delete(r.k); }
     for (const id of [...this.guestSrc.keys()]) if (!this.roster.some(r => r.id === id)) this.guestSrc.delete(id);
   }
+  sendIn(msg) { if (this.conn) (this.conn.sendFast || this.conn.send)(msg); }
   sendInput(q, x, y, ev, g) { if (this.conn) this.conn.send({ t: 'in', q, x: r3(x), y: r3(y), ev, g: g && g.length ? g.map(r => [r[0], r3(r[1]), r3(r[2]), r[3]]) : undefined }); }
   silent() { const now = performance.now(); if (this.state !== this._sState) { this._sState = this.state; this._sAt = now; } return now - this.lastHeard > CONFIG.online.silenceTimeoutMs * (now - (this._sAt || 0) < 20000 ? 4 : 1); }   // (v14.2.14: more patience while a game is starting: a big map takes the host a moment to build)   // the scene checks this and calls finish('lost')
   finish(reason) { if (this.closed) return; this.closed = true; Online.clear(this); clearInterval(this.pinger); if (this.conn) { this.conn.onClose = null; this.conn.close(); } if (this.onClosed) this.onClosed(reason); }
@@ -466,7 +490,14 @@ class ClientSim {
     const ids = [session.myId, ...session.roster.filter(r => r.own === session.myId).map(r => r.id)];
     this.locals = ids.map(id => ({ id, me: this.byId.get(id) || { speedLevel: Settings.speedLevel }, pending: [], frames: [], spins: [], predIndex: -1 }));
     this.localIds = new Set(ids);
-    session.onSnapshot = s => this.onSnap(s);
+    this.evOut = []; this.inHist = []; this.dAcc = 0;
+    session.onSnapshot = s => this.onSnap(s); session.onFx = s => this.fx(s);
+  }
+  fx(s) {                                                          // the one-off things: sounds, commentary, emotes
+    const m = this.m;
+    if (s.cm) for (const t of s.cm) m.hear(t);
+    if (s.em) for (const [i, e] of s.em) if (m.chairs[i] && !(this.localIds.has(m.chairs[i].player && m.chairs[i].player.id))) Emotes.show(m.chairs[i], e);   // emojis (your own already showed)
+    for (const [name, pid, x, y, z] of s.sf || []) if (!this.localIds.has(pid)) Sound.playAt(name, x === undefined ? null : { x, y, z });   /* (v14.3.9: from where it happened) */          // your own spin screech already played locally
   }
   onSnap(s) {
     if (this.snap && s.n !== undefined && this.snap.s.n !== undefined && s.n < this.snap.s.n) return;        // an older snapshot overtaken on the way: ignore
@@ -474,10 +505,9 @@ class ClientSim {
     m.state = STATE_NAME[s.st] || 'play'; m.timer = s.tm; m.clock = s.ck; m.overtime = !!s.ot; m.period = s.pe; m.score = s.sc; if (s.sh) m.shots = s.sh; if (s.pr) m.press = s.pr.map(v => !!v);
     m.banner = s.bn; m.bannerLeft = s.bn ? 1 : 0; m.notice = s.nt; m.noticeLeft = s.nt ? 1 : 0;
     for (const [id, lv] of s.lv) { const p = this.byId.get(id); if (p && !this.localIds.has(id)) p.speedLevel = lv; }
-    if (s.cm) for (const t of s.cm) m.hear(t);
-    if (s.em) for (const [i, e] of s.em) if (m.chairs[i] && !(this.localIds.has(m.chairs[i].player && m.chairs[i].player.id))) Emotes.show(m.chairs[i], e);   // emojis (your own already showed)
+    this.fx(s);
     if (s.mg && m.miniApply) m.miniApply(s.mg);
-    for (const [name, pid, x, y, z] of s.sf) if (!this.localIds.has(pid)) Sound.playAt(name, x === undefined ? null : { x, y, z });   /* (v14.3.9: from where it happened) */          // your own spin screech already played locally
+    if (s.a !== undefined) this.evOut = this.evOut.filter(e => e[0] > s.a);   /* (v14.3.11: events the host has had) */
     for (const L of this.locals) L.predIndex = s.c.findIndex(row => row[6] === L.id);
     this.snap = { s };
   }
@@ -502,16 +532,20 @@ class ClientSim {
       L.frames.push({ seq: this.seq, t: this.clock, dt, ax: v.x, ay: v.y, spin, speed: Math.min(CONFIG.speedLevels[L.me.speedLevel - 1], Settings.maxSpeed()) });
       while (L.frames.length > 90) L.frames.shift();
     }
-    this.sendAcc += dt;
+    this.sendAcc += dt; this.dAcc += dt;
     if (this.sendAcc >= 1 / C.inputHz) {
-      this.sendAcc %= 1 / C.inputHz; this.seq++; const [you, ...guests] = this.locals;
-      this.s.sendInput(this.seq, you.in.ax, you.in.ay, you.pending.splice(0), guests.map(L => [L.id, L.in.ax, L.in.ay, L.pending.splice(0)]));
+      /* v14.3.11: each message has the stick for the time since the last one (and how long that was), the last few of those again
+         (in case one is lost on the way), and every button event the host hasn't confirmed yet */
+      this.sendAcc %= 1 / C.inputHz; this.seq++; const q = this.seq;
+      this.inHist.push([q, Math.round(this.dAcc * 1e4) / 1e4, this.locals.map(L => [L.id, r3(L.in.ax), r3(L.in.ay)])]); this.dAcc = 0; if (this.inHist.length > 4) this.inHist.shift();
+      for (const L of this.locals) for (const ev of L.pending.splice(0)) this.evOut.push([q, L.id, ev]); if (this.evOut.length > 64) this.evOut.splice(0, this.evOut.length - 64);
+      this.s.sendIn({ t: 'in', q, s: this.inHist, e: this.evOut.length ? this.evOut : undefined });
     }
     this.render(dt);
   }
   /* Run the real physics forward from a snapshot to now. Leaves the result in the Match replica and returns a copy of it. */
   project(snap) {
-    const m = this.m, S = snap.s, h = CONFIG.online.predictStep, W = CONFIG.spin;
+    const m = this.m, S = snap.s, h = 1 / (m.kind === 'br' ? 120 : CONFIG.physics.hz), W = CONFIG.spin;   /* (v14.3.11: the host's own step: a different one gave a slightly different answer, corrected on every snapshot) */
     m.chairs.forEach((c, j) => {
       const r = S.c[j]; if (!r) return;
       c.x = r[0]; c.y = r[1]; c.heading = r[2]; c.vx = r[3]; c.vy = r[4]; c.binLeft = r[5]; c.player = this.byId.get(r[6]) || null; c.omega = 0; c.spinLeft = c.spinCooldown = 0; c.onSpin = null;
@@ -541,6 +575,11 @@ class ClientSim {
               else { c.x += c.vx * h; c.y += c.vy * h; }                // everyone else carries on at their last velocity
             }
             first = false;
+            /* v14.3.11: carts bump each other here too (the same physics as the host's, without the fouls and sounds). Without it your cart
+               drove through other carts until the host's snapshot said otherwise: a big correction every time you touched someone */
+            if (Settings.collisions !== false && !(m.kind === 'br')) { for (const c of live) m.chairObstacles(c); const R = CONFIG.chair.radius, M0 = CONFIG.chair.mass;
+              for (let a = 0; a < live.length; a++) for (let b2 = a + 1; b2 < live.length; b2++) { const A = live[a], Bc = live[b2]; if (!mine.has(A) && !mine.has(Bc)) continue; const d = Math.hypot(Bc.x - A.x, Bc.y - A.y); if (d >= 2 * R || d === 0 || A.out || Bc.out) continue;
+                const closing = Physics.circles(A, R, M0 * (A.massMul || 1), Bc, R, M0 * (Bc.massMul || 1), CONFIG.chair.chairBounce); if (typeof crashSlow === 'function') crashSlow(A, Bc, closing); } }
             for (const c of live) m.chairObstacles(c);
             m.stepBall(m.ball, h, live);
           }
@@ -553,7 +592,10 @@ class ClientSim {
     const m = this.m, C = CONFIG.online; if (!this.snap) return;
     let now = null;
     if (this.used !== this.snap) {                                       // a new snapshot: fade out whatever difference it makes to what is on screen
-      const old = this.used ? this.project(this.used) : null; now = this.project(this.snap);
+      /* v14.3.11: where the old snapshot would have put things now = where they were last frame, carried on by their speed (instead of
+         running the whole prediction a second time: half the work on a phone) */
+      const L0 = this.lastNow, adv = o => ({ ...o, x: o.x + (o.vx || 0) * dt, y: o.y + (o.vy || 0) * dt });
+      const old = this.used && L0 ? { c: L0.c.map(adv), b: adv(L0.b) } : this.used ? this.project(this.used) : null; now = this.project(this.snap);
       if (old && this.off && this.snap.s.st === STATE_CODE.play) {
         const keep = (o, a, b, ang) => ({ x: o.x + a.x - b.x, y: o.y + a.y - b.y, h: ang ? o.h + normalizeAngle(a.heading - b.heading) : 0 });
         this.off.c = this.off.c.map((o, j) => (old.c[j] && now.c[j] ? keep(o, old.c[j], now.c[j], true) : { x: 0, y: 0, h: 0 }));
@@ -562,6 +604,7 @@ class ClientSim {
       } else this.off = null;
       this.used = this.snap;
     } else now = this.project(this.snap);
+    this.lastNow = now;
     if (!this.off) this.off = { c: m.chairs.map(() => ({ x: 0, y: 0, h: 0 })), b: { x: 0, y: 0, h: 0 } };
     const k = Math.exp(-C.fadeRate * dt); for (const o of [...this.off.c, this.off.b]) { o.x *= k; o.y *= k; o.h *= k; }
     m.chairs.forEach((c, j) => { const o = this.off.c[j]; if (o) { c.x += o.x; c.y += o.y; c.heading += o.h; } });
@@ -582,3 +625,21 @@ class ClientSim {
 /* v14.3.1: a host whose phone screen turns off (or who switches apps) stops running the game: tell the guests why it froze */
 if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { const S = typeof Online !== 'undefined' && Online.current; if (!S || !(S instanceof HostSession) || !S.entries) return;
   for (const e of S.entries.values()) { if (!document.hidden) e.lastSeen = performance.now() + 5000; try { e.conn && e.conn.send({ t: 'away', on: document.hidden }); } catch (x) { /* gone */ } } });   /* (back: nobody is dropped for the time the host was away) */
+
+/* v14.3.11 InPlay: a remote player's stick, played out at a steady pace on the host. Messages arrive bunched up or spread out (that's
+   the internet), and the host used to apply each one the moment it came in, for however long it happened to last until the next. The
+   guest's own prediction assumed each lasted exactly as long as it did on their screen, so the two drifted apart and the guest's cart
+   was corrected all the time. Now each input lasts as long as it did for the guest. A small cushion absorbs the bunching; if it grows
+   (after a hiccup) it's played a little faster until it's back to normal, and if it runs dry the last stick is held. */
+const InPlay = {
+  push(p, q, x, y, d) { const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; } const Q = p.inq || (p.inq = []); Q.push({ q, x, y, d: Math.max(0.001, Math.min(0.1, d || 1 / 60)) }); if (Q.length > 24) Q.splice(0, Q.length - 6); },
+  step(m, h) {
+    for (const p of m.players) { const Q = p.inq; if (!Q || !Q.length || !p.remote) continue;
+      let left = 0; for (const it of Q) left += it.d;
+      const rate = left > 0.25 ? 2 : left > 0.1 ? 1.2 : left < 0.035 ? 0.85 : 1;   // (the cushion: about 4 to 10 hundredths of a second)
+      let t = h * rate; while (Q.length && t > 0) { const it = Q[0]; p.src.ax = it.x; p.src.ay = it.y; const u = Math.min(t, it.d); it.d -= u; t -= u; if (it.d <= 1e-6) { p.ackQ = it.q; Q.shift(); } }
+    }
+  },
+  ack(e) { const p = e.players && e.players.get(e.id); return p && p.ackQ !== undefined ? p.ackQ : e.seq; }
+};
+{ const sp = Match.prototype.savePrev; Match.prototype.savePrev = function () { if (!this.remote && this.players) InPlay.step(this, 1 / (this.kind === 'br' ? 120 : CONFIG.physics.hz)); return sp.call(this); }; }   // (savePrev runs once before every physics step)

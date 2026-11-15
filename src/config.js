@@ -82,7 +82,7 @@ const CONFIG = {
   server:  { url: '', syncSeconds: 10, idleSyncSeconds: 30 },   // how often a logged-in player checks friends / invites (each check is one Netlify Function call)
 
   // Online play: one player hosts the match, up to five more join by room code. Everything runs in the browser over WebRTC (PeerJS).
-  online: { protocol: 2, maxPlayers: 6, maxGuests: 3, roomPrefix: 'volthockey1-', codeLength: 5, codeAlphabet: 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789',
+  online: { protocol: 3, maxPlayers: 6, maxGuests: 3, roomPrefix: 'volthockey1-', codeLength: 5, codeAlphabet: 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789',
          snapshotHz: 60, inputHz: 60, interpDelayMs: 100, extrapolateMaxSeconds: 0.25, predictStep: 1 / 120,
          fadeRate: 14, fadeMax: 3,   // how fast a new snapshot's disagreement is faded out (per second), and the size of disagreement that is a reset rather than a fade
          correction: 0.35, correctionRate: 12, snapDistance: 1.5,                       // how hard a player's own cart is pulled toward the host's version of it
