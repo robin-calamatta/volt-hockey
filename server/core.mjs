@@ -53,8 +53,9 @@ export function createApi(store, opts = {}) {
   const saveUser = u => store.set(key(u.name), u);
   const online = u => !!u && now() - (u.lastSeen || 0) < LIMITS.onlineMs;
   const me = u => ({ name: u.name, adult: !!u.adult, br: canBR(u), created: u.created, email: u.email ? maskEmail(u.email) : '' });
-  const GAME_DEFAULTS = { brThird: true, off: {} };   /* off: v14.3.3 game modes turned off (hockey, season, practice, br, mini, or one minigame's id) */
-  const gameCfg = async () => { const g = { ...GAME_DEFAULTS, ...((await store.get('cfg/game')) || {}) }; g.off = g.off && typeof g.off === 'object' ? g.off : {}; return g; };
+  const GAME_DEFAULTS = { brThird: true, online: true, broadcast: true, rizeSkip: false, brOnline: 100, off: {}, settings: {} };   /* brOnline: v14.3.12 carts (people first, then CPUs) in an online Volt Royale match */   /* off: v14.3.3 game modes turned off (hockey, season, practice, br, mini, or one minigame's id) */
+  const gameCfg = async () => { const g = { ...GAME_DEFAULTS, ...((await store.get('cfg/game')) || {}) }; g.off = g.off && typeof g.off === 'object' ? g.off : {}; g.brOnline = brOnlineN(g.brOnline); BR_ONLINE = g.brOnline; return g; };
+  let BR_ONLINE = 100; const brOnlineN = v => Math.max(10, Math.min(100, Math.round(+v || 100)));
   /* v14.2.22 Volt Royale public matchmaking. One queue per team size (1 to 5). Queued players poll every couple of seconds; a match forms when
      everyone queued has pressed START, when the first one has waited 5 minutes, or when the queue fills a match (as many people as it has carts; CPUs fill any spots left). The first one queued hosts: their game opens an online room
      and posts its code here; the others see the code and join. Matches live under their own keys (and each player gets a pointer to theirs),
@@ -65,7 +66,7 @@ export function createApi(store, opts = {}) {
   const mmSquad = b => { const q = Number(b && b.squad); return q >= 1 && q <= 5 ? Math.floor(q) : 1; };
   const mmMode = b => { const m = String((b && b.mode) || 'br'); return MM_MODES[m] ? m : 'br'; };
   const mmKey = (mode, sq, nf) => mode === 'br' ? 'mm/q' + sq : 'mm/q-' + mode + (nf ? '-nf' : '');   /* (v14.3.1: no fill in a team game: a queue of its own, two groups a match, one each side) */
-  const mmCap = Q => Q.mode && Q.mode !== 'br' ? MM_MODES[Q.mode].spots : (MM_SPOTS[Q.sq] || 20);
+  const mmCap = Q => Q.mode && Q.mode !== 'br' ? MM_MODES[Q.mode].spots : Math.max(Q.sq || 1, Math.floor(BR_ONLINE / (Q.sq || 1)) * (Q.sq || 1));   /* (v14.3.12: the admin's number, a whole number of squads) */
   const mmWait = Q => Q.mode && Q.mode !== 'br' ? MM_MODES[Q.mode].wait : MM_WAIT;
   const mmN = p => Math.max(1, Math.min(8, Number(p.n) || 1));                          // (a party, or players on one screen, take that many spots)
   async function mmLoad(sq, mode = 'br', nf = false) { const Q = (await store.get(mmKey(mode, sq, nf))) || {}; Q.players = Q.players || {}; Q.sq = sq; Q.mode = mode; Q.nf = mode !== 'br' && !!nf; return Q; }
@@ -365,8 +366,9 @@ export function createApi(store, opts = {}) {
     'POST /admin/raw/delete': async (b) => { await store.del(str(b.key, 300)); return { ok: true }; },
     /* v14.2.6: game-wide switches (the Game tab). brThird: third person allowed in Volt Royale */
     'GET /admin/game': async () => ({ game: await gameCfg() }),
-    'POST /admin/game': async (b) => { const cur = await gameCfg(); for (const k of Object.keys(GAME_DEFAULTS)) if (typeof b[k] === 'boolean') cur[k] = b[k];
-      if (b.off && typeof b.off === 'object') { const off = {}; for (const [k, v] of Object.entries(b.off).slice(0, 80)) if (/^[a-z]{2,16}$/.test(k) && v === true) off[k] = true; cur.off = off; } await store.set('cfg/game', cur); return { game: cur }; }
+    'POST /admin/game': async (b) => { const cur = await gameCfg(); for (const k of Object.keys(GAME_DEFAULTS)) if (typeof b[k] === 'boolean') cur[k] = b[k]; if (b.brOnline !== undefined) cur.brOnline = brOnlineN(b.brOnline);
+      if (b.settings && typeof b.settings === 'object') { const S = {}; for (const [k, v] of Object.entries(b.settings).slice(0, 80)) { if (!/^[A-Za-z0-9]{1,30}$/.test(k) || !v || typeof v !== 'object') continue; const o = {}; if (['boolean', 'number'].includes(typeof v.def) || (typeof v.def === 'string' && v.def.length <= 24)) o.def = v.def; if (v.lock === true) o.lock = true; if (Object.keys(o).length) S[k] = o; } cur.settings = S; }   /* v14.3.12: player settings: starting values and locks */
+      if (b.off && typeof b.off === 'object') { const off = {}; for (const [k, v] of Object.entries(b.off).slice(0, 80)) if (/^[a-z]{2,16}$/.test(k) && v === true) off[k] = true; cur.off = off; } await store.set('cfg/game', cur); BR_ONLINE = cur.brOnline; return { game: cur }; }
   };
 
   /* ---- routing ---- */

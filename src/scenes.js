@@ -104,7 +104,7 @@ const SETTINGS_ORDER = ['Camera and graphics', 'Sound and commentary', 'Voice ch
 class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
   preload() { for (const t of TEAMS) this.load.image('logo-' + t.id, t.logo); }
-  create() { this.scene.start('Title'); }
+  create() { this.scene.start(new URLSearchParams(location.search).has('norize') ? 'Title' : 'Rize'); }   /* (v14.3.12: the studio card first) */
 }
 
 class TitleScene extends Phaser.Scene {
@@ -379,7 +379,7 @@ class SetupScene extends ListMenuScene {
   init(data) { this.practice = !!(data && data.practice); }
   create() {
     const size = (name, key) => ({ label: () => `${name}   ◀ ${Settings[key]} cart${Settings[key] > 1 ? 's' : ''} ▶`, change: d => Settings.adjust(key, d) });
-    const toLobby = () => partyGame(this, { teamA: Settings.teamA, teamB: Settings.teamB, difficulty: Settings.difficulty, practice: this.practice, sizes: this.practice ? [Settings.sizeA, Settings.sizeB].map(n => Math.min(n, CONFIG.match.chairsPerTeam)) : [CONFIG.match.chairsPerTeam, CONFIG.match.chairsPerTeam] }) || this.scene.start('Lobby', { practice: this.practice, sizes: this.practice ? [Settings.sizeA, Settings.sizeB] : [CONFIG.match.chairsPerTeam, CONFIG.match.chairsPerTeam] });
+    const toLobby = () => partyGame(this, { teamA: Settings.teamA, teamB: Settings.teamB, difficulty: Settings.difficulty, practice: this.practice, sizes: this.practice ? [Settings.sizeA, Settings.sizeB].map(n => Math.min(n, CONFIG.match.maxPerSide)) : [CONFIG.match.chairsPerTeam, CONFIG.match.chairsPerTeam] }) || this.scene.start('Lobby', { practice: this.practice, sizes: this.practice ? [Settings.sizeA, Settings.sizeB] : [CONFIG.match.chairsPerTeam, CONFIG.match.chairsPerTeam] });
     this.buildMenu(this.practice ? 'PRACTICE SETUP' : 'MATCH SETUP', [
       { label: () => `Left team   ◀ ${TEAMS[Settings.teamA].name} ▶`, change: d => Settings.cycleTeam('teamA', d) },
       { label: () => `Right team   ◀ ${TEAMS[Settings.teamB].name} ▶`, change: d => Settings.cycleTeam('teamB', d) },
@@ -1051,7 +1051,7 @@ class CameraPageScene extends ListMenuScene {
     const N3 = CONFIG.view3d.names, is2d = () => Settings.camMode === '2d', no3d = () => Render3D.ok === false;
     this.items = [
       { label: () => no3d() ? 'Camera   (3D is not supported on this device: Classic 2D)' : `Camera   ◀ ${N3[Settings.camMode] || N3.third} ▶`, change: d => { cycleCamMode(d); apply(); }, select: () => { cycleCamMode(1); apply(); } },
-      { label: () => `Broadcast view   ◀ ${Settings.allowBroadcast ? 'On' : 'Off'} ▶`, change: () => { Settings.setBroadcast(!Settings.allowBroadcast); apply(); }, select: () => { Settings.setBroadcast(!Settings.allowBroadcast); apply(); } },
+      { label: () => GameCfg.broadcast === false ? 'Broadcast view   (turned off for this game)' : `Broadcast view   ◀ ${Settings.allowBroadcast ? 'On' : 'Off'} ▶`, change: () => { if (GameCfg.broadcast === false) return; Settings.setBroadcast(!Settings.allowBroadcast); apply(); }, select: () => { if (GameCfg.broadcast === false) return; Settings.setBroadcast(!Settings.allowBroadcast); apply(); } },
       { label: () => `Third person view   ◀ ${Settings.allowThird ? 'On' : 'Off'} ▶`, hint: 'On: the camera button also offers the chase camera behind your cart', change: () => { Settings.setThird(!Settings.allowThird); apply(); }, select: () => { Settings.setThird(!Settings.allowThird); apply(); } },
       { label: () => `Court   ◀ ${CONFIG.surfaces[Settings.court | 0].name} ▶`, change: d => { Settings.court = ((Settings.court | 0) + d + CONFIG.surfaces.length) % CONFIG.surfaces.length; Settings.save(); redo(); }, select: () => { Settings.court = ((Settings.court | 0) + 1) % CONFIG.surfaces.length; Settings.save(); redo(); } },
       { label: () => `Crowd   ◀ ${Settings.crowd !== false ? 'On' : 'Off'} ▶`, change: () => { Settings.toggle('crowd'); redo(); }, select: () => { Settings.toggle('crowd'); redo(); } },

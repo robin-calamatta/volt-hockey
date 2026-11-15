@@ -3,6 +3,59 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.3.12: smoother online play, PLAY AGAIN fixed, RIZE intro, admin settings, grenades, team colours, controller pointer
+
+**Deploy the whole zip:** the server changed (admin game settings, online Volt Royale player count). Everyone needs this version (network protocol 4); an older copy is told to reload.
+
+### Online play
+- **PLAY AGAIN no longer leaves guests without control.** After a rematch (in any game: hockey, minigames, Capture the Flag) the host kept counting guests' inputs from the last match and ignored every new one. Each match now has its own number and the count starts again.
+- **Smoother for guests, especially with the ball.** The host used to play a guest's inputs up to twice as fast to catch up after a network hiccup, so the guest's cart did something slightly different on the host than on their own screen: a correction (the ball jumping off your stick, movement feeling behind) whenever the connection or the host's frame rate wobbled. Now:
+  - Every input plays for exactly as long as it did on the guest's screen. A cushion that has stayed big is drained very gently (4%).
+  - The host says how far into the next input it is, and the guest's prediction starts from exactly there.
+  - Spins start at the same moment on both screens.
+  - On 120 / 144 Hz screens, the prediction uses the stick exactly as it was sent.
+  - With a busy host (frames taking 0 to 30 ms) on a 40 ms connection, guest corrections (99th percentile) went from 54 cm to 9 cm; the median went from 2.5 cm to 0.2 cm.
+- **Volt Royale guests:** snapshots go on the fast lane too (a lost one is made up by the next). Only the ones that must arrive (full state, new loot, doors) go the reliable way.
+- **A host who switches tabs** (on a computer) keeps the game running for everyone.
+- **Party games: pick your sides.** Volt Hockey (and team minigames) started the moment everyone was in. Now the room waits on the side picker; once nobody is left in the middle it starts 3 seconds later. The host's START still starts it straight away.
+
+### New
+- **RIZE ENTERTAINMENT intro** (about 3 seconds) before the title: dark grey on black, then the letters catch fire left to right. It can't be skipped unless the admin allows it.
+- **Grenades in Volt Royale:** found in chests and on the floor. Fire throws one; it bounces and goes off after 2 seconds (up to 70 damage, smashes doors and shield walls). CPUs throw them too.
+- **Door health bars** while you're bashing a door.
+- **Carts per side** (1 to 5) in practice and online rooms.
+- **Capture the Flag:**
+  - New option **Flags**: *Moving* (default) or *Classic*. Moving: each flag moves between three spots at its end, after every capture and every minute.
+  - Bigger maps: the open rink is 44 × 24 m, and The Fortress and Canyon Run are a fifth bigger.
+  - **CPUs find their way round walls with the flag.** On the long maps the path search gave up (on Canyon Run it failed 87% of the time), and a CPU then drove straight at the wall between it and home. Now each CPU follows a distance map spread out from where it's going, worked out once and kept. It always finds the way, and it costs a fortieth of the time. King of the Hill uses the same path-finding, and Paintball's own path search no longer gives up early.
+- **Controller SELECT button:**
+  - Tap it in the menus or the lobby for a mouse pointer. The left stick moves it, A clicks, the right stick scrolls, and SELECT or B puts it away.
+  - Hold it to press a notice's main button (accept a party invite or a friend request). Those notices say so.
+- **Microphone muted warning:** you're told when the mic itself is muted (headset switch, the computer's sound settings, or unplugged), and again when you try to talk.
+- **Add party members as friends:** from the party list in Friends, from the ＋ ADD FRIEND tag under their cart in the lobby, or from the notice when someone who isn't a friend joins.
+
+### Clearer
+- **Your team is always blue and theirs red** (when you're all on one side): rings under every cart (yours gold), and your net marked DEFEND in blue and theirs SCORE in red. This works whatever the two teams' own colours are. It can be turned off in Settings > Controls and screen. A cart's ring no longer gets left on the floor online.
+- **Phones:** the voice chat names are small initials, in the screen's edge when there's room; tap them to see the names. The default touch buttons sit closer together. The touch layout editor is a slim bar you can move and fold, with a layout for each game.
+- **Volt Royale Fives:** the team panel shows all 5.
+- **Home screen:** X shows options on every game card. The card starts on 🏠 THIS SCREEN.
+- **Floor is Lava:** the towers and bumpers now show on the 2D (top-down) view.
+
+### Faster
+- **Big TVs and high resolutions:** the 3D view caps how many pixels it draws (3.7 million on High, 2.1 on Medium, 1.0 on Low) and lowers the resolution a little when frames run slow, then raises it again.
+
+### Admin page (Game tab)
+- Turn online play on or off.
+- Turn broadcast view on or off.
+- The third-person option now says what it does.
+- Let players skip the RIZE intro.
+- Set how many players an online Volt Royale match has.
+- **Player settings:** give any listed setting a different starting value, or lock it (it shows 🔒 and can't be changed).
+- Players get "↺ Back to defaults" on every settings page and "↺ Reset all settings" on the main settings menu (press twice).
+
+### Safety net
+- If no screen is showing for 2 seconds, the game goes back to the main menu instead of staying blank. If the graphics card drops the game's drawing, the page reloads.
+
 ## v14.3.11: online play rebuilt for real connections (smooth as a guest, up to 6 players)
 
 Tested with two to six browsers on an emulated connection: 30 to 80 ms each way, ±20 to 30 ms of jitter, and 1 to 3% of packets lost. Figures are how far a guest's own cart had to be corrected by each snapshot from the host. With 6 players:

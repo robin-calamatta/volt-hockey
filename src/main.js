@@ -14,7 +14,7 @@ FriendsBar.build();
 Controls.init(); TouchPad.init();
 MUSIC_READY = scanMusic();                                  // looks for your music files in the background, never blocks start-up
 
-const SCENES = [BootScene, TitleScene, LobbyHomeScene, MinigamesScene, MiniListScene, MiniSetupScene, HowToScene, DemoScene, BRInvScene, BRMapScene, BRQueueScene, SettingsScene, SettingsPageScene, ControlsGuideScene, SetupScene, LobbyScene, GameScene, PreviewScene, CameraPageScene, PauseScene, OnlineMenuScene, BrowseScene, JoinCodeScene, RoomScene, NameEntryScene, JoinMenuScene, SeasonMenuScene, SeasonSetupScene, SeasonHubScene, StandingsScene, GamesScene, BracketScene, TrophyScene, HistoryScene, LeaderboardScene];
+const SCENES = [BootScene, RizeScene, TitleScene, LobbyHomeScene, MinigamesScene, MiniListScene, MiniSetupScene, HowToScene, DemoScene, BRInvScene, BRMapScene, BRQueueScene, SettingsScene, SettingsPageScene, ControlsGuideScene, SetupScene, LobbyScene, GameScene, PreviewScene, CameraPageScene, PauseScene, OnlineMenuScene, BrowseScene, JoinCodeScene, RoomScene, NameEntryScene, JoinMenuScene, SeasonMenuScene, SeasonSetupScene, SeasonHubScene, StandingsScene, GamesScene, BracketScene, TrophyScene, HistoryScene, LeaderboardScene];
 
 /* Phaser stops its whole loop if a scene throws, which looks like a freeze. Catch it, keep running, and tell the player with a small toast that can be dismissed
    (the full error is always in the browser console, F12). "Details" shows it on screen so it can be copied and sent to whoever looks after the game. */
@@ -78,4 +78,18 @@ fontReady.catch(() => {}).then(() => {
   if (window.visualViewport) visualViewport.addEventListener('resize', later);
   setInterval(fit, 2000);                                   // cheap safety net
   later();
+})();
+
+/* v14.3.12 never a blank screen: if no screen is showing for 2 seconds (something broke on the way between two menus), go back to the main
+   menu. And if the graphics card drops the game's drawing (a "lost context": a driver reset, a TV or monitor switch), reload the page
+   rather than sit on a black screen. */
+(function blankGuard() {
+  let empty = 0;
+  setInterval(() => { const g = window.voltGame; if (!g || !g.scene || !g.isBooted || document.hidden) return;
+    let n = 0; try { n = g.scene.getScenes(true).length + g.scene.scenes.filter(s => s.sys.isPaused()).length; } catch (e) { return; }
+    if (n) { empty = 0; return; } if (++empty < 2) return; empty = 0;
+    try { console.warn('No screen was showing: back to the main menu'); g.scene.start('Main'); } catch (e) { /* next time */ } }, 1000);
+  const watch = cv => { if (!cv || cv.__lostWatch) return; cv.__lostWatch = true;
+    cv.addEventListener('webglcontextlost', e => { e.preventDefault(); try { if (typeof Toasts !== 'undefined') Toasts.show('The graphics reset. Reloading the game...', [], 4000); } catch (x) { /* none */ } setTimeout(() => location.reload(), 1500); }, false); };
+  setInterval(() => { const g = window.voltGame; if (g && g.canvas) watch(g.canvas); for (const c of document.querySelectorAll('canvas')) watch(c); }, 2000);
 })();

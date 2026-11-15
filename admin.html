@@ -35,10 +35,17 @@
     </section>
     <section data-panel="reports" hidden><div class="card"><table><thead><tr><th>When</th><th>By</th><th>About</th><th>Where</th><th>Message</th><th></th></tr></thead><tbody id="rlist"></tbody></table></div></section>
     <section data-panel="game" hidden><div class="card"><h3 style="margin-top:0">Game switches</h3>
-      <label class="row" style="gap:10px"><input type="checkbox" id="gBrThird"> <span><b>Third person in Volt Royale</b><br><span class="dim">Off: everyone plays Volt Royale in first person (third person and the broadcast view are not offered). Takes effect in new matches.</span></span></label>
+      <label class="row" style="gap:10px"><input type="number" id="gBrOnline" min="10" max="100" step="1" style="width:80px"> <span><b>Players in an online Volt Royale match</b><br><span class="dim">10 to 100. People fill the spots first and CPUs take the rest. Rounded down to whole teams (Trios with 100: 99). A phone hosting (nobody on a computer in the match) runs at most 40. Takes effect in new matches.</span></span></label>
+      <label class="row" style="gap:10px"><input type="checkbox" id="gBrThird"> <span><b>Volt Royale: let players use the camera behind their cart</b><br><span class="dim">Ticked: in Volt Royale players can switch between first person (through their own eyes) and third person (the camera behind and above the cart: easier to drive, and you can see round corners). Unticked: Volt Royale is first person only, for everyone (third person and the broadcast view can't be picked, so nobody can peek round walls). Hockey and minigames aren't affected. Takes effect in new matches.</span></span></label>
+      <label class="row" style="gap:10px"><input type="checkbox" id="gBroadcast"> <span><b>Broadcast view</b><br><span class="dim">Ticked: players can turn on the broadcast view (a TV camera high above the whole rink or arena) in Settings &gt; Camera and graphics. Unticked: it can't be picked in any game; anyone using it goes back to their normal view. (A screen with nobody playing on it, like the attract demo, still shows the TV camera.)</span></span></label>
+      <label class="row" style="gap:10px"><input type="checkbox" id="gRizeSkip"> <span><b>RIZE opening card can be skipped</b><br><span class="dim">The 3-second RIZE ENTERTAINMENT card that plays when the game opens. Unticked: it always plays to the end. Ticked: a tap, click or button press skips straight to the title.</span></span></label>
+      <label class="row" style="gap:10px"><input type="checkbox" id="gOnline"> <span><b>Online play</b><br><span class="dim">Ticked: players can play online (matchmaking, private rooms, playing with their party). Unticked: the game is this-screen only: the ONLINE switch, private rooms and matchmaking are hidden, and anyone mid-search is sent back to the lobby. Accounts, friends and chat still work. Players' games pick this up within a minute.</span></span></label>
       <h3>Game modes</h3>
       <p class="dim" style="margin-top:0">Ticked: players see it and can play it. Unticked: it's hidden everywhere (the lobby, playlists, online rooms, matchmaking). A group's box turns all of its games on or off at once. Players' games pick this up within a minute (and at every match).</p>
       <div id="gModes"></div>
+      <h3>Player settings</h3>
+      <p class="dim" style="margin-top:0"><b>Starting value</b>: what a setting starts at (and what "Back to defaults" in the game puts it back to). Players who still had the old starting value move to the new one; anyone who had picked their own keeps it. Leave it blank for the game's own. <b>Lock</b>: the setting is the same for everyone (the starting value, or the game's own if blank) and shows 🔒 in the game's menus. Players' games pick this up within a minute.</p>
+      <div id="gSets"></div>
       <div class="row"><button class="go" id="gSave">Save</button><span id="gMsg"></span></div></div></section>
     <section data-panel="data" hidden>
       <div class="card"><div class="row"><select id="pfx"><option value="">everything</option><option value="u/">players (u/)</option><option value="r/">reports (r/)</option><option value="dm/">messages (dm/)</option><option value="lb">leaderboard (lb)</option><option value="names">username index</option><option value="s/">logins (s/)</option><option value="e/">emails (e/)</option><option value="pr/">reset links (pr/)</option></select><button id="kgo">List</button><span class="dim" id="kcount"></span></div>
@@ -70,6 +77,35 @@ const GM_CATS = [['party', 'Party chaos', [['balloons', 'Balloon Bash'], ['hunt'
   ['ball', 'Ball games', [['multiball', 'Multiball Madness'], ['giant', 'Giant Ball'], ['bowling', 'Cart Bowling']]],
   ['racing', 'Racing and driving', [['race', 'Race'], ['stunt', 'Stunt Arena'], ['slalom', 'Slalom Time Trial'], ['delivery', 'Delivery Rush']]],
   ['sneaky', 'Battles and sneaky', [['paintball', 'Paintball'], ['ctf', 'Capture the Flag'], ['imposter', 'Imposter Carts'], ['night', 'Infection Night']]]];
+/* v14.3.12 player settings: [key, label, kind, options] (kind: bool, num [min, max, step], pick [values], with names for the values) */
+const PSETS = [
+  ['Camera'], ['camMode', 'Camera view', 'pick', ['first', 'third', 'broadcast', '2d'], ['First person', 'Third person', 'Broadcast', '2D']], ['allowThird', 'Third person can be picked', 'bool'], ['allowBroadcast', 'Broadcast view can be picked', 'bool'],
+  ['fov3d', 'Field of view (degrees)', 'num', [60, 100, 5]], ['gfx', 'Graphics quality', 'pick', ['', 'Low', 'Medium', 'High'], ['Auto', 'Low', 'Medium', 'High']],
+  ['Sound'], ['masterVolume', 'Master volume', 'num', [0, 1, 0.05]], ['musicVolume', 'Music volume', 'num', [0, 1, 0.05]], ['sfxVolume', 'Sound effects volume', 'num', [0, 1, 0.05]], ['commentVolume', 'Commentary volume', 'num', [0, 1, 0.1]],
+  ['commentaryMode', 'Commentary', 'pick', ['full', 'voice', 'captions', 'off'], ['Voice and captions', 'Voice only', 'Captions only', 'Off']], ['crowd', 'Crowd noise', 'bool'], ['crowdVolume', 'Crowd volume', 'num', [0, 1, 0.1]],
+  ['spatial', '3D sound (headphones)', 'bool'], ['cartSound', 'Cart driving sound', 'bool'], ['cartVolume', 'Cart driving volume', 'num', [0.1, 2, 0.1]],
+  ['Voice chat'], ['voiceMode', 'Microphone', 'pick', ['open', 'ptt'], ['Open mic', 'Push to talk']], ['voiceVolume', 'Voice volume', 'num', [0, 1, 0.05]], ['micVolume', 'Microphone level', 'num', [0, 2, 0.1]],
+  ['Game rules'], ['timeSpeed', 'Game clock speed', 'num', [0.5, 10, 0.5]], ['penalties', 'Penalties', 'bool'], ['penaltySeconds', 'Penalty length (seconds)', 'num', [5, 120, 5]], ['penaltyCarry', 'Penalties carry on after a goal', 'bool'],
+  ['collisions', 'Carts bump each other', 'bool'], ['lockCart', 'Lock your cart (no switching)', 'bool'], ['turnSpeed', 'Turn speed', 'num', [0.5, 2, 0.1]],
+  ['Ball and carts'], ['stickLength', 'Stick length (m)', 'num', [0.1, 0.5, 0.02]], ['ballBounce', 'Ball bounce', 'num', [0, 1, 0.05]], ['ballGrip', 'Ball grip', 'num', [0, 30, 2]], ['ballFriction', 'Ball friction', 'num', [0, 4, 0.1]], ['sizeA', 'Carts per side, left (practice)', 'num', [0, 5, 1]], ['sizeB', 'Carts per side, right (practice)', 'num', [0, 5, 1]],
+  ['CPU and controls'], ['difficulty', 'CPU skill', 'pick', ['Easy', 'Normal', 'Hard', 'Pro'], ['Easy', 'Normal', 'Hard', 'Pro']], ['invertLook', 'Invert look up / down', 'bool'], ['lookH', 'Look speed, sideways', 'num', [0.2, 2, 0.1]], ['lookV', 'Look speed, up / down', 'num', [0.2, 2, 0.1]], ['autoFullscreen', 'Go fullscreen on phones', 'bool']];
+function drawSets(S) {
+  S = S || {}; const box = $('#gSets'); box.innerHTML = '';
+  for (const row of PSETS) {
+    if (row.length === 1) { const h = document.createElement('div'); h.className = 'dim'; h.style.cssText = 'margin:10px 0 4px;font-weight:700;color:#cfe'; h.textContent = row[0]; box.append(h); continue; }
+    const [k, label, kind, opt, names] = row, cur = S[k] || {}, d = document.createElement('div'); d.className = 'row'; d.style.cssText = 'gap:10px;margin:2px 0;align-items:center'; d.dataset.k = k; d.dataset.kind = kind;
+    let input = '';
+    if (kind === 'bool') input = `<select data-v><option value="">(game's own)</option><option value="1" ${cur.def === true ? 'selected' : ''}>On</option><option value="0" ${cur.def === false ? 'selected' : ''}>Off</option></select>`;
+    else if (kind === 'num') input = `<input data-v type="number" min="${opt[0]}" max="${opt[1]}" step="${opt[2]}" style="width:90px" placeholder="(game's own)" value="${cur.def !== undefined ? cur.def : ''}">`;
+    else input = `<select data-v><option value="__">(game's own)</option>${opt.map((v, i) => `<option value="${v}" ${cur.def === v ? 'selected' : ''}>${names[i]}</option>`).join('')}</select>`;
+    d.innerHTML = `<span style="width:260px">${label}</span>${input}<label class="row" style="gap:4px"><input type="checkbox" data-l ${cur.lock ? 'checked' : ''}> 🔒 Lock</label>`; box.append(d);
+  }
+}
+function readSets() {
+  const S = {}; $('#gSets').querySelectorAll('[data-k]').forEach(d => { const k = d.dataset.k, kind = d.dataset.kind, v = d.querySelector('[data-v]').value, lock = d.querySelector('[data-l]').checked, o = {};
+    if (kind === 'bool' && v !== '') o.def = v === '1'; else if (kind === 'num' && v !== '') o.def = +v; else if (kind === 'pick' && v !== '__') o.def = v;
+    if (lock) o.lock = true; if (Object.keys(o).length) S[k] = o; }); return S;
+}
 function drawModes(off) {
   const cb = (id, label, cls = '') => `<label class="${cls}"><input type="checkbox" data-gm="${id}" ${off[id] ? '' : 'checked'}> <span>${label}</span></label>`;
   let h = GM_TOP.map(([id, l]) => `<div class="gg">${cb(id, l)}</div>`).join('');
@@ -84,8 +120,8 @@ function syncCats() {   /* a group box: ticked when all its games are on, half w
   const all = $('[data-gm="mini"]').checked; $('#gModes').querySelectorAll('.gm').forEach(d => { d.style.opacity = all ? 1 : 0.45; });
 }
 function readModes() { const off = {}; $('#gModes').querySelectorAll('[data-gm]').forEach(c => { if (!c.checked) off[c.dataset.gm] = true; }); return off; }
-async function loadGame() { try { const r = await api('GET', '/admin/game'); $('#gBrThird').checked = !!r.game.brThird; drawModes(r.game.off || {}); $('#gMsg').textContent = ''; } catch (e) { $('#gMsg').textContent = e.message; } }
-$('#gSave').onclick = async () => { $('#gMsg').textContent = 'Saving...'; try { const r = await api('POST', '/admin/game', { brThird: $('#gBrThird').checked, off: readModes() }); $('#gBrThird').checked = !!r.game.brThird; drawModes(r.game.off || {}); $('#gMsg').textContent = 'Saved.'; } catch (e) { $('#gMsg').textContent = e.message; } };
+async function loadGame() { try { const r = await api('GET', '/admin/game'); $('#gBrThird').checked = !!r.game.brThird; $('#gBroadcast').checked = r.game.broadcast !== false; $('#gOnline').checked = r.game.online !== false; $('#gRizeSkip').checked = !!r.game.rizeSkip; $('#gBrOnline').value = r.game.brOnline || 100; drawSets(r.game.settings); drawModes(r.game.off || {}); $('#gMsg').textContent = ''; } catch (e) { $('#gMsg').textContent = e.message; } }
+$('#gSave').onclick = async () => { $('#gMsg').textContent = 'Saving...'; try { const r = await api('POST', '/admin/game', { brThird: $('#gBrThird').checked, broadcast: $('#gBroadcast').checked, online: $('#gOnline').checked, rizeSkip: $('#gRizeSkip').checked, settings: readSets(), brOnline: +$('#gBrOnline').value || 100, off: readModes() }); $('#gBrThird').checked = !!r.game.brThird; $('#gBroadcast').checked = r.game.broadcast !== false; $('#gOnline').checked = r.game.online !== false; $('#gRizeSkip').checked = !!r.game.rizeSkip; $('#gBrOnline').value = r.game.brOnline; drawSets(r.game.settings); drawModes(r.game.off || {}); $('#gMsg').textContent = 'Saved.'; } catch (e) { $('#gMsg').textContent = e.message; } };
 document.querySelector('nav [data-tab=game]').addEventListener('click', loadGame);
 async function search() {
   try {

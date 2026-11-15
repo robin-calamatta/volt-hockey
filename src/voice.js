@@ -149,3 +149,30 @@ const Voice = {
     return out;
   }
 };
+
+/* v14.3.12 a warning when your microphone itself is muted: the mute switch on a headset, a mic muted in the computer's sound settings,
+   or one that's been unplugged. The browser either says so (the mic's "muted"), or the mic sends nothing at all: perfect silence, which
+   a working microphone never does (even a quiet room gives a little noise). The warning comes up when it happens, again when you try to
+   talk (push to talk), and every couple of minutes while it stays muted. */
+const MicWarn = {
+  silentFor: 0, last: 0, warnAt: 0, was: false,
+  check(V) {
+    const now = performance.now(), dt = Math.min(0.2, (now - (this.last || now)) / 1000); this.last = now;
+    if (!V.mic || !V.nodes || V.mode() === 'off') { this.silentFor = 0; this.was = false; return; }
+    const tr = V.mic.getAudioTracks()[0]; let why = '';
+    if (!tr || tr.readyState === 'ended') why = 'Your microphone was unplugged or turned off.';
+    else if (tr.muted) why = 'Your microphone is muted (on the mic or headset, or in your computer\'s sound settings).';
+    else {
+      if (!V.nodes.raw || V.nodes.raw.src !== V.nodes.src) { try { const an = V.ctx().createAnalyser(); an.fftSize = 512; V.nodes.src.connect(an); V.nodes.raw = { an, src: V.nodes.src, buf: new Float32Array(512) }; } catch (e) { return; } }
+      const R = V.nodes.raw; R.an.getFloatTimeDomainData(R.buf); let mx = 0; for (const v of R.buf) { const a = Math.abs(v); if (a > mx) mx = a; }
+      this.silentFor = mx < 1e-6 ? this.silentFor + dt : 0;
+      if (this.silentFor > 6) why = 'Your microphone isn\'t picking anything up: it may be muted on the mic or headset, or in your computer\'s sound settings.';
+      else if ((Settings.micVolume === 0) && V.talking()) why = 'Your mic volume is at 0 (Settings > Sound and voice).';
+    }
+    const trying = V.talking() && V.mode() === 'ptt';
+    if (why && (!this.was || now > this.warnAt || (trying && now > this.warnAt - 110000))) { this.warnAt = now + 120000; try { Toasts.show('🎙️🚫 <b>Mic muted.</b> ' + esc(why), [], 7000); } catch (e) { /* later */ } }
+    if (!why && this.was) { try { Toasts.show('🎙️ Your microphone is back on.', [], 2500); } catch (e) { /* fine */ } }
+    this.was = !!why; this.why = why;
+  }
+};
+{ const fr = Voice.frame; Voice.frame = function (...a) { const r = fr.apply(this, a); try { MicWarn.check(this); } catch (e) { /* never stop voice */ } return r; }; }

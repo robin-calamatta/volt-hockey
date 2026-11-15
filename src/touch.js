@@ -29,10 +29,13 @@ const TOUCH = {
 
 /* Volt Royale has more buttons and a hotbar along the bottom right: its own starting spots for them */
 TOUCH.profilePos = {
-  /* v14.2.18 Volt Hockey: the half turns sit nearest the bottom-right corner, the bigger 90-degree turns further in */
-  hockey: { halfCW: { x: 0.94, y: 0.66 }, halfCCW: { x: 0.84, y: 0.80 }, spinCW: { x: 0.83, y: 0.42 }, spinCCW: { x: 0.70, y: 0.68 } },
-  br: { spinCW: { x: 0.92, y: 0.52 }, spinCCW: { x: 0.79, y: 0.66 }, a: { x: 0.93, y: 0.75 }, b: { x: 0.66, y: 0.76 }, x: { x: 0.81, y: 0.42 }, y: { x: 0.93, y: 0.32 },
-  halfCCW: { x: 0.70, y: 0.21 }, halfCW: { x: 0.80, y: 0.21 }, camera: { x: 0.60, y: 0.21 }, rstick: { x: 0.735, y: 0.60 }, b: { x: 0.625, y: 0.74 }, x: { x: 0.83, y: 0.36 }, speedUp: { x: 0.555, y: 0.79 }, quick: { x: 0.07, y: 0.40 }, speedDown: { x: 0.165, y: 0.40 } } };   // (v14.2.17: PING next to the bag)
+  /* v14.3.12 closer together, in thumb's reach: each side's buttons are gathered round where the thumb rests (the move stick on the left;
+     the turns, or the aim stick, on the right) instead of spread up the screen */
+  hockey: { spinCW: { x: 0.835, y: 0.53 }, spinCCW: { x: 0.715, y: 0.71 }, halfCW: { x: 0.94, y: 0.66 }, halfCCW: { x: 0.85, y: 0.83 }, y: { x: 0.945, y: 0.43 }, camera: { x: 0.945, y: 0.25 },
+    x: { x: 0.075, y: 0.42 }, quick: { x: 0.175, y: 0.42 } },
+  br: { rstick: { x: 0.735, y: 0.63 }, spinCW: { x: 0.895, y: 0.52 }, spinCCW: { x: 0.80, y: 0.70 }, a: { x: 0.915, y: 0.77 }, b: { x: 0.625, y: 0.80 }, speedUp: { x: 0.585, y: 0.62 },
+    x: { x: 0.83, y: 0.355 }, y: { x: 0.935, y: 0.32 }, halfCCW: { x: 0.655, y: 0.375 }, halfCW: { x: 0.74, y: 0.34 }, camera: { x: 0.59, y: 0.30 },
+    quick: { x: 0.07, y: 0.42 }, speedDown: { x: 0.165, y: 0.42 } } };   // (v14.2.17: PING next to the bag)
 
 const TouchPad = {
   state: { held: {}, tapped: {}, ax: 0, ay: 0 }, els: {}, root: null, bar: null, hint: null, editing: false, selected: null, built: false,
@@ -190,3 +193,78 @@ function toggleFullscreen() {
   if (navigator.standalone) { toast('Already running as an app (no address bar).'); return; }
   goFullscreen(false);
 }
+
+/* v14.3.12 the layout editor, out of the way:
+   - The panel is a slim toolbar at the top of the screen. Drag it by its ⠿ handle anywhere, or tap — to fold it into a small pill (tap
+     the pill to open it again). Nothing is hidden under it for good, and the buttons can be dragged right under where it was.
+   - Lay out each game on its own: HOCKEY, ROYALE and MINIGAMES show that game's buttons with their real names (FIRE, JUMP, 90° TURN...),
+     in that game's own positions. Moving a button in one game no longer moves it in the others. Opened from the pause menu in a game,
+     it starts on that game.
+   - Every button (and both sticks) can be dragged, and made smaller or bigger one at a time (select it first) or all together.
+   - RESET puts this game's buttons back where they start. The panel is lighter, so you can see the game behind it. */
+{ const T = TouchPad, TL = () => Settings.touchLayoutP || (Settings.touchLayoutP = {});
+  const lay0 = T.layout.bind(T);
+  T.layout = function (id) {
+    const per = this.posProfile && TL()[this.posProfile] && TL()[this.posProfile][id];
+    if (per) { const d = lay0(id); return { x: per.x !== undefined ? per.x : d.x, y: per.y !== undefined ? per.y : d.y, scale: per.scale !== undefined ? per.scale : d.scale }; }
+    return lay0(id);
+  };
+  T.setLayout = function (id, patch) {
+    if (this.posProfile) { const P = TL(); P[this.posProfile] = P[this.posProfile] || {}; P[this.posProfile][id] = { ...this.layout(id), ...patch }; return; }
+    Settings.touchLayout = Settings.touchLayout || {}; Settings.touchLayout[id] = { ...this.layout(id), ...patch };
+  };
+  const GAMES = { hockey: { name: 'HOCKEY', fake: { match: { mini: null, state: 'play' } } }, br: { name: 'ROYALE', fake: { match: { mini: { kind: 'br' }, state: 'play' } } }, mini: { name: 'MINIGAMES', fake: { match: { mini: { kind: 'race' }, state: 'play' } } } };
+  T.makeBar = function () {
+    const css = document.createElement('style'); css.textContent = `
+      #touch.editing{background:rgba(4,10,16,.18)}
+      #touchbar{left:50%;top:4px;transform:translateX(-50%);flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px;padding:4px 6px;border-radius:12px;max-width:96vw;background:rgba(8,16,24,.82)}
+      #touchbar button{font:700 13px "Barlow Condensed",Arial,sans-serif;padding:3px 7px;border-radius:7px;border-width:1px}
+      #touchbar button.on{background:#19c3ff;color:#06121a}
+      #touchbar .h{cursor:grab;font-size:20px;padding:0 6px;touch-action:none;color:#9fb2bf}
+      #touchbar .sep{width:1px;align-self:stretch;background:#2d5068;margin:0 2px}
+      #touchbar #touchinfo{font-size:12px;opacity:.85;flex-basis:100%;text-align:center;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      @media (max-height:520px){#touchbar #touchinfo{display:none}#touchbar .h{font-size:16px}}
+      #touchbar.mini{padding:4px 8px}#touchbar.mini > :not(.keep){display:none}`;
+    document.head.append(css);
+    const bar = document.createElement('div'); bar.id = 'touchbar';
+    bar.innerHTML = `<span class="h keep" title="Drag me">⠿</span><button class="keep" data-a="fold">—</button><span class="sep"></span>` +
+      Object.entries(GAMES).map(([k, g]) => `<button data-a="game:${k}">${g.name}</button>`).join('') + `<span class="sep"></span>` +
+      `<button data-a="smaller">− Smaller</button><button data-a="bigger">+ Bigger</button><button data-a="opacity">Opacity</button><button data-a="reset">Reset</button>` +
+      `<button class="go keep" data-a="lock">🔒 Done</button><div class="msg" id="touchinfo"></div>`;
+    bar.addEventListener('pointerdown', e => e.stopPropagation());
+    bar.addEventListener('click', e => { const b = e.target.closest('button'), a = b && b.dataset.a; if (a) this.action(a); });
+    /* drag the toolbar by its handle */
+    const h = bar.querySelector('.h'); let dr = null;
+    h.addEventListener('pointerdown', e => { e.preventDefault(); const r = bar.getBoundingClientRect(); dr = { dx: e.clientX - r.left, dy: e.clientY - r.top }; h.setPointerCapture(e.pointerId); });
+    h.addEventListener('pointermove', e => { if (!dr) return; const x = Math.max(0, Math.min(innerWidth - 60, e.clientX - dr.dx)), y = Math.max(0, Math.min(innerHeight - 30, e.clientY - dr.dy)); bar.style.left = x + 'px'; bar.style.top = y + 'px'; bar.style.transform = 'none'; });
+    h.addEventListener('pointerup', () => { dr = null; }); h.addEventListener('pointercancel', () => { dr = null; });
+    document.body.append(bar); this.bar = bar;
+  };
+  const edit0 = T.edit.bind(T);
+  T.edit = function () {
+    const g = window.voltGame && voltGame.scene, sc = g && g.isActive('Game') && g.getScene('Game'), k = sc && sc.match ? (sc.match.mini ? (sc.match.mini.kind === 'br' ? 'br' : 'mini') : 'hockey') : (this.editGame || 'hockey');
+    edit0(); this.bar.classList.remove('mini'); this.bar.style.left = ''; this.bar.style.top = ''; this.bar.style.transform = ''; this.pick(k);
+  };
+  T.pick = function (k) {
+    this.editGame = k; const P = this.profile(GAMES[k].fake);
+    this.posProfile = TOUCH.profilePos[k] ? k : (k === 'mini' ? 'mini' : null); this.press = P.press; this.selected = null;
+    for (const id of Object.keys(TOUCH.controls)) this.els[id].style.display = P.show.includes(id) ? 'flex' : 'none';
+    this.lblKey = null; this.relabel(P.labels);
+    for (const b of this.bar.querySelectorAll('[data-a^="game:"]')) b.classList.toggle('on', b.dataset.a === 'game:' + k);
+    this.place(); this.info();
+  };
+  const act0 = T.action.bind(T);
+  T.action = function (a) {
+    if (a.startsWith('game:')) return this.pick(a.slice(5));
+    if (a === 'fold') { this.bar.classList.toggle('mini'); this.bar.querySelector('[data-a=fold]').textContent = this.bar.classList.contains('mini') ? '✎ Layout' : '—'; return; }
+    if (a === 'reset' && this.posProfile) { const P = TL(); delete P[this.posProfile]; if (this.editGame === 'hockey' || this.editGame === 'br') { } Settings.touchScale = 1; Settings.touchOpacity = TOUCH.opacity; this.selected = null; this.place(); this.info(); return; }
+    const r = act0(a); if (a === 'lock') { this.profKey = null; this.lblKey = null; this.wasEditing = null; } return r;
+  };
+  const info0 = T.info.bind(T);
+  T.info = function () { info0(); const t = document.getElementById('touchinfo'); if (t && this.editGame) t.textContent = `${GAMES[this.editGame].name}: drag any button. ` + t.textContent; };
+  /* the editor shows the chosen game's buttons: the per-frame sync must not show all of them again */
+  const sync0 = T.sync.bind(T);
+  T.sync = function () { const was = this.wasEditing; const r = sync0(); if (this.editing && was !== true && this.editGame) this.pick(this.editGame); return r; };
+}
+/* minigames have their own positions too (empty to start: the base ones) */
+TOUCH.profilePos.mini = TOUCH.profilePos.mini || {};

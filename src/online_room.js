@@ -14,7 +14,7 @@ const teamsMatter = cfg => !!cfg && (!cfg.mini || cfg.mini.mode === 'teams');
   P.roomItems = function () {
     const S = this.session, cfg = () => S.cfg, names = Object.keys(CONFIG.difficulties), GAMES = [...(gameOn('hockey') ? [null] : []), ...MINI_KINDS().filter(k => k !== 'br' && gameOn(k))]   /* (v14.2.22: Volt Royale online is public matchmaking only) */ ;
     const cycleGame = d => { const i = GAMES.indexOf(cfg().mini ? cfg().mini.kind : null), k = GAMES[(i + d + GAMES.length) % GAMES.length]; S.setConfig(k ? { mini: miniCfg(k), practice: true } : { mini: null, practice: false }); };
-    const size = (side, d) => { const sizes = [...cfg().sizes]; sizes[side] = clamp(sizes[side] + d, 1, CONFIG.match.chairsPerTeam); S.setConfig({ sizes }); };
+    const size = (side, d) => { const sizes = [...cfg().sizes]; sizes[side] = clamp(sizes[side] + d, 1, CONFIG.match.maxPerSide); S.setConfig({ sizes }); };
     return [
       { label: () => `Room   ◀ ${S.visibility === 'public' ? 'PUBLIC (listed)' : 'Private (code only)'} ▶`, change: () => this.toggleVisibility(), select: () => this.toggleVisibility() },
       { label: () => `Lobby name   ◀ ${S.lobbyName} ▶`, change: d => this.cycleName(d), select: () => this.typeName() },
@@ -44,7 +44,7 @@ const teamsMatter = cfg => !!cfg && (!cfg.mini || cfg.mini.mode === 'teams');
     this.wire();
     if (this.role === 'client' && S.pendingStart) { const msg = S.pendingStart; S.pendingStart = null; return this.beginClient(msg); }   /* (rejoining a game that's going: straight back in) */
     if (this.view === 'teams') {                                          /* the host: the two teams, like Play now */
-      const sizeOf = side => ({ get: () => S.cfg.sizes[side], set: d => { const sizes = [...S.cfg.sizes]; sizes[side] = clamp(sizes[side] + d, 1, CONFIG.match.chairsPerTeam); S.setConfig({ sizes }); } });
+      const sizeOf = side => ({ get: () => S.cfg.sizes[side], set: d => { const sizes = [...S.cfg.sizes]; sizes[side] = clamp(sizes[side] + d, 1, CONFIG.match.maxPerSide); S.setConfig({ sizes }); } });
       TeamSelect.build(this, {
         title: 'ONLINE ROOM', sub: () => this.headLine(),
         cards: [{ side: 'HOME', get: () => S.cfg.teamA, set: t => S.setConfig({ teamA: t }), carts: sizeOf(0) }, { side: 'AWAY', get: () => S.cfg.teamB, set: t => S.setConfig({ teamB: t }), carts: sizeOf(1) }],

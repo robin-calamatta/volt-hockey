@@ -36,7 +36,7 @@ const CONFIG = {
   spin:    { degrees: 90, seconds: 0.14, cooldown: 0.55 }, // slap-shot spin (RT clockwise, LT counter-clockwise)
 
   foul:    { noticeSeconds: 3, minClosingSpeed: 2.8, binSeconds: 8, facingDot: 0.6, hitDot: 0.8, bumpSoundSpeed: 1.5 },
-  match:   { periods: 2, periodSeconds: 15 * 60, countdownSeconds: 3, goalPauseSeconds: 3, overtimeSeconds: 180, maxPlayers: 6, chairsPerTeam: 3 },                      // chairsPerTeam = carts per side in a normal match (practice lets you pick 1-5)
+  match:   { periods: 2, periodSeconds: 15 * 60, countdownSeconds: 3, goalPauseSeconds: 3, overtimeSeconds: 180, maxPlayers: 6, chairsPerTeam: 3, maxPerSide: 5 },   /* (v14.3.12: practice and private rooms: up to 5 carts a side) */                      // chairsPerTeam = carts per side in a normal match (practice lets you pick 1-5)
   // Season mode (src/season.js): a round-robin season, then the top teams play off for the Volt Hockey World Cup.
   season:  { series: [3, 3, 5],                       // playoff series lengths, first round to the final (best of N)
              qualifiers: 8, winPoints: 2, otLossPoints: 1,
@@ -82,7 +82,7 @@ const CONFIG = {
   server:  { url: '', syncSeconds: 10, idleSyncSeconds: 30 },   // how often a logged-in player checks friends / invites (each check is one Netlify Function call)
 
   // Online play: one player hosts the match, up to five more join by room code. Everything runs in the browser over WebRTC (PeerJS).
-  online: { protocol: 3, maxPlayers: 6, maxGuests: 3, roomPrefix: 'volthockey1-', codeLength: 5, codeAlphabet: 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789',
+  online: { protocol: 4, maxPlayers: 6, maxGuests: 3, roomPrefix: 'volthockey1-', codeLength: 5, codeAlphabet: 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789',
          snapshotHz: 60, inputHz: 60, interpDelayMs: 100, extrapolateMaxSeconds: 0.25, predictStep: 1 / 120,
          fadeRate: 14, fadeMax: 3,   // how fast a new snapshot's disagreement is faded out (per second), and the size of disagreement that is a reset rather than a fade
          correction: 0.35, correctionRate: 12, snapDistance: 1.5,                       // how hard a player's own cart is pulled toward the host's version of it
@@ -124,9 +124,9 @@ const CONFIG = {
     steer:   { dead: 0.12, turnDead: 0.1, forwardDead: 0.2, pivotSpeed: 0.13, turnCurve: 1.35, aimLead: 0.18 },
     tags:    { height: 1.75, near: 5, minScale: 0.5, maxScale: 1.15 },
     minimap: { x: 1102, y: 8, scale: 6.1, alpha: 0.82 },
-    quality: { High:   { pixelRatio: 2,    shadows: true,  shadowMap: 2048, fans: true },
-               Medium: { pixelRatio: 1.25, shadows: true,  shadowMap: 1024, fans: true },
-               Low:    { pixelRatio: 0.8,  shadows: false, shadowMap: 512,  fans: false } },
+    quality: { High:   { pixelRatio: 2,    shadows: true,  shadowMap: 2048, fans: true,  maxMP: 3.7 },
+               Medium: { pixelRatio: 1.25, shadows: true,  shadowMap: 1024, fans: true,  maxMP: 2.1 },
+               Low:    { pixelRatio: 0.8,  shadows: false, shadowMap: 512,  fans: false, maxMP: 1.0 } },   /* maxMP (v14.3.12): the most pixels drawn, in millions, however big the screen (a 4K TV is 8.3 million: the game drew all of them) */
     // Right stick: look around. First person turns your head (yaw / pitch in degrees); third person swings the camera round the cart. Let go and it springs back.
     look:    { yaw: 115, up: 35, down: 55, orbit: 180, lift: 1.4, follow: 11 },
     shake:   { seconds: 0.35, metres: 0.08 }, maxFov: 92

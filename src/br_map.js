@@ -102,11 +102,11 @@ class BRMapScene extends Phaser.Scene {
 
 /* v14.2.6: game-wide switches set in the admin page (Game tab). brThird: third person (and the broadcast view) allowed in Volt Royale */
 const GameCfg = {
-  brThird: true, off: {},   /* off: v14.3.3 game modes turned off in the admin page */
-  async load() { try { if (typeof Account === 'undefined' || !Account.available()) return; const r = await Account.req('GET', '/game'); if (r && r.game) { const before = JSON.stringify(this.off || {}); Object.assign(this, { brThird: r.game.brThird !== false, off: r.game.off && typeof r.game.off === 'object' ? r.game.off : {} }); if (JSON.stringify(this.off) !== before && this.onChange) this.onChange(); } } catch (e) { /* (offline: keep what we had) */ } }
+  brThird: true, online: true, broadcast: true, rizeSkip: false, settings: {}, brOnline: 100, off: {},   /* off: v14.3.3 game modes turned off in the admin page */
+  async load() { try { if (typeof Account === 'undefined' || !Account.available()) return; const r = await Account.req('GET', '/game'); if (r && r.game) { const before = JSON.stringify(this.off || {}); const wasOn = this.online; Object.assign(this, { online: r.game.online !== false, broadcast: r.game.broadcast !== false, rizeSkip: !!r.game.rizeSkip, settings: r.game.settings && typeof r.game.settings === 'object' ? r.game.settings : {}, brOnline: Math.max(10, Math.min(100, +r.game.brOnline || 100)), brThird: r.game.brThird !== false, off: r.game.off && typeof r.game.off === 'object' ? r.game.off : {} }); if ((JSON.stringify(this.off) !== before || wasOn !== this.online) && this.onChange) this.onChange(); if (typeof AdminSettings !== 'undefined') AdminSettings.apply(); } } catch (e) { /* (offline: keep what we had) */ } }
 };
 setTimeout(() => GameCfg.load(), 1500);
 { const P = GameScene.prototype, cr = P.create, mo = P.modeOf;
   P.create = function (...a) { GameCfg.load(); return cr.apply(this, a); };   // (checked again at every match: the admin may have changed it)
-  P.modeOf = function (p) { const r = mo.call(this, p); return this.match && this.match.kind === 'br' && !GameCfg.brThird && (r === 'third' || r === 'broadcast') ? 'first' : r; };
+  P.modeOf = function (p) { let r = mo.call(this, p); if (r === 'broadcast' && p && GameCfg.broadcast === false) r = Settings.allowThird ? 'third' : 'first';   /* (v14.3.12: the admin turned the broadcast view off) */ return this.match && this.match.kind === 'br' && !GameCfg.brThird && (r === 'third' || r === 'broadcast') ? 'first' : r; };
 }

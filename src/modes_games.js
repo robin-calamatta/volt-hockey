@@ -512,10 +512,12 @@ MODES.imposter = {
 /* =============================== CAPTURE THE FLAG =============================== */
 MODES.ctf = {
   teams: true,
-  init(m) { const g = m.gs; g.score = [0, 0]; g.base = [{ x: 2.6, y: m.centerY }, { x: m.width - 2.6, y: m.centerY }]; g.flag = [0, 1].map(s => ({ x: g.base[s].x, y: g.base[s].y, home: 1, car: -1, drop: 0 })); for (const c of m.chairs) c.gs.caps = 0; },
+  init(m) { const g = m.gs; g.score = [0, 0]; this.sites(m); g.base = [0, 1].map(s => ({ ...g.sites[s][g.site[s]] })); g.flag = [0, 1].map(s => ({ x: g.base[s].x, y: g.base[s].y, home: 1, car: -1, drop: 0 })); for (const c of m.chairs) c.gs.caps = 0; },
   kickoff(m) { m.chairs.forEach(c => { const mates = m.chairs.filter(k => k.side === c.side), j = mates.indexOf(c), x = c.side ? m.width - 4.6 : 4.6, y = m.centerY + (j - (mates.length - 1) / 2) * 2.3; Object.assign(c, { x, y, px: x, py: y, heading: c.side ? Math.PI : 0, ph: c.side ? Math.PI : 0 }); }); const g = m.gs; g.flag.forEach((f, s) => Object.assign(f, { x: g.base[s].x, y: g.base[s].y, home: 1, car: -1 })); },
   step(m, h) {
     const g = m.gs, live = MG.live(m);
+    if (!g.sites) { this.sites(m); g.base = [0, 1].map(s => ({ ...g.sites[s][g.site[s]] })); }
+    if (m.state === 'play') for (const s of [0, 1]) if (g.flag[s].home && m.simTime > g.moveAt[s] && !live.some(c => Math.hypot(c.x - g.base[s].x, c.y - g.base[s].y) < 1.6)) { this.moveBase(m, s); this.home(m, s); }
     g.flag.forEach((f, s) => {
       if (f.car >= 0) { const c = m.chairs[f.car]; const p = c.toWorld(-0.7, 0); f.x = MG.r2(p.x); f.y = MG.r2(p.y); return; }
       if (!f.home) { f.drop -= h; if (f.drop <= 0) { this.home(m, s); MG.notice(m, `THE ${MG.up(TEAMS[m.teams[s]].name)} FLAG IS BACK`, 1.4); return; } }
@@ -525,9 +527,17 @@ MODES.ctf = {
       }
     });
     for (const c of live) { const s = 1 - c.side, f = g.flag[s]; if (f.car === c.k && Math.hypot(c.x - g.base[c.side].x, c.y - g.base[c.side].y) < 1.6) {
-      g.score[c.side]++; c.gs.caps++; this.home(m, s); m.sfx('goal'); MG.notice(m, `${MG.up(m.name(c))} CAPTURES! ${g.score[0]} - ${g.score[1]}`, 2); m.line(`${m.name(c)} captures the flag!`);
+      g.score[c.side]++; c.gs.caps++; this.moveBase(m, s); this.home(m, s); m.sfx('goal'); MG.notice(m, `${MG.up(m.name(c))} CAPTURES! ${g.score[0]} - ${g.score[1]}`, 2); m.line(`${m.name(c)} captures the flag!`);
       if (g.score[c.side] >= m.mini.caps) this.end(m); } }
   },
+  /* v14.3.12: each team has three flag sites at its end (middle, near side, far side). The flag starts at one, and moves to another after
+     every capture and every minute (while it's at home), so the flag and the base you bring theirs back to aren't always in the same spot */
+  sites(m) { const g = m.gs, W = m.width, H = m.height, free = (x, y) => typeof Arena === 'undefined' || !Arena.map(m) || Arena.free(m, x, y, 1.7);
+    if (m.mini && m.mini.flags === 'fixed') { g.sites = [[{ x: 2.6, y: m.centerY }], [{ x: W - 2.6, y: m.centerY }]]; g.site = [0, 0]; g.moveAt = [1e9, 1e9]; return; }   /* (classic: the old spot, never moves) */
+    g.sites = [0, 1].map(s => { const out = []; for (const [fx, fy] of [[0.07, 0.5], [0.14, 0.2], [0.14, 0.8], [0.2, 0.5], [0.05, 0.25], [0.05, 0.75], [0.24, 0.3], [0.24, 0.7]]) { if (out.length >= 3) break; const x = MG.r2(s ? W - Math.max(2.6, W * fx) : Math.max(2.6, W * fx)), y = MG.r2(Math.max(2.6, Math.min(H - 2.6, H * fy))); if (free(x, y) && !out.some(q => Math.hypot(q.x - x, q.y - y) < 4)) out.push({ x, y }); }
+      if (!out.length) out.push({ x: s ? W - 2.6 : 2.6, y: m.centerY }); return out; });
+    g.site = [0, 1].map(s => Math.floor(Math.random() * g.sites[s].length)); g.moveAt = [(m.simTime || 0) + 60, (m.simTime || 0) + 60]; },
+  moveBase(m, s, why) { const g = m.gs, n = g.sites[s].length; if (n < 2) return; let i = g.site[s]; while (i === g.site[s]) i = Math.floor(Math.random() * n); g.site[s] = i; g.base[s] = { ...g.sites[s][i] }; g.moveAt[s] = (m.simTime || 0) + 60; MG.notice(m, `THE ${MG.up(TEAMS[m.teams[s]].name)} FLAG MOVED${why ? ' ' + why : ''}`, 1.6); },
   carrying: (m, c) => m.gs.flag.some(f => f.car === c.k),
   home(m, s) { const g = m.gs; Object.assign(g.flag[s], { x: g.base[s].x, y: g.base[s].y, home: 1, car: -1 }); },
   contact(m, a, b, d) {
@@ -847,7 +857,9 @@ MODES.paintball = {
     const push = e => { heap.push(e); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
     const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let s = i; if (l < heap.length && heap[l][0] < heap[s][0]) s = l; if (r < heap.length && heap[r][0] < heap[s][0]) s = r; if (s === i) break; [heap[s], heap[i]] = [heap[i], heap[s]]; i = s; } } return top; };
     let found = false, n = 0;
-    while (heap.length && n++ < 6000) { const [, cur] = pop(); if (cur === goal) { found = true; break; } const ci = cur % W, cj = (cur / W) | 0;
+    const cl = new Uint8Array(W * H);
+    while (heap.length && n < 40000) { const [, cur] = pop(); if (cl[cur]) continue; cl[cur] = 1; n++;   /* (v14.3.12: each cell is looked at once (one left in the queue twice was looked at again), and up to 40000 (was 6000)) */
+      if (cur === goal) { found = true; break; } const ci = cur % W, cj = (cur / W) | 0;
       for (const [di, dj, w] of [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.41], [1, -1, 1.41], [-1, 1, 1.41], [-1, -1, 1.41]]) { const a = ci + di, b = cj + dj; if (a < 0 || b < 0 || a >= W || b >= H) continue; const k = b * W + a; if (g[k] || (di && dj && (g[cj * W + a] || g[b * W + ci]))) continue; const ng = gs[cur] + w; if (ng < gs[k]) { gs[k] = ng; from[k] = cur; push([ng + Math.hypot(a - ti, b - tj), k]); } } }
     if (!found) return null; const path = []; for (let k = goal; k !== -1 && k !== start; k = from[k]) path.push({ x: (k % W + 0.5) * cs, y: (((k / W) | 0) + 0.5) * cs }); return path.reverse();
   },
@@ -919,10 +931,10 @@ Object.assign(GAME_INFO, {
     goal: 'Collect the orbs while blending in, or unmask every other agent.',
     rules: ['All carts look alike. Most are harmless CPUs pottering about; a few are agents (every player is one).', 'Agents collect glowing orbs: sit on one for a second and a half (the ring fills up). Taking one makes you flash for a moment.', 'A: zap the cart in front of you. An agent is unmasked and out. A harmless cart: you are stunned and revealed.', 'First to collect enough orbs wins, or be the last agent left.'],
     controls: [CTRL.drive, CTRL.drift, 'Zap (in front of you): RT  /  E  /  .  /  touch ⚡ ZAP', CTRL.pause], opts: [minOpt([2, 3, 4], 3), { key: 'orbs', label: 'Orbs to win', values: [5, 7, 9], def: 7 }, { key: 'agents', label: 'Agents', values: [2, 3, 4], def: 3 }] },
-  ctf: { name: 'Capture the Flag', cat: 'sneaky', blurb: 'Steal their flag and drive it home.', minutes: 4, teams: true,
+  ctf: { name: 'Capture the Flag', cat: 'sneaky', blurb: 'Steal their flag and drive it home.', minutes: 4, teams: true, court: { width: 44, height: 24 },
     goal: 'Capture the other team\'s flag more times than they capture yours.',
-    rules: ['Each team has a flag at its end.', 'Drive over the other team\'s flag to pick it up (you are a little slower carrying it).', 'Bring it to your own base: a capture.', 'Touch an enemy carrier to knock the flag loose. Touch your own dropped flag to send it home.', 'A dropped flag goes home by itself after 8 seconds.'],
-    controls: [CTRL.drive, CTRL.drift, CTRL.spin, CTRL.item, CTRL.pause], opts: [minOpt([3, 4, 6], 4), { key: 'caps', label: 'Captures to win', values: [2, 3, 5], def: 3 }] },
+    rules: ['Each team has a flag at its end. With Moving flags (the default) it moves between three spots there: after every capture, and every minute.', 'Drive over the other team\'s flag to pick it up (you are a little slower carrying it).', 'Bring it to your own base: a capture.', 'Touch an enemy carrier to knock the flag loose. Touch your own dropped flag to send it home.', 'A dropped flag goes home by itself after 8 seconds.'],
+    controls: [CTRL.drive, CTRL.drift, CTRL.spin, CTRL.item, CTRL.pause], opts: [minOpt([3, 4, 6], 4), { key: 'caps', label: 'Captures to win', values: [2, 3, 5], def: 3 }, { key: 'flags', label: 'Flags', values: ['move', 'fixed'], names: ['Moving (3 spots each)', 'Classic (always the same spot)'], def: 'move', hint: () => 'Moving: each flag moves between three spots at its end, after every capture and every minute. Classic: each flag always sits in the middle of its end.' }] },
   night: { name: 'Infection Night', cat: 'sneaky', blurb: 'Manhunt in the dark. Headlights only.', minutes: 3,
     goal: 'Runners: still be free when the clock runs out. IT: catch everyone.',
     rules: ['The lights are out: you only see what your headlights and the carts\' glow show.', 'IT glows red. IT catches a runner just by touching them.', 'A caught runner becomes IT (after 2 seconds).', 'Anyone still free at the end wins.'],

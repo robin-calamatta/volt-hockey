@@ -67,15 +67,27 @@ Object.assign(Party, {
   Party.reset = function () { this.game = null; this.myReady = 0; this._gv = undefined; return rs.call(this); };
 }
 /* the party's game goes through the room, which starts by itself once everyone is in it */
-{ const pg = partyGame; partyGame = function (scene, preset) { return pg(scene, { ...preset, autoStart: Party.members.length }); }; }
+{ const pg = partyGame; partyGame = function (scene, preset) { return pg(scene, { ...preset, autoStart: Party.members.length, partyPick: preset && preset.season ? 0 : 1 }); }; }
 { const P = RoomScene.prototype, up = P.update;
   P.update = function (...a) {
     const S = this.session, pre = this.preset;
     if (this.role === 'host' && pre && pre.autoStart && !this.autoDone && S && !this.opening && S.code) {
       this.autoAt = this.autoAt || this.time.now; const inRoom = S.roster.filter(r => !r.guest).length;
       if (S.setReady) for (const r of S.roster) if (!r.host && !r.rdy) S.setReady(r.id, true);   // (v14.2.13: they readied up in the lobby: no second ready-up in the room)
-      if (inRoom >= pre.autoStart || this.time.now - this.autoAt > 25000) { this.autoDone = true; pre.autoStart = 0; return this.startHost(); }
-      if (this.statusText && this.statusText.active) this.statusText.setText(`Bringing your party in: ${inRoom} / ${pre.autoStart} here. It starts by itself.`);
+      const sides = !!pre.partyPick && typeof teamsMatter === 'function' && teamsMatter(S.cfg) && !(S.cfg && S.cfg.season);
+      if (inRoom >= pre.autoStart || this.time.now - this.autoAt > 25000) {
+        /* v14.3.12: a game with sides waits on the side picker until everyone has picked one (it used to start the moment everyone was in) */
+        if (!sides) { this.autoDone = true; pre.autoStart = 0; return this.startHost(); }
+        this.autoDone = true; pre.autoStart = 0; this.pickSides = { at: this.time.now }; Sound.play('select');
+      } else if (this.statusText && this.statusText.active) this.statusText.setText(`Bringing your party in: ${inRoom} / ${pre.autoStart} here.${sides ? ' Then pick your sides.' : ' It starts by itself.'}`);
+    }
+    /* everyone picking a side: once nobody is left in the middle, it starts 3 seconds later (the host's START starts it straight away) */
+    if (this.role === 'host' && this.pickSides && S && !this.opening && this.sys.isActive()) {
+      const P0 = this.pickSides, mid = S.roster.filter(r => r.mid);
+      if (mid.length) { P0.go = 0; this.pickMsg = `Pick your sides (◀ ▶).   Waiting for: ${mid.map(r => r.name).join(', ')}.   START to go now.`; }
+      else { if (!P0.go) { P0.go = this.time.now + 3000; Sound.play('blip'); } const left = Math.ceil((P0.go - this.time.now) / 1000);
+        if (left <= 0) { this.pickSides = null; this.pickMsg = null; return this.startHost(); }
+        this.pickMsg = `Everyone has a side. Starting in ${left}...   (◀ ▶ to change)`; }
     }
     return up.apply(this, a);
   };
@@ -114,7 +126,7 @@ Object.assign(Party, {
     for (const row of S.roster) { const P0 = this.pos && this.pos.get(row.id); if (!P0) continue; const t = this.rdyT[i] || (this.rdyT[i] = this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '15px', fontStyle: 'bold', padding: { x: 6, y: 2 } }).setOrigin(1, 0.5).setDepth(7)); i++;
       t.setVisible(true).setPosition(P0.x + 160, P0.y).setText(row.host ? 'HOST' : row.rdy ? '✓ READY' : 'NOT READY').setColor(row.host ? '#ffe27a' : row.rdy ? '#0b1a10' : '#ffffff').setBackgroundColor(row.host ? '#3a2f0a' : row.rdy ? '#7dff6a' : '#55626c'); }
     for (; i < this.rdyT.length; i++) this.rdyT[i].setVisible(false);
-    if (this.statusText && this.statusText.active && !(this.flash && this.time.now < this.flashUntil) && !(this.preset && this.preset.autoStart)) {
+    if (this.statusText && this.statusText.active && !(this.flash && this.time.now < this.flashUntil) && !(this.preset && this.preset.autoStart) && !(this.pickSides)) {
       const me = this.meRow(); if (this.role === 'client' && me) this.statusText.setText(me.rdy ? "You're ready. Waiting for the host to start.   (A: not ready)" : 'Press A when you are ready.   The host starts the game.');
       else if (this.role === 'host') { const n = S.roster.filter(r => !r.host).length, k = S.roster.filter(r => !r.host && r.rdy).length; if (n) this.statusText.setText(`${k} / ${n} ready.   START plays when everyone is ready.`); }
     }
@@ -299,4 +311,11 @@ Object.assign(Party, {
     if (a === 'slotinv') { const first = this.modal.querySelector('[data-act="pinv1"]'); if (first) { first.scrollIntoView({ block: 'center', behavior: 'smooth' }); PadNav.focus && PadNav.focus(first); } else Toasts.show('No friends online right now. Use "Add a friend" to find people.', [], 3500); return; }
     return ac.call(this, a, who);
   };
+}
+/* v14.3.12 the party's side picker: what to do, under the columns */
+{ const P = RoomScene.prototype, dr = P.draw;
+  P.draw = function (...a) { const r = dr.apply(this, a), S = this.session, T = this.statusText; if (!S || !T || !T.active || (this.flash && this.time.now < this.flashUntil)) return r;
+    if (this.role === 'host' && this.pickSides && this.pickMsg) T.setText(this.pickMsg);
+    else if (this.role === 'client' && typeof teamsMatter === 'function' && teamsMatter(S.cfg) && !(S.cfg && S.cfg.season)) { const me = this.meRow && this.meRow(); if (me && me.mid) T.setText('Pick your side: ◀ ▶ (or tap the arrows on your row).'); }
+    return r; };
 }

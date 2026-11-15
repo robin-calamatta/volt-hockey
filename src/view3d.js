@@ -27,7 +27,11 @@ const Render3D = {
   sync() {                                                     // lie exactly under the Phaser canvas (which letterboxes itself to fit the window)
     const gc = window.voltGame && voltGame.canvas; if (!gc || !this.r) return null;
     if (gc.style.position !== 'relative') { gc.style.position = 'relative'; gc.style.zIndex = '1'; }
-    const b = gc.getBoundingClientRect(), pr = Math.min(window.devicePixelRatio || 1, this.quality().pixelRatio);
+    const b = gc.getBoundingClientRect(), Q = this.quality(), pr0 = Math.min(window.devicePixelRatio || 1, Q.pixelRatio), cap = Math.sqrt((Q.maxMP || 3.7) * 1e6 / Math.max(1, b.width * b.height));
+    /* v14.3.12 a big screen (a TV at 4K) or a slow graphics card: drawing at most a set number of pixels, and fewer while frames take too long (back up again when they're quick) */
+    const D = this.dyn || (this.dyn = { k: 1, slow: 0, fast: 0, at: performance.now() }), now = performance.now(), ft = window.voltGame ? voltGame.loop.delta : 16; D.ft = (D.ft || 16) * 0.95 + ft * 0.05;
+    if (now - D.at > 1500 && !document.hidden) { D.at = now; if (D.ft > 21 && D.k > 0.5) D.k = Math.max(0.5, D.k * 0.85); else if (D.ft < 15 && D.k < 1) D.k = Math.min(1, D.k * 1.1); }
+    let pr = Math.min(pr0, cap) * D.k; pr = Math.round(pr * 20) / 20; if (this.pr && Math.abs(pr - this.pr) / this.pr < 0.06) pr = this.pr;
     if (b.width !== this.w || b.height !== this.h || b.left !== this.l || b.top !== this.t || pr !== this.pr) {
       this.w = b.width; this.h = b.height; this.l = b.left; this.t = b.top; this.pr = pr;
       Object.assign(this.canvas.style, { left: b.left + 'px', top: b.top + 'px', width: b.width + 'px', height: b.height + 'px' });

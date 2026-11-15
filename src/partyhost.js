@@ -36,7 +36,7 @@ const isMobileDevice = () => !!(window.matchMedia && matchMedia('(pointer: coars
   partyGame = function (scene, preset) {
     if (Party.role !== 'leader' || !Party.others().length || !isMobileDevice() || (preset && (preset.season || preset.mm))) return pg(scene, preset);
     const pc = Party.others().find(m => m.dev === 'desktop' && Party.conns.get(m.key)); if (!pc) return pg(scene, preset);
-    const full = { ...preset, autoStart: Party.members.length }, fallback = () => { Toasts.show('Your phone hosts this one.', [], 2500); pg(voltGame.scene.getScenes(true)[0] || scene, preset); };
+    const full = { ...preset, autoStart: Party.members.length, partyPick: preset && preset.season ? 0 : 1 }, fallback = () => { Toasts.show('Your phone hosts this one.', [], 2500); pg(voltGame.scene.getScenes(true)[0] || scene, preset); };
     try { Party.conns.get(pc.key).send({ t: 'hostfor', preset: JSON.parse(JSON.stringify(full)) }); } catch (e) { return pg(scene, preset); }
     Party.handing = { key: pc.key, fallback, timer: setTimeout(() => { if (Party.handing && Party.handing.key === pc.key) { Party.handing = null; fallback(); } }, 25000) };
     Sound.play('select'); Toasts.show(`<b>${esc(pc.name)}</b>'s computer will host this game (a phone stops hosting when its screen turns off). Bringing everyone in...`, [], 5000);

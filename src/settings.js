@@ -16,7 +16,7 @@ const Settings = {
     if (v < 2) { this.speedLevel = CONFIG.defaults.speedLevel; this.allowThird = false; }
     this.allowBroadcast = false; this.settingsVer = 4; this.fixCam(); this.save();             // v9.3: broadcast off by default too
   },
-  camAllowed(m) { return (m !== 'third' || this.allowThird) && (m !== 'broadcast' || this.allowBroadcast); },
+  camAllowed(m) { return (m !== 'third' || this.allowThird) && (m !== 'broadcast' || (this.allowBroadcast && !(typeof GameCfg !== 'undefined' && GameCfg.broadcast === false))); },   /* (v14.3.12: the admin can turn the broadcast view off) */
   camCycle() { return CONFIG.view3d.cycle.filter(m => this.camAllowed(m)); },                          // the views the camera button steps through
   fixCam() { if (!this.camCycle().includes(this.camMode)) this.camMode = 'first'; },
   setThird(on) { this.allowThird = !!on; this.fixCam(); this.save(); },

@@ -168,7 +168,50 @@ const Chat = {
     if (!this.open && ++this.shown % 30 === 0) this.render();                    // let old lines fade
     // voice: who is on, who is talking
     const sp = Voice.speakers(); this.voiceEl.style.display = sp.length ? 'flex' : 'none';
-    if (sp.length) this.voiceEl.innerHTML = sp.map(s => `<div class="${s.level > 0.08 ? 'talk' : ''} ${s.muted ? 'mute' : ''}">${s.me ? (s.muted ? '🔇' : '🎙') : '🔊'} ${esc(s.name)}</div>`).join('');
+    if (sp.length && VoiceOrbs.on()) VoiceOrbs.draw(this.voiceEl, sp);
+    else { this.voiceEl.classList.remove('orbs', 'gut'); this.voiceEl.style.cssText = sp.length ? 'display:flex' : 'display:none';
+      if (sp.length) this.voiceEl.innerHTML = sp.map(s => `<div class="${s.level > 0.08 ? 'talk' : ''} ${s.muted ? 'mute' : ''}">${s.me ? (s.muted ? '🔇' : '🎙') : '🔊'} ${esc(s.name)}</div>`).join(''); }
     const mic = this.btns && this.btns.querySelector('[data-a=mic]'); if (mic) { mic.style.display = Account.loggedIn && Voice.mode() !== 'off' ? '' : 'none'; mic.classList.toggle('live', Voice.talking() && Voice.calls.size > 0); mic.textContent = Voice.mode() === 'mute' ? '🔇' : '🎙'; }
+  }
+};
+
+/* v14.3.12 VoiceOrbs: on a phone or tablet in a game, the party's names and mics were a column of name tags over the touch buttons
+   (5 or 6 people: half the left side of the screen). Now each person is a small round orb with their initials:
+   - In the black bars beside the game (most phones are wider than the game), the orbs sit there in a column, out of the way.
+     Otherwise they overlap in a little stack at the top-left corner.
+   - Whoever is talking: their orb lights up green and pulses, and their name shows next to it while they talk.
+   - Muted: the orb is greyed out with a slash. Your own orb has a white ring.
+   - Tap the orbs: everyone's names show for 4 seconds. */
+const VoiceOrbs = {
+  openUntil: 0,
+  on() { const g = window.voltGame && voltGame.scene; return !!(g && g.isActive('Game')) && ((window.matchMedia && matchMedia('(pointer: coarse)').matches) || !!Settings.touch); },
+  css() { if (this.cssDone) return; this.cssDone = 1; const c = document.createElement('style'); c.textContent = `
+    #voicelist.orbs{gap:0;pointer-events:auto;font-size:13px;align-items:flex-start}
+    #voicelist.orbs .o{display:flex;align-items:center;gap:6px;background:none;border:none;padding:0;margin:0}
+    #voicelist.orbs .b{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:8px;color:#06121a;border:2px solid rgba(5,7,15,.9);box-shadow:0 1px 3px rgba(0,0,0,.6);position:relative}
+    #voicelist.orbs .o.me .b{border-color:#fff}
+    #voicelist.orbs .o.mute .b{filter:grayscale(1) brightness(.6)}
+    #voicelist.orbs .o.mute .b:after{content:"";position:absolute;left:3px;right:3px;top:50%;height:2px;background:#ff5a3c;transform:rotate(-40deg)}
+    #voicelist.orbs .o.talk .b{box-shadow:0 0 0 2px #3dff9a,0 0 10px #3dff9a;animation:vopulse .5s infinite alternate}
+    #voicelist.orbs .n{display:none;background:rgba(13,21,27,.75);color:#fff;border-radius:9px;padding:0 6px;font-size:11px;white-space:nowrap}
+    #voicelist.orbs .o.talk .n,#voicelist.orbs.open .n{display:block}
+    #voicelist.orbs:not(.gut){flex-direction:row !important;align-items:flex-start}
+    #voicelist.orbs:not(.gut) .o{flex-direction:column;align-items:flex-start;gap:2px}
+    #voicelist.orbs:not(.gut) .o + .o{margin-left:-7px}
+    #voicelist.orbs:not(.gut).open{flex-direction:column !important}
+    #voicelist.orbs:not(.gut).open .o{flex-direction:row}
+    #voicelist.orbs:not(.gut).open .o + .o{margin-left:0;margin-top:2px}
+    #voicelist.orbs.gut .o{margin-bottom:2px}
+    @keyframes vopulse{from{transform:scale(1)}to{transform:scale(1.12)}}`; document.head.append(c); },
+  cols: ['#19c3ff', '#ffd23f', '#ff5fa2', '#7dff6a', '#b18cff', '#ff9a3c', '#5fe0d0', '#ff6b6b'],
+  hue(n) { let h = 0; for (const ch of String(n)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return this.cols[h % this.cols.length]; },
+  draw(el, sp) {
+    this.css(); el.classList.add('orbs'); if (!el.dataset.tap) { el.dataset.tap = 1; el.addEventListener('pointerdown', e => { if (!this.on()) return; e.stopPropagation(); this.openUntil = performance.now() + 4000; }); }
+    let gutter = 0, top = 8, left = 6; try { const r = voltGame.canvas.getBoundingClientRect(); gutter = r.left; top = Math.max(6, r.top + 6); } catch (e) { /* none */ }
+    const gut = gutter >= 26; el.classList.toggle('gut', gut); el.classList.toggle('open', performance.now() < this.openUntil);
+    el.style.cssText = `display:flex;flex-direction:column;position:fixed;z-index:31;left:${gut ? Math.max(2, (gutter - 22) / 2) : left}px;top:${gut ? top - 2 : top - 2}px;right:auto`;
+    const ini = n => { const w = String(n || '?').trim().split(/\s+/); return esc(((w[0] || '?')[0] + (w[1] ? w[1][0] : (w[0][1] || ''))).toUpperCase()); };
+    const html = sp.map(s => `<div class="o ${s.level > 0.08 ? 'talk' : ''} ${s.muted ? 'mute' : ''} ${s.me ? 'me' : ''}"><div class="b" style="background:${this.hue(s.name)}">${ini(s.name)}</div><div class="n">${esc(s.name)}</div></div>`).join('');
+    if (html !== this.last) { el.innerHTML = html; this.last = html; }
   }
 };

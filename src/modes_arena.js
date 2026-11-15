@@ -27,6 +27,10 @@ const ARENA_MAPS = {
       moving: [{ type: 'gate', w: 0.7, h: 7, a: [28, 2.4], b: [28, -4], period: 10 }, { type: 'gate', w: 0.7, h: 7, a: [28, 33.6], b: [28, 40], period: 10, phase: 0.5 }, { type: 'spin', x: 28, y: 18, len: 2.4, speed: 1 }] }
   }
 };
+/* v14.3.12 Capture the Flag maps are a fifth bigger (more room to run, more ways round) */
+for (const M of Object.values(ARENA_MAPS.ctf)) { const k = 1.2, r = v => Math.round(v * k * 10) / 10;
+  M.size = { width: r(M.size.width), height: r(M.size.height) }; M.walls = M.walls.map(([x0, y0, x1, y1, kind]) => [r(x0), r(y0), r(x1), r(y1), kind]);
+  M.moving = M.moving.map(o => ({ ...o, ...(o.a ? { a: o.a.map(r), b: o.b.map(r) } : {}), ...(o.x !== undefined ? { x: r(o.x), y: r(o.y) } : {}), ...(o.len ? { len: r(o.len) } : {}), ...(o.w ? { w: r(o.w), h: r(o.h) } : {}) })); }
 const Arena = {
   map(m) { const A = m && m.mini && ARENA_MAPS[m.mini.kind]; return A && A[m.mini.map] || null; },
   walls(m) { const M = this.map(m); if (!M) return []; return M._w || (M._w = M.walls.map(([x0, y0, x1, y1, kind]) => ({ x0, y0, x1, y1, kind }))); },
@@ -38,19 +42,38 @@ const Arena = {
       for (const p of mv.posts) { const dx = c.x - p.x, dy = c.y - p.y, d = Math.hypot(dx, dy), mn = R + p.r; if (d < mn && d > 0) { c.x = p.x + dx / d * mn; c.y = p.y + dy / d * mn; const vn = c.vx * dx / d + c.vy * dy / d; if (vn < 0) { c.vx -= 1.6 * vn * dx / d; c.vy -= 1.6 * vn * dy / d; } } } }
   },
   free(m, x, y, pad = 1) { return !this.all(m).some(b => x > b.x0 - pad && x < b.x1 + pad && y > b.y0 - pad && y < b.y1 + pad); },
-  route(m, c, tx, ty) {                                                    // the Paintball path-finder, on this arena's walls
+  /* v14.3.12 the way to a spot: a distance map spreading out from the spot over the whole arena (worked out once per spot and kept), and
+     each CPU follows it downhill from where it is. The old search gave up on long winding maps (Canyon Run), and a CPU with the flag
+     then drove straight at the wall between it and home. */
+  route(m, c, tx, ty) {
     const M = this.map(m), fake = { walls: () => this.walls(m) }; if (!m.arNav) { const save = m.pbNav; m.pbNav = null; MODES.paintball.nav.call(fake, m); m.arNav = m.pbNav; m.pbNav = save; }
-    const save = m.pbNav; m.pbNav = m.arNav; const r = MODES.paintball.route.call({ nav: () => m.arNav }, m, c, tx, ty); m.pbNav = save; return r;
+    const { cs, W, H, g } = m.arNav, cell = (x, y) => [Math.max(0, Math.min(W - 1, Math.floor(x / cs))), Math.max(0, Math.min(H - 1, Math.floor(y / cs)))];
+    const free = ([i, j]) => { if (!g[j * W + i]) return j * W + i; for (let r = 1; r < 6; r++) for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) { const a = i + di, b = j + dj; if (a >= 0 && b >= 0 && a < W && b < H && !g[b * W + a]) return b * W + a; } return j * W + i; };
+    const start = free(cell(c.x, c.y)), goal = free(cell(tx, ty)), F = this.field(m, goal); if (!isFinite(F[start])) return null;
+    const N8 = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.414], [1, -1, 1.414], [-1, 1, 1.414], [-1, -1, 1.414]], path = []; let cur = start;
+    for (let n = 0; n < 400 && cur !== goal; n++) { const ci = cur % W, cj = (cur / W) | 0; let best = cur, bd = F[cur];
+      for (const [di, dj, w] of N8) { const a = ci + di, b = cj + dj; if (a < 0 || b < 0 || a >= W || b >= H) continue; const k = b * W + a; if (g[k] || (di && dj && (g[cj * W + a] || g[b * W + ci]))) continue; if (F[k] + w * 0.001 < bd) { bd = F[k] + w * 0.001; best = k; } }
+      if (best === cur) break; cur = best; path.push({ x: (cur % W + 0.5) * cs, y: (((cur / W) | 0) + 0.5) * cs }); }
+    return path;
+  },
+  field(m, goal) {
+    const Fs = m.arFields || (m.arFields = new Map()); let F = Fs.get(goal); if (F) { Fs.delete(goal); Fs.set(goal, F); return F; }
+    const { W, H, g } = m.arNav; F = new Float32Array(W * H).fill(Infinity); F[goal] = 0; const heap = [[0, goal]], done = new Uint8Array(W * H);
+    const push = e => { heap.push(e); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let s = i; if (l < heap.length && heap[l][0] < heap[s][0]) s = l; if (r < heap.length && heap[r][0] < heap[s][0]) s = r; if (s === i) break; [heap[s], heap[i]] = [heap[i], heap[s]]; i = s; } } return top; };
+    while (heap.length) { const [d, cur] = pop(); if (done[cur]) continue; done[cur] = 1; const ci = cur % W, cj = (cur / W) | 0;
+      for (const [di, dj, w] of [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.414], [1, -1, 1.414], [-1, 1, 1.414], [-1, -1, 1.414]]) { const a = ci + di, b = cj + dj; if (a < 0 || b < 0 || a >= W || b >= H) continue; const k = b * W + a; if (g[k] || done[k] || (di && dj && (g[cj * W + a] || g[b * W + ci]))) continue; const nd = d + w; if (nd < F[k]) { F[k] = nd; push([nd, k]); } } }
+    Fs.set(goal, F); if (Fs.size > 48) Fs.delete(Fs.keys().next().value); return F;
   },
   steer(c, m, cmd, goal) {                                                 // the CPU wants to go somewhere: if a wall is in the way, find the way round
     if (!cmd || !(cmd.x || cmd.y) || !this.map(m)) return cmd; const d = Math.hypot(cmd.x, cmd.y) || 1, dx = cmd.x / d, dy = cmd.y / d, all = this.all(m);
-    const N = c.arNav || (c.arNav = {}), sp = Math.hypot(c.vx, c.vy); far = !goal || Math.hypot(goal.x - c.x, goal.y - c.y) > 2.5; N.slow = sp < 0.6 && far ? (N.slow || 0) + 1 / 60 : 0;   // stuck on a wall for a while: back off and find a new way
+    const N = c.arNav || (c.arNav = {}), sp = Math.hypot(c.vx, c.vy), far = !goal || Math.hypot(goal.x - c.x, goal.y - c.y) > 2.5; N.slow = sp < 0.6 && far ? (N.slow || 0) + 1 / 60 : 0;   // stuck on a wall for a while: back off and find a new way
     if (N.back > 0) { N.back -= 1 / 60; return { ...cmd, x: -dx + (N.side || 0.6) * -dy, y: -dy + (N.side || 0.6) * dx }; }
     if (N.slow > 1.4) { N.slow = 0; N.back = 0.6; N.side = Math.random() < 0.5 ? 1 : -1; N.path = null; return cmd; }
     const gx = goal ? goal.x : c.x + dx * 12, gy = goal ? goal.y : c.y + dy * 12;
     if (MG.clearPath(c.x, c.y, goal ? gx : c.x + dx * 3, goal ? gy : c.y + dy * 3, all, R_CART() * 0.9)) return cmd;
     const tx = Math.max(1, Math.min(m.width - 1, gx)), ty = Math.max(1, Math.min(m.height - 1, gy)), key = Math.round(tx / 3) + ',' + Math.round(ty / 3);
-    if (!N.path || m.simTime - N.at > 0.9 || N.key !== key) { N.path = this.route(m, c, tx, ty); N.at = m.simTime; N.key = key; }
+    if (!N.path || m.simTime - N.at > 0.9 || N.key !== key) { const np = this.route(m, c, tx, ty); if (np && np.length) N.path = np; else if (N.key !== key) N.path = null; N.at = m.simTime; N.key = key; }   /* (v14.3.12: no way found this time: keep the last one) */
     const P = N.path; if (!P || !P.length) return cmd; while (P.length > 1 && Math.hypot(P[0].x - c.x, P[0].y - c.y) < 0.9) P.shift();
     let wp = P[0]; for (let i = Math.min(P.length - 1, 8); i > 0; i--) if (MG.clearPath(c.x, c.y, P[i].x, P[i].y, all, 0.5)) { wp = P[i]; break; }
     return { ...cmd, x: wp.x - c.x, y: wp.y - c.y };

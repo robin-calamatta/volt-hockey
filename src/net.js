@@ -333,17 +333,19 @@ class HostSession {
     const se = this.cfg.season;                                    // a party season game: the season's length and each team's own skill
     this.match = makeMatch({ mini: this.cfg.mini || null, teamA: this.cfg.teamA, teamB: this.cfg.teamB, players, difficulty: this.cfg.difficulty, sizes: this.cfg.sizes, practice: this.cfg.practice, periodSeconds: se ? se.periodSeconds : undefined, diffBySide: se ? se.levels : undefined });
     this.match.sfxQueue = []; this.match.callQueue = []; this.state = 'playing'; this.snapAcc = 0; this.relist();
-    this.ghosts = new Map(); this.broadcast(this.startMsg = { t: 'start', cfg: this.cfg, rules: Settings.rules(), players: players.map(p => ({ id: p.id, name: p.name, side: p.side, tag: p.tag, look: p.look || ((this.roster.find(r => r.id === p.id) || {}).host ? Progress.look() : null) })) });
+    this.mid = (this.mid || 0) + 1; for (const e of this.entries.values()) { e.seq = 0; e.qq = 0; }   /* (v14.3.12: a new match counts inputs from 0 again: the old count made the host ignore every guest's input after PLAY AGAIN) */
+    this.ghosts = new Map(); this.broadcast(this.startMsg = { t: 'start', mid: this.mid, cfg: this.cfg, rules: Settings.rules(), players: players.map(p => ({ id: p.id, name: p.name, side: p.side, tag: p.tag, look: p.look || ((this.roster.find(r => r.id === p.id) || {}).host ? Progress.look() : null) })) });
     return this.match;
   }
   applyInput(entry, msg) {                                       // a player's stick and button events (plus those of their local guests, in msg.g)
     if (!entry.players || !this.match) return;
+    if (msg.mid !== undefined && msg.mid !== this.mid) return;   /* (input from the last match, still on its way) */
     if (!(msg.q > entry.seq)) return;
     if (Array.isArray(msg.s)) {                                   /* v14.3.11: [[q, seconds, [[id, x, y], ...]], ...] (the newest few) and events [[q, id, ev], ...] */
       const prev = entry.seq; entry.seq = msg.q;
-      for (const row of msg.s.slice(-6)) { if (!Array.isArray(row) || !(row[0] > (entry.qq || 0))) continue; entry.qq = row[0];
+      for (const row of msg.s.slice(-10)) { if (!Array.isArray(row) || !(row[0] > (entry.qq || 0))) continue; entry.qq = row[0];
         for (const st of (Array.isArray(row[2]) ? row[2] : []).slice(0, 1 + CONFIG.online.maxGuests)) { const p = entry.players.get(st[0]); if (p) InPlay.push(p, row[0], +st[1] || 0, +st[2] || 0, +row[1] || 0); } }
-      const evs = new Map(); for (const e of (Array.isArray(msg.e) ? msg.e : []).slice(0, 64)) { if (!Array.isArray(e) || !(e[0] > prev)) continue; const p = entry.players.get(e[1]); if (!p) continue; (evs.get(p) || evs.set(p, []).get(p)).push(e[2]); }
+      const evs = new Map(), SPN = { cw: 1, ccw: -1, hcw: 0.5, hccw: -0.5 }; for (const e of (Array.isArray(msg.e) ? msg.e : []).slice(0, 64)) { if (!Array.isArray(e) || !(e[0] > prev)) continue; const p = entry.players.get(e[1]); if (!p) continue; if (SPN[e[2]] && !this.match.mini && InPlay.spin(p, e[0], SPN[e[2]])) continue; (evs.get(p) || evs.set(p, []).get(p)).push(e[2]); }
       for (const [p, ev] of evs) this.applyTo(p, null, null, ev);
       return;
     }
@@ -395,8 +397,11 @@ class HostSession {
   sendSnapshots() { const snap = this.snapshot();
     for (const e of this.entries.values()) { if (!e.id) continue; const bl = e.conn.backlog ? e.conn.backlog() : 0;
       if (bl > 64000) { e.skipped = (e.skipped || 0) + 1; const P = e.pend || (e.pend = { sf: [], cm: [], em: [] }); P.sf.push(...(snap.sf || [])); P.cm.push(...(snap.cm || [])); P.em.push(...(snap.em || [])); continue; }
-      let out = { ...snap, a: InPlay.ack(e) }; if (e.pend) { out.sf = e.pend.sf.concat(snap.sf || []).slice(-60); out.cm = e.pend.cm.concat(snap.cm || []).slice(-20); const em = e.pend.em.concat(snap.em || []); out.em = em.length ? em.slice(-20) : undefined; e.pend = null; }
-      if (this.match && this.match.kind !== 'br' && e.conn.fastOpen && e.conn.fastOpen()) {
+      let out = { ...snap, a: InPlay.ack(e), af: InPlay.part(e) || undefined }; if (e.pend) { out.sf = e.pend.sf.concat(snap.sf || []).slice(-60); out.cm = e.pend.cm.concat(snap.cm || []).slice(-20); const em = e.pend.em.concat(snap.em || []); out.em = em.length ? em.slice(-20) : undefined; e.pend = null; }
+      /* v14.3.12 Volt Royale on the fast lane too: most of its snapshots only hold what changed since the last full one, so a lost one is
+         made up by the next. The ones that must arrive still go the reliable way: the full cart state (every 15th), new loot, doors, the loot list */
+      const G2 = out.mg || {}, mustArrive = this.match && this.match.kind === 'br' && !!(G2.csk || (G2.lp && ((G2.lp.f && G2.lp.f.length) || G2.lp.ids)) || (G2.gs && (G2.gs.dr || G2.gs.dh)));
+      if (this.match && !mustArrive && e.conn.fastOpen && e.conn.fastOpen()) {
         if (e.conn.fastBacklog() > 32000) { e.skipped = (e.skipped || 0) + 1; const P = e.pend || (e.pend = { sf: [], cm: [], em: [] }); P.sf.push(...(out.sf || [])); P.cm.push(...(out.cm || [])); P.em.push(...(out.em || [])); continue; }
         if ((out.sf && out.sf.length) || (out.cm && out.cm.length) || (out.em && out.em.length)) e.conn.send({ t: 'fx', sf: out.sf, cm: out.cm, em: out.em });   // (these happen once: they must arrive)
         e.conn.sendFast({ ...out, sf: [], cm: [], em: undefined });
@@ -537,9 +542,14 @@ class ClientSim {
       /* v14.3.11: each message has the stick for the time since the last one (and how long that was), the last few of those again
          (in case one is lost on the way), and every button event the host hasn't confirmed yet */
       this.sendAcc %= 1 / C.inputHz; this.seq++; const q = this.seq;
-      this.inHist.push([q, Math.round(this.dAcc * 1e4) / 1e4, this.locals.map(L => [L.id, r3(L.in.ax), r3(L.in.ay)])]); this.dAcc = 0; if (this.inHist.length > 4) this.inHist.shift();
+      this.inHist.push([q, Math.round(this.dAcc * 1e4) / 1e4, this.locals.map(L => [L.id, r3(L.in.ax), r3(L.in.ay)])]); this.dAcc = 0; if (this.inHist.length > 8) this.inHist.shift();
+      /* v14.3.12: the host plays one stick for the whole message (the one sent) and a spin at its start: our prediction does exactly the
+         same for these frames (on a 120 / 144 Hz screen a message covers two or three frames, each with its own stick) */
+      for (const L of this.locals) { const ax = r3(L.in.ax), ay = r3(L.in.ay), mm = Math.hypot(ax, ay), gx = mm > 1 ? ax / mm : ax, gy = mm > 1 ? ay / mm : ay; let sp = 0, first = null;
+        for (const f of L.frames) if (f.seq === q - 1) { f.ax = gx; f.ay = gy; if (f.spin) sp = f.spin; f.spin = 0; if (!first) first = f; }
+        if (first && sp) first.spin = sp; }
       for (const L of this.locals) for (const ev of L.pending.splice(0)) this.evOut.push([q, L.id, ev]); if (this.evOut.length > 64) this.evOut.splice(0, this.evOut.length - 64);
-      this.s.sendIn({ t: 'in', q, s: this.inHist, e: this.evOut.length ? this.evOut : undefined });
+      this.s.sendIn({ t: 'in', mid: this.mid, q, s: this.inHist, e: this.evOut.length ? this.evOut : undefined });
     }
     this.render(dt);
   }
@@ -564,7 +574,7 @@ class ClientSim {
           const t0 = lists[k][0].t - lists[k][0].dt, last = [...L.spins].reverse().find(q => q.t <= t0);
           if (last) { const el = t0 - last.t; me.spinCooldown = Math.max(0, W.cooldown - el); me.spinLeft = Math.max(0, W.seconds * (last.amt || 1) - el); me.spinOmega = last.dir * (W.degrees * Math.PI / 180) / W.seconds; }
         });
-        let acc = 0;
+        let acc = -(S.af || 0);   /* (v14.3.12: the host has already played this much of the first one) */
         for (let i = 0; i < n; i++) {
           acc += lists[0][i].dt; let first = true;
           while (acc >= h) {
@@ -623,8 +633,20 @@ class ClientSim {
 }
 
 /* v14.3.1: a host whose phone screen turns off (or who switches apps) stops running the game: tell the guests why it froze */
-if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { const S = typeof Online !== 'undefined' && Online.current; if (!S || !(S instanceof HostSession) || !S.entries) return;
-  for (const e of S.entries.values()) { if (!document.hidden) e.lastSeen = performance.now() + 5000; try { e.conn && e.conn.send({ t: 'away', on: document.hidden }); } catch (x) { /* gone */ } } });   /* (back: nobody is dropped for the time the host was away) */
+/* v14.3.12 a host on a computer that switches to another tab keeps the game running. The browser stops drawing a hidden tab (and the
+   game loop with it), so everyone else's game froze or crawled. Now a little background ticker (a Web Worker: the browser doesn't slow
+   those down) runs the game without drawing it, 60 times a second, while the tab is hidden. A phone that turns its screen off stops
+   everything, workers too: there the guests are still told the host has gone, as before. */
+const HostAwake = {
+  w: null, last: 0,
+  start() { if (this.w) return; try { this.w = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 16)'], { type: 'text/javascript' }))); this.last = performance.now(); this.w.onmessage = () => this.tick(); } catch (e) { this.w = null; } return !!this.w; },
+  tick() { if (!document.hidden) return this.stop(); const now = performance.now(), d = Math.min(100, now - this.last); this.last = now; try { voltGame.headlessStep(now, d); } catch (e) { /* keep going */ } },
+  stop() { if (!this.w) return; this.w.terminate(); this.w = null; try { voltGame.loop.resetDelta(); } catch (e) { /* fine */ } }
+};
+if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { const S = typeof Online !== 'undefined' && Online.current; if (!S || !(S instanceof HostSession) || !S.entries) { HostAwake.stop(); return; }
+  if (document.hidden && !(typeof isMobileDevice === 'function' && isMobileDevice()) && HostAwake.start()) return;   // (kept running: nobody needs telling)
+  if (!document.hidden) { HostAwake.stop(); if (!S.toldAway) return; } S.toldAway = document.hidden;
+  for (const e of S.entries.values()) { if (!document.hidden) e.lastSeen = performance.now() + 5000; try { e.conn && e.conn.send({ t: 'away', on: document.hidden }); } catch (x) { /* gone */ } } });
 
 /* v14.3.11 InPlay: a remote player's stick, played out at a steady pace on the host. Messages arrive bunched up or spread out (that's
    the internet), and the host used to apply each one the moment it came in, for however long it happened to last until the next. The
@@ -632,14 +654,26 @@ if (typeof document !== 'undefined') document.addEventListener('visibilitychange
    was corrected all the time. Now each input lasts as long as it did for the guest. A small cushion absorbs the bunching; if it grows
    (after a hiccup) it's played a little faster until it's back to normal, and if it runs dry the last stick is held. */
 const InPlay = {
-  push(p, q, x, y, d) { const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; } const Q = p.inq || (p.inq = []); Q.push({ q, x, y, d: Math.max(0.001, Math.min(0.1, d || 1 / 60)) }); if (Q.length > 24) Q.splice(0, Q.length - 6); },
+  /* v14.3.12: each input is played for exactly as long as it lasted on the guest's screen, never sped up or slowed down (the old way
+     played them up to twice as fast to catch up after a hiccup, so the guest's cart did something slightly different on the host than on
+     their own screen: a correction, which looked like lag, every time the connection or the host's frame rate wobbled). If the inputs run
+     out, the last stick is held, and the cushion is left bigger from then on (it absorbs the next wobble). Only a cushion that has stayed
+     big for a while is drained, very gently (a few percent), and a spin starts exactly where it did on the guest's screen. */
+  push(p, q, x, y, d) { const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; } const Q = p.inq || (p.inq = []); Q.push({ q, x, y, d: Math.max(0.001, Math.min(0.1, d || 1 / 60)), u: 0 }); if (Q.length > 40) { const drop = Q.splice(0, Q.length - 12); p.ackQ = drop[drop.length - 1].q; } },
+  spin(p, q, v) { const it = p.inq && p.inq.find(i => i.q === q); if (it && !it.u && it !== p.inCur) { it.spin = v; return true; } return false; },
   step(m, h) {
-    for (const p of m.players) { const Q = p.inq; if (!Q || !Q.length || !p.remote) continue;
-      let left = 0; for (const it of Q) left += it.d;
-      const rate = left > 0.25 ? 2 : left > 0.1 ? 1.2 : left < 0.035 ? 0.85 : 1;   // (the cushion: about 4 to 10 hundredths of a second)
-      let t = h * rate; while (Q.length && t > 0) { const it = Q[0]; p.src.ax = it.x; p.src.ay = it.y; const u = Math.min(t, it.d); it.d -= u; t -= u; if (it.d <= 1e-6) { p.ackQ = it.q; Q.shift(); } }
+    for (const p of m.players) { const Q = p.inq; if (!Q || !p.remote) continue;
+      let left = 0; for (const it of Q) left += it.d - it.u;
+      /* the smallest the cushion has been over the last 2 seconds: if even that is over 7 hundredths of a second, drain it a little */
+      const now = m.simTime || 0; if (left < (p.inMin === undefined ? 1 : p.inMin)) p.inMin = left; if (now - (p.inMinAt || 0) > 2) { p.inMinWas = p.inMin; p.inMin = left; p.inMinAt = now; }
+      const rate = (p.inMinWas || 0) > 0.07 && left > 0.05 ? 1.04 : 1;
+      let t = h * rate;
+      while (Q.length && t > 1e-9) { const it = Q[0]; if (!it.u) { p.src.ax = it.x; p.src.ay = it.y; if (it.spin) { p.spinQueued = it.spin; it.spin = 0; } p.inCur = it; }
+        const u = Math.min(t, it.d - it.u); it.u += u; t -= u; if (it.d - it.u <= 1e-6) { p.ackQ = it.q; Q.shift(); p.inCur = null; } }
     }
   },
+  /* how much of the next input the host has already played (seconds): the guest's prediction starts that far into it */
+  part(e) { const p = e.players && e.players.get(e.id); return p && p.inq && p.inq[0] && p.inq[0].u ? Math.round(p.inq[0].u * 1e4) / 1e4 : 0; },
   ack(e) { const p = e.players && e.players.get(e.id); return p && p.ackQ !== undefined ? p.ackQ : e.seq; }
 };
 { const sp = Match.prototype.savePrev; Match.prototype.savePrev = function () { if (!this.remote && this.players) InPlay.step(this, 1 / (this.kind === 'br' ? 120 : CONFIG.physics.hz)); return sp.call(this); }; }   // (savePrev runs once before every physics step)

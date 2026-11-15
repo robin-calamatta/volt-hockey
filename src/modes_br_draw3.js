@@ -79,7 +79,13 @@ Object.assign(BR_COLS, { seat: 0x2f5fa8, stone: 0x9a948a, hangar: 0xc8ced4, silo
         hinge.add(panel, knob); hinge.position.set(d.horiz ? d.x0 + 0.04 : d.cx, 0, d.horiz ? d.cy : d.y0 + 0.04); grp.add(hinge); panel.castShadow = true; this.scene.add(grp);
         return { d, grp, hinge, panel, a: 0 }; }); }
     if (this.doorG) for (const D of this.doorG) { const s = g.dr ? g.dr[D.d.door] : 0, want = s === 1 ? (D.d.horiz ? -D.d.inY : D.d.inX) * 1.55 : 0; D.a += (want - D.a) * (1 - Math.exp(-dt * 9)); D.hinge.rotation.y = D.a; D.grp.visible = s !== 2;
-      const hp = g.dh ? g.dh[D.d.door] / BR_DOOR.hp : 1; D.panel.material.color.setHex(hp > 0.66 ? 0x7a4f2c : hp > 0.33 ? 0x6a4122 : 0x553318); }
+      const hp = g.dh ? g.dh[D.d.door] / BR_DOOR.hp : 1; D.panel.material.color.setHex(hp > 0.66 ? 0x7a4f2c : hp > 0.33 ? 0x6a4122 : 0x553318);
+      /* v14.3.12 a health bar over a door being bashed or shot: shows for 8 seconds after each hit, green to red */
+      if (hp !== D.hp0) { if (D.hp0 !== undefined && hp < D.hp0) D.hitT = t; D.hp0 = hp; if (D.bar) this.doorBarDraw(D, hp); }
+      const showBar = hp > 0 && hp < 1 && s !== 2 && D.hitT !== undefined && t - D.hitT < 8;
+      if (showBar && !D.bar) { const cv = G3.canvas(128, 20), tx = new THREE.CanvasTexture(cv); D.bar = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, depthTest: false, transparent: true })); D.bar.userData.cv = cv; D.bar.renderOrder = 5;
+        D.bar.position.set(D.d.cx === undefined ? D.d.x0 + D.d.len / 2 : D.d.cx, 2.55, D.d.cy === undefined ? D.d.y0 + D.d.len / 2 : D.d.cy); D.bar.scale.set(1.3, 0.2, 1); this.scene.add(D.bar); this.doorBarDraw(D, hp); }
+      if (D.bar) { D.bar.visible = showBar && D.grp.visible !== false; if (D.bar.visible) D.bar.material.opacity = Math.min(1, (8 - (t - D.hitT)) / 1.5); } }
     /* splinters, bubbles, damage numbers live in the world */
     const objs = g.objs || []; this.fx3 = this.fx3 || new Map(); const seen = new Set();
     for (const o of objs) {
@@ -202,3 +208,11 @@ Object.assign(BR_COLS, { seat: 0x2f5fa8, stone: 0x9a948a, hangar: 0xc8ced4, silo
     this.resultHint = hintT; this.result = items; this.events.once('shutdown', () => { this.result = null; this.resultHint = null; this.overAt = undefined; });
   };
 }
+
+/* v14.3.12 the door health bar's picture */
+View3D.prototype.doorBarDraw = function (D, hp) {
+  const cv = D.bar.userData.cv, c = cv.getContext('2d'), k = Math.max(0, Math.min(1, hp));
+  c.clearRect(0, 0, 128, 20); c.fillStyle = 'rgba(5,7,15,0.85)'; c.fillRect(0, 0, 128, 20);
+  c.fillStyle = k > 0.6 ? '#5fe07a' : k > 0.3 ? '#ffd23f' : '#ff4a3d'; c.fillRect(3, 3, 122 * k, 14);
+  c.strokeStyle = '#ffffff'; c.lineWidth = 2; c.strokeRect(1, 1, 126, 18); D.bar.material.map.needsUpdate = true;
+};

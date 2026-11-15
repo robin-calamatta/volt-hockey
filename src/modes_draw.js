@@ -80,7 +80,7 @@ Object.assign(View3D.prototype, {
     }
     if (k === 'ctf') {
       this.flags = [0, 1].map(s => { const col = TEAMS[m.teams[s]].color, B = g.base[s];
-        flat(new THREE.RingGeometry(1.35, 1.6, 40), this.modeMat(col, { basic: true }), B.x, B.y); flat(new THREE.CircleGeometry(1.35, 40), this.modeMat(col, { basic: true, op: 0.18 }), B.x, B.y);
+        const bR = flat(new THREE.RingGeometry(1.35, 1.6, 40), this.modeMat(col, { basic: true }), B.x, B.y), bD = flat(new THREE.CircleGeometry(1.35, 40), this.modeMat(col, { basic: true, op: 0.18 }), B.x, B.y); (this.ctfBase || (this.ctfBase = []))[s] = [bR, bD];
         const f = new THREE.Group(), pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1.7, 8), this.mat(0xdddddd, { metal: 0.5 })); pole.position.y = 0.85;
         const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.48), new THREE.MeshStandardMaterial({ color: col, side: THREE.DoubleSide, emissive: col, emissiveIntensity: 0.25 })); cloth.position.set(0.38, 1.45, 0);
         f.add(pole, cloth); f.traverse(x => { if (x.isMesh) x.castShadow = true; }); add(f); f.userData.cloth = cloth; return f; });
@@ -145,6 +145,7 @@ Object.assign(View3D.prototype, {
     if (k === 'hill' && g.zones && this.hills) g.zones.forEach((Z, i) => { const H = this.hills[i], hot = Z.over > 0, col = hot && Math.sin(t * 20) > 0 ? 0xffffff : Z.crowd > 1 ? 0xff4d4d : Z.king >= 0 ? 0x7dff6a : 0xffd23f; for (const x of [H.disc, H.ring]) { x.position.x = Z.x; x.position.z = Z.y; x.scale.set(Z.r, 1, Z.r); x.material.color.setHex(col); } H.disc.material.opacity = 0.2 + 0.1 * Math.sin(t * 4); });
     if (k === 'sumo' && g.R) { this.sumoTop.scale.set(g.R, 1, g.R); this.sumoRim.scale.set(g.R, 1, g.R); }
     if (k === 'lava' && g.t) { this.lavaMats[1].opacity = 0.35 + 0.35 * Math.abs(Math.sin(t * 9)); this.lavaMats[2].emissiveIntensity = 0.7 + 0.25 * Math.sin(t * 3); this.lavaTiles.forEach((p, i) => { const s = g.t[i]; p.visible = s !== '0'; if (s !== '0') p.material = this.lavaMats[s]; }); }
+    if (k === 'ctf' && g.base && this.ctfBase) g.base.forEach((B, s) => { for (const q of this.ctfBase[s] || []) q.position.set(B.x, q.position.y, B.y); });   /* (v14.3.12: the base moves) */
     if (k === 'ctf' && g.flag) g.flag.forEach((f, s) => { const fl = this.flags[s]; fl.position.set(f.x, f.car >= 0 ? 0.55 : 0, f.y); fl.userData.cloth.rotation.y = Math.sin(t * 3 + s) * 0.35; });
     if (k === 'golf' && this.golfFlag) this.golfFlag.rotation.y = Math.sin(t * 2) * 0.3;
     if (k === 'slalom' && g.gates) { const c = me || m.chairs[0], q = g.gates[(c.gs.g || 0) % g.gates.length]; this.gateGlow.visible = !c.gs.done; this.gateGlow.position.set(q.x, 0.02, q.y); this.gateGlow.material.opacity = 0.5 + 0.4 * Math.sin(t * 6);
@@ -217,6 +218,8 @@ Object.assign(GameScene.prototype, {
       else if (o.t === 'pbammo') g.fillStyle(0x2e7d32, 1).fillRect(o.x - 0.28, o.y - 0.28, 0.56, 0.56).fillStyle(0xffd23f, 1).fillCircle(o.x, o.y, 0.12);
       else if (o.t === 'pbpow') g.fillStyle(o.kind === 'shield' ? 0x3dd6ff : 0xffd23f, 0.3).fillCircle(o.x, o.y, 0.45).fillStyle(o.kind === 'shield' ? 0x3dd6ff : 0xffd23f, 1).fillCircle(o.x, o.y, 0.22);
       else if (o.t === 'boom') { const k2 = 1 - o.life / 0.7; g.fillStyle(o.lava ? 0xff3b1c : 0xffa31c, 0.7 * (1 - k2)).fillCircle(o.x, o.y, 0.4 + k2 * 3); }
+      else if (o.t === 'akp') g.fillStyle(0x000000, 0.3).fillCircle(o.x + 0.12, o.y + 0.15, o.r).fillStyle(0x2f6fed, 1).fillCircle(o.x, o.y, o.r).lineStyle(0.07, 0xf4f4f2, 1).strokeCircle(o.x, o.y, o.r * 0.82).fillStyle(0xffd23f, 1).fillCircle(o.x, o.y, o.r * 0.55);   /* (v14.3.12: the arena towers and bumpers on the flat view too) */
+      else if (o.t === 'akb') { const hot = o.hit !== undefined && m.simTime - o.hit < 0.25; g.fillStyle(0x000000, 0.3).fillCircle(o.x + 0.08, o.y + 0.1, o.r).fillStyle(0xff3fd2, 1).fillCircle(o.x, o.y, o.r * (hot ? 1.08 : 1)).lineStyle(0.06, 0xd0d4d8, 1).strokeCircle(o.x, o.y, o.r).fillStyle(hot ? 0xffe27a : 0xffffff, 1).fillCircle(o.x, o.y, o.r * 0.6); }
       else if (o.t === 'pkg') g.fillStyle(HOUSE_COLS[o.to % HOUSE_COLS.length], 1).fillRect(o.x - 0.22, o.y - 0.22, 0.44, 0.44).lineStyle(0.05, 0x6b4a2b, 1).strokeRect(o.x - 0.22, o.y - 0.22, 0.44, 0.44);
     }
     for (const c of m.chairs) {

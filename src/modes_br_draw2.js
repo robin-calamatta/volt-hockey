@@ -71,10 +71,10 @@ Object.assign(GameScene.prototype, {
     this.textures.addCanvas(key, cv); return key;
   },
   brTeamPanel(m, me, watching) {                                           // bottom left: you and your team-mates (face, name, health, armour), above the speed meter
-    const V = CONFIG.view, sq = m.mini.squad || 1; if (!this.brT || !this.brT.g.scene) this.brT = { g: this.add.graphics().setDepth(30), rows: Array.from({ length: 3 }, () => ({ face: this.add.image(0, 0, '__WHITE').setDepth(31).setDisplaySize(30, 30), name: this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '15px', fontStyle: 'bold', color: '#ffffff' }).setDepth(31).setOrigin(0, 0.5), st: this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '13px', fontStyle: 'bold', color: '#ffd23f' }).setDepth(31).setOrigin(1, 0.5) })) };
+    const V = CONFIG.view, sq = m.mini.squad || 1; if (!this.brT || !this.brT.g.scene) this.brT = { g: this.add.graphics().setDepth(30), rows: Array.from({ length: 5 }, () => ({ face: this.add.image(0, 0, '__WHITE').setDepth(31).setDisplaySize(30, 30), name: this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '15px', fontStyle: 'bold', color: '#ffffff' }).setDepth(31).setOrigin(0, 0.5), st: this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '13px', fontStyle: 'bold', color: '#ffd23f' }).setDepth(31).setOrigin(1, 0.5) })) };
     const T = this.brT, g = T.g; g.clear(); const team = me ? m.chairs.filter(c => c.gs.team === me.gs.team).sort((a, b) => (a === me ? -1 : b === me ? 1 : a.k - b.k)) : [];
     T.rows.forEach((r, i) => { const c = team[i], show = c && (sq > 1 || c === me) && m.state !== 'over'; [r.face, r.name, r.st].forEach(o => o.setVisible(!!show)); if (!show) return;
-      const G = c.gs, w = 218, x = 14, y = V.height - 104 - (team.length - 1 - i) * 38 - 44, isW = watching === c;
+      const G = c.gs, w = 218, x = 14, y = V.height - 104 - (Math.min(5, team.length) - 1 - i) * 38 - 44, isW = watching === c;   /* (v14.3.12: room for all five in Fives: it only had three rows) */
       g.fillStyle(isW ? 0x2a3a48 : 0x0d151b, c.out ? 0.45 : 0.78).fillRoundedRect(x, y - 16, w, 34, 8); if (isW) g.lineStyle(2, 0xffd23f, 1).strokeRoundedRect(x, y - 16, w, 34, 8);
       r.face.setTexture(this.brFaceKey(c)).setDisplaySize(28, 28).setPosition(x + 18, y + 1).setAlpha(c.out ? 0.4 : 1);
       r.name.setText((c === me ? 'YOU' : (MG.pname(c) || m.name(c))).slice(0, 12)).setPosition(x + 36, y - 6).setColor(c.out ? '#7d8a96' : c === me ? '#ffd23f' : '#ffffff');

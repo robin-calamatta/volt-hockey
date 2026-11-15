@@ -172,7 +172,7 @@ class RoomScene extends ListMenuScene {
       this.session.open().then(() => { this.opening = false; }).catch(e => this.fail(e));
     }
     const cycle = (key, d) => { const cfg = this.session.cfg, other = key === 'teamA' ? cfg.teamB : cfg.teamA; let i = cfg[key]; do { i = (i + d + TEAMS.length) % TEAMS.length; } while (i === other); this.session.setConfig({ [key]: i }); };
-    const size = (side, d) => { const sizes = [...this.session.cfg.sizes]; sizes[side] = clamp(sizes[side] + d, 1, CONFIG.match.chairsPerTeam); this.session.setConfig({ sizes }); };
+    const size = (side, d) => { const sizes = [...this.session.cfg.sizes]; sizes[side] = clamp(sizes[side] + d, 1, CONFIG.match.maxPerSide); this.session.setConfig({ sizes }); };
     const names = Object.keys(CONFIG.difficulties), me = () => this.session.roster.find(r => r.id === this.session.myId);
     const flip = () => { const side = me() ? 1 - me().side : 0; if (host) this.session.setSide(1, side); else this.session.setSide(side); };
     const cfg = () => this.session.cfg, teamName = i => TEAMS[i].name;
@@ -244,7 +244,7 @@ class RoomScene extends ListMenuScene {
     const s = this.session; Settings.applyRules(msg.rules || {});
     const players = msg.players.map(p => ({ id: p.id, name: p.name, side: p.side, tag: p.tag, speedLevel: Settings.speedLevel, chair: null, spinQueued: 0, look: p.id === s.myId ? null : Avatar.cleanLook(p.look) }));
     const match = makeMatch({ mini: msg.cfg.mini || null, teamA: msg.cfg.teamA, teamB: msg.cfg.teamB, players, difficulty: msg.cfg.difficulty, sizes: msg.cfg.sizes, practice: msg.cfg.practice, remote: true, periodSeconds: msg.cfg.season ? msg.cfg.season.periodSeconds : undefined });
-    this.scene.start('Game', { online: { role: 'client', session: s, match, players, sim: new ClientSim(s, match, players) } });
+    this.scene.start('Game', { online: { role: 'client', session: s, match, players, sim: Object.assign(new ClientSim(s, match, players), { mid: msg.mid }) } });
   }
   exit(message) {                                             // close or leave the room and go back to the Online menu (a party leader's own game: back where it was started)
     Settings.restoreRules(); Controls.claimed.clear();

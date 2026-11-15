@@ -12,10 +12,10 @@ const PlayWhere = {
     mini: { name: 'MINIGAME MIX', sub: 'A different minigame each match, with up to 8 players online.', icon: '🎲' },
     online: { name: 'PRIVATE ROOM', sub: 'Make a room for your friends (share its code), or join one.', icon: '🔑' } },
   QUEUED: ['br', 'hockey', 'mini'],
-  online() { return Settings.playOnline !== false; },
-  set(on) { if (this.online() === !!on) return; Settings.playOnline = !!on; Settings.save(); this.apply(); Sound.play('select'); },
+  online() { return Settings.playOnline === true && GameCfg.online !== false; },   /* (v14.3.12: THIS SCREEN unless you switch; never when the admin has turned online play off) */
+  set(on) { if (on && GameCfg.online === false) { Sound.play('back'); Toasts.show('Online play is turned off right now. Play on 🏠 THIS SCREEN.', [], 3500); return; } if (this.online() === !!on) return; Settings.playOnline = !!on; Settings.save(); this.apply(); Sound.play('select'); },
   init() {
-    if (this.base) return; this.base = LOBBY_MODES.slice(); if (typeof BR_LOBBY_MODE !== 'undefined' && !this.base.includes(BR_LOBBY_MODE)) this.base.push(BR_LOBBY_MODE);
+    if (this.base) return; Settings.playOnline = false;   /* v14.3.12: the game opens on THIS SCREEN every time */ this.base = LOBBY_MODES.slice(); if (typeof BR_LOBBY_MODE !== 'undefined' && !this.base.includes(BR_LOBBY_MODE)) this.base.push(BR_LOBBY_MODE);
     for (const M of this.base) { M.local = { name: M.name, sub: M.sub, icon: M.icon, opts: M.opts }; const g = M.go;
       if (this.QUEUED.includes(M.id)) M.go = sc => this.online() ? this.queue(sc, M.id) : g(sc); }
   },
@@ -25,6 +25,12 @@ const PlayWhere = {
     if (typeof brSync === 'function') brSync();                              // (Volt Royale only for 16 and over)
     for (const M of this.base) Object.assign(M, M.local, on ? this.ONLINE[M.id] || {} : {}, on && M.id === 'mini' ? { opts: undefined } : {});
     if (!LOBBY_MODES.some(m => m.id === Settings.lobbyMode)) Settings.lobbyMode = LOBBY_MODES[0].id;
+    /* v14.3.12 X (options) does something on every game card. It used to on only two, and nothing came up on the rest */
+    const rules = sc => sc.scene.start('SettingsPage', { page: 'Game rules', ctx: {} });
+    const X = { hockey: on ? rules : sc => sc.scene.start('Setup', { practice: false }), practice: sc => sc.scene.start('Setup', { practice: true }), season: rules,
+      mini: on ? () => Toasts.show('The MINIGAME MIX has no options: each match picks a different minigame. To pick one and set its options, switch the game card to 🏠 THIS SCREEN.', [], 5000) : null,
+      online: sc => sc.scene.start('JoinCode') };
+    for (const M of this.base) if (X[M.id] && (!M.local.opts || (on && M.id !== 'br'))) M.opts = X[M.id];
   },
   queue(sc, id) {
     if (typeof memberWaits === 'function' && memberWaits()) return;
@@ -44,7 +50,7 @@ const PlayWhere = {
   P.create = function (...a) { PlayWhere.apply(); return cr.apply(this, a); };
   /* the switch: two boxed halves across the top of the game card */
   P.drawPlay = function (...a) {
-    const r = dp.apply(this, a); if (Party.role === 'member') return r;
+    const r = dp.apply(this, a); if (Party.role === 'member' || GameCfg.online === false) return r;
     const x = 28, y = 478, w = 430, on = PlayWhere.online(), hw = 150, top = y - 46;
     this.box(x, top, hw * 2 + 8, 40, 0x05070f, 0.85, 0x2d5068, 11);
     [['🌐  ONLINE', true], ['🏠  THIS SCREEN', false]].forEach(([label, v], i) => { const bx = x + 4 + i * (hw + 4), sel = on === v;
@@ -104,4 +110,12 @@ const lobbyTouchy = () => (window.matchMedia && matchMedia('(pointer: coarse)').
 }
 { const P = LobbyHomeScene.prototype, up = P.update;
   P.update = function (...a) { const r = up.apply(this, a); if (this.overlay === 'modes' && this.modesC && this.modesC.active && lobbyTouchy()) this.modesC.y -= 56; return r; };   /* (the games menu too) */
+}
+
+/* v14.3.12 online play turned off in the admin page: the online screens send you back to the lobby (with a word why), and the lobby
+   redraws without the ONLINE switch as soon as the game hears about it */
+{ for (const C of [OnlineMenuScene, JoinCodeScene, RoomScene, BRQueueScene]) { const cr = C.prototype.create;
+    C.prototype.create = function (...a) { if (GameCfg.online === false) { this.offline = true; Toasts.show('Online play is turned off right now.', [], 3500); this.time.delayedCall(0, () => { try { if (typeof Online !== 'undefined' && Online.current) Online.leave && Online.leave(); } catch (e) { /* none */ } this.scene.start('Main'); }); return; } return cr.apply(this, a); };
+    const up = C.prototype.update; if (up) C.prototype.update = function (...a) { if (this.offline) return; return up.apply(this, a); }; }
+  const oc = GameCfg.onChange; GameCfg.onChange = function (...a) { if (oc) oc.apply(this, a); PlayWhere.apply(); const g = window.voltGame && voltGame.scene; if (g && g.isActive('Main')) { const sc = g.getScene('Main'); if (sc.redraw) sc.redraw(); } if (this.online === false && g && ['BRQueue', 'OnlineMenu', 'JoinCode'].some(k => g.isActive(k))) { Toasts.show('Online play was just turned off.', [], 3500); g.getScenes(true).forEach(s => g.stop(s.sys.settings.key)); g.start('Main'); } };
 }

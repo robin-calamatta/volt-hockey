@@ -130,7 +130,7 @@ const TeamSelect = {
   P.create = function () {
     const practice = this.practice, sizeOf = k => Settings[k], other = k => (k === 'sizeA' ? 'sizeB' : 'sizeA');
     const cartsFor = key => ({ get: () => sizeOf(key), set: d => { Settings.adjust(key, d); if (Settings[key] === 0 && Settings[other(key)] === 0) Settings.adjust(key, 1); } });   // (one team can be empty in practice, not both)
-    const toLobby = () => { const sizes = practice ? [Settings.sizeA, Settings.sizeB].map(n => Math.min(n, CONFIG.match.chairsPerTeam)) : [CONFIG.match.chairsPerTeam, CONFIG.match.chairsPerTeam];
+    const toLobby = () => { const sizes = practice ? [Settings.sizeA, Settings.sizeB].map(n => Math.min(n, CONFIG.match.maxPerSide)) : [CONFIG.match.chairsPerTeam, CONFIG.match.chairsPerTeam];
       partyGame(this, { teamA: Settings.teamA, teamB: Settings.teamB, difficulty: Settings.difficulty, practice, sizes }) || this.scene.start('Lobby', { practice, sizes }); };
     TeamSelect.build(this, {
       title: practice ? 'PRACTICE' : 'PLAY NOW', sub: practice ? 'Free play: no clock, any team sizes' : 'A full game against the CPU or your friends',
