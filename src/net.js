@@ -16,10 +16,21 @@ const randomCode = () => Array.from({ length: CONFIG.online.codeLength }, () => 
 const accountTag = () => ({ party: typeof Party !== 'undefined' && Party.active ? Party.id : '', psize: typeof Party !== 'undefined' && Party.active ? Party.members.length : 1, look: typeof Progress !== 'undefined' ? Progress.look() : null, acct: typeof Account !== 'undefined' ? Account.name : '', adult: typeof Account !== 'undefined' && Account.adult, vid: typeof Voice !== 'undefined' ? Voice.myId() : '', nf: !!Settings.mmNoFill });   /* nf: v14.3.1 no fill (public matches) */
 const cleanCode = text => String(text || '').toUpperCase().split('').filter(ch => CONFIG.online.codeAlphabet.includes(ch)).join('').slice(0, CONFIG.online.codeLength);
 
+/* v14.3.13 🌐 ONLINE or 📶 LAN. On LAN the game connections use no outside servers to find a way through (no STUN, no relay), so they only
+   go straight from device to device on the same network. Public rooms and matchmaking only show people on the same network (the server
+   tells each player a code for their network: their internet address, hashed, never the address itself). Finding a room by its code
+   still uses the usual introducer, and the room list too. Party and voice links are unchanged. */
+const NetMode = {
+  id: '', at: 0,
+  lan() { return typeof Settings !== 'undefined' && Settings.netLan === true && !(typeof GameCfg !== 'undefined' && (GameCfg.lan === false || GameCfg.online === false)); },
+  ice() { return this.lan() ? [] : CONFIG.online.iceServers; },
+  async load(force) { if (!force && this.id && performance.now() - this.at < 120000) return this.id; try { const r = await Account.req('GET', '/net'); if (r && typeof r.net === 'string') { this.id = r.net; this.at = performance.now(); } } catch (e) { /* no server: no network code */ } return this.id; },
+  name() { return this.lan() ? '📶 LAN' : '🌐 ONLINE'; }
+};
 /* ---- transport: a "connection" is { send(obj), close(), onMessage, onClose } ---- */
 class PeerTransport {
   static available() { return typeof Peer === 'function'; }
-  options() { return { ...CONFIG.online.peerServer, config: { iceServers: CONFIG.online.iceServers }, debug: 0 }; }
+  options() { return { ...CONFIG.online.peerServer, config: { iceServers: NetMode.ice() }, debug: 0 }; }   /* (v14.3.13: none on LAN) */
   wrap(conn, peer) {
     /* v14.2.13: a message over about 12 KB goes in pieces and is put back together at the other end. The data channel refuses anything much
        bigger ("message-too-big") and drops the connection: on the huge Volt Royale maps that dropped every guest as the game began */
@@ -82,7 +93,7 @@ function sanitizeRoom(r) {                                       // whatever arr
   const code = cleanCode(r.code); if (code.length !== CONFIG.online.codeLength) return null;
   const num = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(+v) || 0));
   return { code, name: cleanText(r.name, DIR().nameMax) || 'Volt room', host: cleanText(r.host, 20) || 'Player 1', players: num(r.players, 0, CONFIG.online.maxPlayers), max: num(r.max, 1, CONFIG.online.maxPlayers),
-    left: cleanText(r.left, 16), right: cleanText(r.right, 16), skill: cleanText(r.skill, 12), practice: !!r.practice, playing: !!r.playing, kind: cleanText(r.kind || '', 16), v: num(r.v, 0, 99) };
+    left: cleanText(r.left, 16), right: cleanText(r.right, 16), skill: cleanText(r.skill, 12), practice: !!r.practice, playing: !!r.playing, kind: cleanText(r.kind || '', 16), v: num(r.v, 0, 99), lan: cleanText(r.lan || '', 16).replace(/[^0-9a-fx]/g, '') };
 }
 
 class DirectoryPublisher {
@@ -157,6 +168,7 @@ function watchIce(conn, onFail, n = 0) {
 }
 // Human-readable text for the errors PeerJS (or we) can produce.
 function netErrorText(e) {
+  if (NetMode.lan() && e && ['ice', 'timeout'].includes(e.type || e.reason)) return 'Could not reach that room on your local network. Both devices need to be on the same network (the same Wi-Fi), and the room has to be a 📶 LAN room. To play over the internet, switch to 🌐 ONLINE.';   /* (v14.3.13) */
   const t = (e && (e.type || e.reason)) || 'unknown';
   return ({
     'rejoin-over': 'That game has finished, so there is nothing to rejoin.', 'peer-unavailable': 'Room not found. Check the code.', timeout: 'Could not reach the room (timed out). Check the code. If it is right, a router or firewall may be blocking the connection between the two computers.',
@@ -176,6 +188,7 @@ function netErrorText(e) {
    An input event string is one of: cw ccw up down sw  (spin clockwise / counter-clockwise, speed up / down, switch cart). */
 class HostSession {
   constructor(transport) {
+    this.lanRoom = NetMode.lan(); if (this.lanRoom) NetMode.load();   /* (v14.3.13: a LAN room) */
     this.transport = transport; this.code = null; this.myId = 1; this.state = 'lobby'; this.entries = new Map(); this.nextId = 2; this.match = null; this.guestSrc = new Map();      // guestSrc: the devices of this machine's local guests (id -> input source)
     this.cfg = { teamA: Settings.teamA, teamB: Settings.teamB, sizes: [CONFIG.match.chairsPerTeam, CONFIG.match.chairsPerTeam], difficulty: Settings.difficulty, practice: false };
     this.roster = [{ id: 1, name: Settings.myName() || 'Player 1', side: 0, mid: true, host: true, ...accountTag() }]; this.snapAcc = 0;   // accountTag: username, adult, voice id (for chat and voice rules) this.tickNo = 0; this.closed = false;
@@ -185,7 +198,7 @@ class HostSession {
   publicInfo() {                                                  // what the room list shows (null while private)
     if (this.visibility !== 'public' || !this.code || this.closed) return null;
     return { code: this.code, name: this.lobbyName, host: this.roster[0].name, players: this.roster.length, max: Math.min(CONFIG.online.maxPlayers, this.cfg.sizes[0] + this.cfg.sizes[1]),
-      left: TEAMS[this.cfg.teamA].name, right: TEAMS[this.cfg.teamB].name, skill: this.cfg.difficulty, practice: this.cfg.practice, playing: this.state !== 'lobby', kind: this.cfg.mini ? this.cfg.mini.kind : 'hockey', v: PROTOCOL };
+      left: TEAMS[this.cfg.teamA].name, right: TEAMS[this.cfg.teamB].name, skill: this.cfg.difficulty, practice: this.cfg.practice, playing: this.state !== 'lobby', kind: this.cfg.mini ? this.cfg.mini.kind : 'hockey', v: PROTOCOL, lan: this.lanRoom ? NetMode.id || 'x' : '' };   /* (lan: v14.3.13 the network code of a LAN room) */
   }
   setVisibility(v) {
     this.visibility = v === 'public' ? 'public' : 'private';

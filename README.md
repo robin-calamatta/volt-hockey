@@ -3,6 +3,83 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.3.15: website only (Google Play project removed); offline play and install-as-an-app stay
+
+- **Removed the Google Play / Android project from v14.3.14:** the `android/` folder, the GitHub build workflow (`.github/`) and `.well-known/assetlinks.json`, plus their Netlify settings. Nothing else needs them. No signing key or GitHub secrets are needed.
+- **Still in, from v14.3.14:**
+  - **Offline play:** after opening once with internet, the game also starts with no internet (🏠 THIS SCREEN games, practice, seasons, Volt Royale against CPUs, minigames, settings, the locker).
+  - **Install as an app:** in Chrome or Edge on a computer, or Chrome on an Android phone, the game installs with its own icon and window and plays offline. The game offers it in a notice, and in Settings > Controls and screen > ⚡ Install Volt Hockey as an app. On an iPhone, iPad or Mac, use Safari's Share > Add to Home Screen / Add to Dock.
+  - Account deletion (Friends > Delete account, or `delete-account.html`), and the `privacy.html` and `legal.html` pages.
+  - Phaser bundled in `lib/`, and the lobby quest-bar fix.
+- The privacy notice's app paragraph now describes the browser-installed app.
+
+**Deploy:** push to GitHub as usual (or deploy the whole zip). Netlify's build writes the offline file list. For a drag-and-drop upload, run `node tools/make-offline-list.js` first.
+
+## v14.3.14: Google Play (Android app), offline play, install as an app, account deletion
+
+**Deploy the whole zip:** the server changed (account deletion). Push it to GitHub as usual: Netlify's build also writes the new offline file list.
+
+### Android app for Google Play
+- New `android/` folder: the Android app, a Trusted Web Activity. It opens playvolthockey.netlify.app full-screen in Chrome, with no address bar.
+  - Everything works exactly as on the website, and with the same players: online, LAN, accounts, friends, voice and controllers.
+  - Every Netlify deploy updates the app at once.
+  - Package `com.rizeentertainment.volthockey`, landscape, immersive full-screen. Made from Google's Bubblewrap templates.
+- New `.github/workflows/android.yml`: GitHub builds the signed Play bundle (.aab) and a test APK. Click **Actions > Android app > Run workflow**. It needs two repository secrets, from the private key pack.
+- New `.well-known/assetlinks.json`: links the app to the website. You add Google's signing fingerprint here after the first upload (see `android/README.md`).
+- **`android/README.md` is the step-by-step guide** to building, the Play Console, testing and publishing.
+
+### Plays with no internet
+- New `sw.js` and `src/offline.js`. The first time the game opens with internet, it saves a copy of itself on the device. About 4 MB is saved up front; songs, commentary and the font are saved as they're used.
+- After that, the game opens with no internet: 🏠 THIS SCREEN games, practice, seasons, Volt Royale against CPUs, minigames, settings and the locker.
+- 🌐 ONLINE, 📶 LAN and accounts still need the internet. Going offline mid-game shows a notice.
+- With internet, every file comes fresh from the server first, so an update is never held back by the saved copy. The server (/api) and the admin page are never saved.
+- New `tools/make-offline-list.js` writes `offline-files.json`, the list of files to save. Netlify runs it on every deploy. Run it yourself before a drag-and-drop upload.
+- **Phaser is now bundled** (`lib/phaser.min.js`, 3.80.1) instead of loaded from a CDN, so the game also starts offline.
+
+### Install as an app (computer or phone)
+- On a computer (Chrome, Edge) or in Android Chrome, the game can be installed as an app: its own icon and window, no address bar, and offline play.
+  - When the browser allows it, a notice offers it once. It asks again a week after "Not now".
+  - Settings > Controls and screen > **⚡ Install Volt Hockey as an app**, at any time.
+  - Safari has no install button for websites. The row explains Share > Add to Home Screen (iPhone, iPad) or File > Add to Dock (Mac).
+- The web manifest has a maskable icon, a scope, an id and categories.
+
+### Delete your account (needed for Google Play)
+- **In the game:** Friends > **Delete account**. Your password, plus typing DELETE, confirms it.
+- **On the web:** `delete-account.html`. Sign in with your username or email and password, then type DELETE.
+- The server deletes:
+  - the account, its email and its leaderboard row;
+  - its private messages and its place in matchmaking;
+  - it from everyone's friends lists.
+
+  Reports about it are kept. The admin page's delete does the same.
+
+### Legal pages on the web
+- New `privacy.html` (the privacy notice on its own, for Google Play) and `legal.html` (all the documents). They come straight from `src/legal.js`, so there's one copy of the text.
+- The privacy notice adds:
+  - how to delete your account;
+  - what the Android app uses: the microphone for voice chat only, no location, no ads, no tracking.
+- `LEGAL.owner` is now **Rize Entertainment**. **Set `LEGAL.contact` to your email before publishing.**
+
+### Fixes
+- Lobby: a daily quest's progress bar no longer runs into its numbers (e.g. "0/1000").
+
+## v14.3.13: 📶 LAN play (local network), with an admin switch
+
+**Deploy the whole zip:** the server changed (the network check, LAN matchmaking and the admin switch).
+
+- **🌐 ONLINE or 📶 LAN.**
+  - The switch on the home screen's game card now has three choices: 🌐 ONLINE · 📶 LAN · 🏠 THIS SCREEN (◀ ▶, or tap one).
+  - The ONLINE menu has a matching **Network** row, and its title and Browse button say LAN when it's on.
+- **What LAN does:**
+  - Matchmaking (Volt Royale, hockey quick match, the minigame mix) only matches you with people on the same network.
+  - **Browse** only lists LAN rooms on your network. Over the internet, Browse no longer lists LAN rooms, which couldn't be reached from outside their network anyway.
+  - A room you create is a LAN room. Its connections go straight from device to device, with no STUN or relay servers.
+  - Joining by code still works on the same network. If the devices aren't on the same network, the message says so and suggests 🌐 ONLINE.
+  - Party and voice links are unchanged.
+- **How "the same network" is worked out:** the server hashes each player's internet address (as the server sees it) with a secret. The address itself never leaves the server. People on one Wi-Fi share an address, so they get the same code. For IPv6, the network's half of the address is used.
+- **Admin page (Game tab): "Local network (LAN) play".** On by default. Unticked, the 📶 LAN choice is hidden everywhere and the server refuses LAN matchmaking. Online play has to be on for either.
+- "Reset all settings" keeps your ONLINE / LAN choice.
+
 ## v14.3.12: smoother online play, PLAY AGAIN fixed, RIZE intro, admin settings, grenades, team colours, controller pointer
 
 **Deploy the whole zip:** the server changed (admin game settings, online Volt Royale player count). Everyone needs this version (network protocol 4); an older copy is told to reload.

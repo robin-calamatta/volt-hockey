@@ -69,7 +69,7 @@ const FriendsBar = {
     if (!this.modal) return; const keep = PadNav.current && this.modal.contains(PadNav.current) ? PadNav.current.dataset.key : null, old = this.modal.querySelector('.bd'), scroll = old ? old.scrollTop : 0;
     const S = Social.data, B = (...a) => this.btn(...a), parts = [];
     if (Account.loggedIn) {
-      parts.push(`<div class="r"><span class="n">${esc(Account.name)}<span class="s">${Account.user.email ? 'Email ' + esc(Account.user.email) : 'No email yet: add one so you can reset your password'}${Account.adult ? '' : ' · under 18: chat with friends only'}</span></span>${B('email', Account.user.email ? 'Change email' : 'Add email', '', Account.user.email ? '' : 'go')}${B('logout', 'Log out')}</div>`);
+      parts.push(`<div class="r"><span class="n">${esc(Account.name)}<span class="s">${Account.user.email ? 'Email ' + esc(Account.user.email) : 'No email yet: add one so you can reset your password'}${Account.adult ? '' : ' · under 18: chat with friends only'}</span></span>${B('email', Account.user.email ? 'Change email' : 'Add email', '', Account.user.email ? '' : 'go')}${B('logout', 'Log out')}${B('delacc', 'Delete account')}</div>`);
       parts.push(`<div class="r">${B('add', '＋ Add a friend', '', 'go')}${B('board', '🏆 Leaderboard')}</div>`);
       parts.push('<h4>Party</h4>');
       if (!Party.active) parts.push(`<div class="r"><span class="n">Not in a party<span class="s">Friends in your party follow you into every game you start, and talk on voice the whole time.</span></span>${B('pstart', 'Start a party', '', 'go')}</div>`);
@@ -104,7 +104,7 @@ const FriendsBar = {
   },
   async act(a, who) {
     const close = () => this.toggle(false);
-    const go = { close, email: () => { close(); Forms.email(); }, add: () => { close(); Forms.findFriend(); }, logout: async () => { await Account.logout(); Party.reset(); close(); },
+    const go = { close, email: () => { close(); Forms.email(); }, add: () => { close(); Forms.findFriend(); }, logout: async () => { await Account.logout(); Party.reset(); close(); }, delacc: () => { close(); Forms.deleteAccount(); },
       board: () => { close(); const g = voltGame; if (g.scene.isActive('Game') || g.scene.isPaused('Game')) return Toasts.show('Open the leaderboard from the main menu after your match.', [], 4000); g.scene.getScenes(true).forEach(s => g.scene.stop(s.sys.settings.key)); g.scene.start('Leaderboard'); },
       pstart: async () => { try { await Party.create(); close(); Forms.invite('party', Party.id); } catch (e) { /* shown */ } }, pinvite: () => { close(); Forms.invite('party', Party.id); },
       pchat: () => { close(); Chat.openChat('party'); }, freq: () => PartyFriends.add(who), facc: () => Social.accept(who), pleave: () => Party.leave(), kick: () => Party.kick(who), lead: () => Party.handOver(who),

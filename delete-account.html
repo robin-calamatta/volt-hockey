@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Delete your account · Volt Hockey</title>
+<link rel="icon" href="icons/icon-192.png"><meta name="theme-color" content="#0d151b">
+<style>
+  :root{color-scheme:dark} body{margin:0;background:#0d151b;color:#e8eef2;font:17px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+  main{max-width:760px;margin:0 auto;padding:24px 16px 48px} h1{font-size:28px;margin:28px 0 6px;color:#fff} h3{margin:22px 0 4px;color:#ffd23f;font-size:19px}
+  a{color:#5cc8ff} nav{display:flex;flex-wrap:wrap;gap:8px 16px;padding:10px 0 4px;border-bottom:1px solid #2f4a5c} .lg-date{color:#9fb2bf;margin:0}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:22px;letter-spacing:.04em;color:#ffd23f;text-decoration:none} .brand img{width:36px;height:36px;border-radius:8px}
+  .foot{margin-top:36px;color:#9fb2bf;font-size:15px;border-top:1px solid #2f4a5c;padding-top:12px}
+  label{display:block;margin:14px 0 4px;color:#cfd8de} input{width:100%;box-sizing:border-box;padding:10px 12px;font-size:17px;border-radius:9px;border:1px solid #2f4a5c;background:#0f1a22;color:#fff}
+  button{margin-top:18px;padding:11px 18px;font-size:17px;font-weight:700;border-radius:10px;border:0;cursor:pointer} .danger{background:#ff3b30;color:#fff} .msg{margin-top:12px;min-height:1.4em} .ok{color:#7dff6a} .bad{color:#ff8a80}
+  .box{background:#0f1a22;border:1px solid #2f4a5c;border-radius:14px;padding:6px 18px 18px;margin-top:18px}
+</style></head>
+<body><main><a class="brand" href="./"><img src="icons/icon-192.png" alt="">VOLT HOCKEY</a>
+<h1>Delete your Volt Hockey account</h1>
+<p>Deleting your account permanently removes, straight away:</p>
+<ul><li>your login (username and password)</li><li>your email address</li><li>your saved settings and game progress</li><li>your place on the leaderboard</li><li>your friends list (you're removed from your friends' lists too) and your private messages</li></ul>
+<p>Reports made about an account may be kept for safety and legal reasons. Copies in backups are removed as the backups expire. Anything saved in your own browser or app stays until you clear it.</p>
+<p>You can also do this in the game: open <b>Friends</b>, then <b>Delete account</b>. If you can't sign in (for example you forgot your password), use "Forgot password" in the game first, or contact us through the details in the <a href="privacy.html">privacy notice</a>.</p>
+<div class="box">
+  <label for="u">Username or email</label><input id="u" autocomplete="username" maxlength="40">
+  <label for="p">Password</label><input id="p" type="password" autocomplete="current-password" maxlength="200">
+  <label for="c">Type DELETE to confirm</label><input id="c" autocomplete="off" maxlength="10">
+  <button class="danger" id="go">Delete my account</button><div class="msg" id="msg"></div>
+</div>
+<p class="foot"><a href="privacy.html">Privacy notice</a> · <a href="legal.html">All legal documents</a> · <a href="./">Play Volt Hockey</a></p>
+</main>
+<script>
+/* v14.3.14 delete an account from the web (Google Play asks for a web link as well as the in-game button) */
+document.getElementById('go').onclick = async () => {
+  const $ = id => document.getElementById(id), msg = $('msg'), u = $('u').value.trim(), p = $('p').value;
+  const say = (t, ok) => { msg.textContent = t; msg.className = 'msg ' + (ok ? 'ok' : 'bad'); };
+  if (!u || !p) return say('Enter your username and password.');
+  if ($('c').value.trim().toUpperCase() !== 'DELETE') return say('Type DELETE to confirm.');
+  say('Deleting...', true); msg.className = 'msg';
+  try {
+    const call = async (path, body, token) => { const r = await fetch('api' + path, { method: 'POST', headers: { 'content-type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}) }, body: JSON.stringify(body) }); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'Something went wrong (' + r.status + ').'); return d; };
+    const login = await call('/login', { username: u, password: p });
+    await call('/account/delete', { password: p, confirm: 'DELETE' }, login.token);
+    say('Your account "' + u + '" has been deleted.', true); $('p').value = ''; $('c').value = '';
+  } catch (e) { say(e.message); }
+};
+</script></body></html>

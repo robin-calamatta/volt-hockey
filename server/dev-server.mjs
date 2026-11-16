@@ -28,7 +28,7 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname.startsWith('/api/')) {
     let raw = ''; for await (const c of req) raw += c;
     let body = {}; try { body = raw ? JSON.parse(raw) : {}; } catch (e) { body = {}; }
-    const out = await api(req.method, url.pathname.slice(4), Object.fromEntries(url.searchParams), body, req.headers);
+    const out = await api(req.method, url.pathname.slice(4), Object.fromEntries(url.searchParams), body, { 'x-forwarded-for': req.socket.remoteAddress || '', ...req.headers });   // (v14.3.13: the address, for LOCAL NETWORK play)
     res.writeHead(out.status, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return res.end(JSON.stringify(out.body));
   }
   if (url.pathname.startsWith('/peerjs')) return;                                    // handled by the PeerJS server below

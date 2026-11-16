@@ -7,18 +7,22 @@ class OnlineMenuScene extends ListMenuScene {
   create() {
     const ok = PeerTransport.available(), blocked = () => this.note.setText(netErrorText({ type: 'unsupported' }));
     const rj = typeof Rejoin !== 'undefined' && Rejoin.get();
-    this.buildMenu('ONLINE', [
+    const netFlip = () => { Settings.netLan = !NetMode.lan(); Settings.save(); if (Settings.netLan) NetMode.load(true); Sound.play('blip'); this.scene.restart({ message: Settings.netLan ? '📶 LAN: rooms, Browse and matchmaking only show people on your network.' : '🌐 Online: playing over the internet.' }); };
+    this.buildMenu(NetMode.lan() ? 'LAN' : 'ONLINE', [
       ...(rj && ok ? [{ label: () => `▶ Back into your game (room ${rj.code})`, hint: 'Your connection dropped: rejoin the game that is still going, in your own cart', select: () => joinRoomByCode(this, rj.code, t => this.note && this.note.active && this.note.setText(t), () => {}, rj.token) }] : []),
       ...(gameOn('hockey') ? [{ label: () => 'Create room', select: () => (ok ? this.scene.start('Room', { role: 'host' }) : blocked()) }] : []),   /* (v14.3.3: hidden when the admin turned the game off) */
       ...(MINI_KINDS().filter(k => k !== 'br' && gameOn(k)).length ? [{ label: () => 'Create a minigame room', hint: 'Balloon Bash, Race or Manhunt online (or switch any room with its Game row)', select: () => this.scene.start('Minigames') }] : []),
-      { label: () => 'Browse public rooms', select: () => (ok ? this.scene.start('Browse') : blocked()) },
+      ...(GameCfg.lan !== false ? [{ label: () => `Network   ◀ ${NetMode.lan() ? '📶 LAN (same network only)' : '🌐 Online (internet)'} ▶`, hint: '🌐 Online: anyone, anywhere.   📶 LAN: only people on your network (the same Wi-Fi), straight from device to device',
+        change: () => netFlip(), select: () => netFlip() }] : []),
+      { label: () => NetMode.lan() ? 'Browse 📶 LAN rooms' : 'Browse public rooms', select: () => (ok ? this.scene.start('Browse') : blocked()) },
       { label: () => 'Join with a code', select: () => (ok ? this.scene.start('JoinCode') : blocked()) },
       { label: () => 'Back', select: () => this.scene.start('Main') }
     ], 230);
     this.onBack = () => this.scene.start('Main');
     if (this.autoJoin) { const code = this.autoJoin; this.autoJoin = ''; this.time.delayedCall(50, () => joinRoomByCode(this, code, t => this.note && this.note.active && this.note.setText(t), () => {})); }
-    this.note = this.add.text(CX, 560, this.message, { ...STYLE.hint, fontSize: '24px', align: 'center', wordWrap: { width: 900 } }).setOrigin(0.5);
-    this.add.text(CX, 660, 'Up to 6 players. Create a room and keep it private (friends join with its 5-letter code) or make it public so anyone can find it under Browse. CPU carts fill the empty spots.', { ...STYLE.hint, fontSize: '18px', color: '#9fb2bf', align: 'center', wordWrap: { width: 1000 } }).setOrigin(0.5);
+    const many = this.items && this.items.length > 6;   /* (v14.3.13: with the Network row the list runs lower: the note goes under it, and the blurb is left out) */
+    this.note = this.add.text(CX, many ? 628 : 560, this.message, { ...STYLE.hint, fontSize: '24px', align: 'center', wordWrap: { width: 900 } }).setOrigin(0.5);
+    if (!many) this.add.text(CX, 660, 'Up to 6 players. Create a room and keep it private (friends join with its 5-letter code) or make it public so anyone can find it under Browse. CPU carts fill the empty spots.', { ...STYLE.hint, fontSize: '18px', color: '#9fb2bf', align: 'center', wordWrap: { width: 1000 } }).setOrigin(0.5);
   }
 }
 
@@ -66,11 +70,13 @@ class BrowseScene extends Phaser.Scene {
   pageSize() { return 8; }
   refresh() {
     if (this.loading) return; this.loading = true; this.lastLoad = this.time.now;
-    listPublicRooms().then(res => {
+    const lan = NetMode.lan();
+    Promise.all([listPublicRooms(), lan ? NetMode.load() : null]).then(([res, net]) => {
       this.loading = false; if (!this.scene.isActive()) return;
-      this.rooms = res.rooms.filter(r => r.kind !== 'br' || brAllowed()).sort((a, b) => (a.playing - b.playing) || (b.players - a.players));
+      /* v14.3.13 📶 LAN: only rooms on this network. 🌐 ONLINE: not the LAN rooms (they can't be reached from outside their network) */
+      this.rooms = res.rooms.filter(r => (r.kind !== 'br' || brAllowed()) && (lan ? !!r.lan && r.lan === (net || NetMode.id) : !r.lan)).sort((a, b) => (a.playing - b.playing) || (b.players - a.players));
       this.cursor = clamp(this.cursor, 0, Math.max(0, this.rooms.length - 1));
-      this.status = res.error ? netErrorText({ type: res.error }) : (this.rooms.length ? '' : 'No public rooms right now. Go back and create one!');
+      this.status = res.error ? netErrorText({ type: res.error }) : (this.rooms.length ? '' : lan ? 'No 📶 LAN rooms on your network right now. Go back and create one (people on the same Wi-Fi will see it here).' : 'No public rooms right now. Go back and create one!');
     });
   }
   state(r) { return r.v !== PROTOCOL ? 'OLD VERSION' : r.playing ? 'IN MATCH' : r.players >= r.max ? 'FULL' : 'JOIN'; }

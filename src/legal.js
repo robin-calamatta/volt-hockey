@@ -10,10 +10,11 @@
    point, not legal advice. */
 const LEGAL = {
   version: '2026-11-09',
-  owner: 'the developer of Volt Hockey',          // who "we" are: a person's or company's legal name
+  owner: 'Rize Entertainment',                     // who "we" are: a person's or company's legal name
   contact: '',                                     // an email address for legal, privacy and copyright notices (empty: "through the game's website")
   law: 'the Province of Ontario and the federal laws of Canada that apply there',
   courts: 'Ontario, Canada',
+  site: 'https://playvolthockey.netlify.app',      // the Game's website (v14.3.14: the privacy notice links its account-deletion page here)
   key: 'volt.legal',
   accepted() { try { const s = JSON.parse(localStorage.getItem(this.key) || 'null'); return !!(s && s.v === this.version); } catch (e) { return !!this.sessionOk; } },
   accept() { this.sessionOk = true; try { localStorage.setItem(this.key, JSON.stringify({ v: this.version, at: new Date().toISOString() })); } catch (e) { /* storage blocked: asked again next visit */ } },
@@ -88,6 +89,10 @@ const LEGAL_DOCS = {
 <p>Players under 18 can only chat with friends they have accepted. If you are a parent or guardian and want to see or delete your child's account information, contact us.</p>
 <h3>Your choices</h3>
 <p>You may ask to see, correct or delete your account information, subject to the law. You can block and mute players, and log out at any time. Clearing your browser's data removes what is stored on your device.</p>
+<h3>Deleting your account</h3>
+<p>You can delete your account yourself at any time: in the Game (open Friends, then <b>Delete account</b>), or on the web at <a href="${LEGAL.site}/delete-account.html" target="_blank" rel="noopener">${LEGAL.site.replace(/^https?:\/\//, '')}/delete-account.html</a>. Deleting it removes your login, email address, saved settings and progress, leaderboard entry, friends list and private messages from our servers straight away. Reports made about an account may be kept for safety and legal reasons. Copies in backups are removed as the backups expire.</p>
+<h3>Installed app and permissions</h3>
+<p>If you install the Game as an app (from your browser), it is the same Game as the website and keeps the same information described here, plus a copy of the Game's files on your device so it can start without internet. It asks for the <b>microphone</b> only when you turn on voice chat; your voice goes straight to the other players in your chat and is not recorded or stored by us. The Game doesn't use your location, contacts, photos, or advertising identifiers, and contains no ads or third-party tracking.</p>
 <h3>Security and retention</h3>
 <p>We take reasonable steps to protect your information, but no system is perfectly secure. We keep account information while your account exists and for a limited time after, as needed for safety, legal and backup purposes.</p>
 <p>Contact us ${LEGAL.reach()}.</p>` },

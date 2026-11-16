@@ -66,6 +66,7 @@ const Account = {
     if (typeof Social !== 'undefined') Social.start();
     this.emit();
   },
+  async deleteAccount(password, confirm) { const r = await this.req('POST', '/account/delete', { password, confirm }); this.dropLogin(); return r; },   // (v14.3.14)
   async logout() { try { await this.req('POST', '/logout', {}); } catch (e) { /* offline: forget it locally anyway */ } this.dropLogin(); },
   async changePassword(old, password) { return this.req('POST', '/password', { old, password }); },
 

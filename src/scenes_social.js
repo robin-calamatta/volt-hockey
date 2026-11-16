@@ -99,6 +99,20 @@ const Forms = {
       el.querySelector('[data-a=go]').onclick = go; el.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') go(); });
     });
   },
+  /* v14.3.14 delete your account (Google Play and the privacy notice: players can delete their own account in the game, and on the web at
+     /delete-account.html). The password and typing DELETE confirm it. */
+  deleteAccount() {
+    if (!Account.loggedIn) return this.account();
+    this.show(`<h2>Delete your account</h2>
+      <div class="note">This permanently deletes <b>${esc(Account.name)}</b>: your login, email, saved settings and progress on the server, your leaderboard place, your friends list and your private messages. It can't be undone. (What's saved in this browser stays until you clear it.)</div>
+      ${this.pw('p', 'Your password', 'current-password')}${this.field('c', 'Type DELETE to confirm', 'text', 'maxlength="10" autocomplete="off"')}
+      <div class="err"></div><div class="row"><button data-a="x">Cancel</button><button class="go" data-a="go" style="background:#ff3b30;color:#fff">Delete my account</button></div>`, el => {
+      const err = el.querySelector('.err'), val = n => el.querySelector(`[name=${n}]`).value;
+      el.querySelector('[data-a=x]').onclick = () => this.close();
+      el.querySelector('[data-a=go]').onclick = async () => { if (val('c').trim().toUpperCase() !== 'DELETE') { err.textContent = 'Type DELETE to confirm.'; return; } err.textContent = 'Deleting...';
+        try { const name = Account.name; await Account.deleteAccount(val('p'), 'DELETE'); try { Party.reset(); } catch (e) { /* none */ } this.close(); Toasts.show(`The account <b>${esc(name)}</b> has been deleted.`, [], 5000); } catch (e) { err.textContent = e.message; } };
+    });
+  },
   /* add or change the email on your account */
   email() {
     if (!Account.loggedIn) return this.account();

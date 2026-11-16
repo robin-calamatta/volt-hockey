@@ -9,7 +9,7 @@
 </head><body>
 <div id="rotate"><b>📱</b>Turn your phone sideways to play Volt Hockey.</div>
 <div id="stage"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
+<script src="lib/phaser.min.js"></script>   <!-- Phaser 3.80.1 (MIT), bundled since v14.3.14 so the game also starts with no internet -->
 <script src="lib/three.min.js"></script>   <!-- Three.js r149 for the 3D view (bundled, no CDN needed) -->
 <!-- Load order matters: each file may use the ones above it. -->
 <script src="src/config.js"></script>
@@ -118,6 +118,7 @@
 <script src="src/online_first.js"></script>  <!-- v14.3: online first: ONLINE / THIS SCREEN on the game card, PLAY goes into matchmaking -->
 <script src="src/gamemodes.js"></script>     <!-- v14.3.3: game modes on / off from the admin page -->
 <script src="src/teamclear.js"></script>    <!-- v14.3.12: your team in blue, theirs in red; DEFEND / SCORE nets -->
+<script src="src/offline.js"></script>     <!-- v14.3.14: plays with no internet (sw.js), and "install as an app" -->
 <script src="src/padmouse.js"></script>     <!-- v14.3.12: SELECT on a controller: a mouse pointer in the menus; hold it to accept a notice -->
 <script src="src/partyfriends.js"></script>  <!-- v14.3.12: add party members as friends -->
 <script src="src/adminsettings.js"></script> <!-- v14.3.12: settings back to defaults; the admin's defaults and locks -->

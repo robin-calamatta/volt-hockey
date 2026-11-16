@@ -5,7 +5,7 @@
      it: a locked setting is the same for everyone and shows 🔒 in the menus (it can't be changed there). A new starting value moves
      players who still had the old starting value; anyone who had picked their own keeps it (unless it's locked).
    How a menu row is matched to its settings: while a row's text is worked out, every setting it reads is noted (that's the row's keys). */
-const SET_KEEP = ['storageKey', 'playerName', 'career', 'touchLayout', 'touchLayoutP', 'touch', 'seasonTeam', 'teamA', 'teamB', 'settingsVer', 'adminSeen', 'lobbyMode', 'lobbyMini', 'playOnline', 'mg', 'modes'];
+const SET_KEEP = ['storageKey', 'playerName', 'career', 'touchLayout', 'touchLayoutP', 'touch', 'seasonTeam', 'teamA', 'teamB', 'settingsVer', 'adminSeen', 'lobbyMode', 'lobbyMini', 'playOnline', 'netLan', 'mg', 'modes'];
 const SET_FACTORY = (() => { const o = {}; for (const k of Object.keys(Settings)) { const d = Object.getOwnPropertyDescriptor(Settings, k); if (!d || d.get || typeof d.value === 'function' || SET_KEEP.includes(k)) continue; try { o[k] = JSON.parse(JSON.stringify(d.value)); } catch (e) { /* skip */ } } return o; })();
 const AdminSettings = {
   locks: {},

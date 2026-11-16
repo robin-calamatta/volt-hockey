@@ -53,7 +53,7 @@ export function createApi(store, opts = {}) {
   const saveUser = u => store.set(key(u.name), u);
   const online = u => !!u && now() - (u.lastSeen || 0) < LIMITS.onlineMs;
   const me = u => ({ name: u.name, adult: !!u.adult, br: canBR(u), created: u.created, email: u.email ? maskEmail(u.email) : '' });
-  const GAME_DEFAULTS = { brThird: true, online: true, broadcast: true, rizeSkip: false, brOnline: 100, off: {}, settings: {} };   /* brOnline: v14.3.12 carts (people first, then CPUs) in an online Volt Royale match */   /* off: v14.3.3 game modes turned off (hockey, season, practice, br, mini, or one minigame's id) */
+  const GAME_DEFAULTS = { brThird: true, online: true, lan: true, broadcast: true, rizeSkip: false, brOnline: 100, off: {}, settings: {} };   /* brOnline: v14.3.12 carts (people first, then CPUs) in an online Volt Royale match */   /* off: v14.3.3 game modes turned off (hockey, season, practice, br, mini, or one minigame's id) */
   const gameCfg = async () => { const g = { ...GAME_DEFAULTS, ...((await store.get('cfg/game')) || {}) }; g.off = g.off && typeof g.off === 'object' ? g.off : {}; g.brOnline = brOnlineN(g.brOnline); BR_ONLINE = g.brOnline; return g; };
   let BR_ONLINE = 100; const brOnlineN = v => Math.max(10, Math.min(100, Math.round(+v || 100)));
   /* v14.2.22 Volt Royale public matchmaking. One queue per team size (1 to 5). Queued players poll every couple of seconds; a match forms when
@@ -65,11 +65,15 @@ export function createApi(store, opts = {}) {
   const MM_MODES = { hockey: { spots: 6, wait: 60e3 }, mini: { spots: 8, wait: 60e3 } };
   const mmSquad = b => { const q = Number(b && b.squad); return q >= 1 && q <= 5 ? Math.floor(q) : 1; };
   const mmMode = b => { const m = String((b && b.mode) || 'br'); return MM_MODES[m] ? m : 'br'; };
-  const mmKey = (mode, sq, nf) => mode === 'br' ? 'mm/q' + sq : 'mm/q-' + mode + (nf ? '-nf' : '');   /* (v14.3.1: no fill in a team game: a queue of its own, two groups a match, one each side) */
+  const mmKey = (mode, sq, nf, lan) => (mode === 'br' ? 'mm/q' + sq : 'mm/q-' + mode + (nf ? '-nf' : '')) + (lan ? '-L' + lan : '');   /* (v14.3.13: LOCAL NETWORK searches only meet people on the same network) */
+  /* v14.3.13 which network a player is on: their internet address as the server sees it (people at one home or office share it), hashed with a
+     secret so the address itself never leaves the server. For IPv6 the first half (the network's part) is used. */
+  const ipOf = h => { h = h || {}; const raw = String(h['x-nf-client-connection-ip'] || String(h['x-forwarded-for'] || '').split(',')[0] || h['x-real-ip'] || '').trim().replace(/^::ffff:/, ''); if (!raw) return ''; if (raw.includes(':')) return raw.toLowerCase().split(':').slice(0, 4).join(':'); return raw; };
+  async function netId(h) { const ip = ipOf(h); if (!ip) return ''; let salt = await store.get('cfg/netsalt'); if (!salt) { salt = crypto.randomBytes(16).toString('hex'); await store.set('cfg/netsalt', salt); } return crypto.createHash('sha256').update(salt + '|' + ip).digest('hex').slice(0, 12); }   /* (v14.3.1: no fill in a team game: a queue of its own, two groups a match, one each side) */
   const mmCap = Q => Q.mode && Q.mode !== 'br' ? MM_MODES[Q.mode].spots : Math.max(Q.sq || 1, Math.floor(BR_ONLINE / (Q.sq || 1)) * (Q.sq || 1));   /* (v14.3.12: the admin's number, a whole number of squads) */
   const mmWait = Q => Q.mode && Q.mode !== 'br' ? MM_MODES[Q.mode].wait : MM_WAIT;
   const mmN = p => Math.max(1, Math.min(8, Number(p.n) || 1));                          // (a party, or players on one screen, take that many spots)
-  async function mmLoad(sq, mode = 'br', nf = false) { const Q = (await store.get(mmKey(mode, sq, nf))) || {}; Q.players = Q.players || {}; Q.sq = sq; Q.mode = mode; Q.nf = mode !== 'br' && !!nf; return Q; }
+  async function mmLoad(sq, mode = 'br', nf = false, lan = '') { const Q = (await store.get(mmKey(mode, sq, nf, lan))) || {}; Q.players = Q.players || {}; Q.sq = sq; Q.mode = mode; Q.nf = mode !== 'br' && !!nf; Q.lan = lan || ''; return Q; }
   async function mmMine(u) { const id = await store.get('mm/u/' + u.name.toLowerCase()); if (!id) return null; const M = await store.get('mm/m/' + id); if (!M || now() - M.at > MM_KEEP) return null; return M; }
   const mmView = (u, Q, M) => { const list = Object.values(Q.players).sort((a, b) => a.at - b.at), first = list[0], cnt = list.reduce((k, p) => k + mmN(p), 0);
     return { count: cnt, ready: list.filter(p => p.go).reduce((k, p) => k + mmN(p), 0), you: { go: !!(Q.players[u.name.toLowerCase()] || {}).go }, since: first ? first.at : null, startsAt: first ? first.at + mmWait(Q) : null, cap: mmCap(Q), mode: Q.mode || 'br', now: now(),   /* (v14.2.23: counts, not a list of names) */
@@ -77,10 +81,11 @@ export function createApi(store, opts = {}) {
   /* v14.3.2: a new search forgets the last match. Leaving a match early left it on file for 3 minutes, so the next search "found" it again and
      waited on a room that was gone: the matchmaking screen hung */
   async function mmForget(u) { await store.del('mm/u/' + u.name.toLowerCase()); return null; }
-  async function mmPoll(u, b) {
+  async function mmPoll(u, b, h) {
     const mode = mmMode(b); if (mode === 'br' && !canBR(u)) bad('Volt Royale is for players 16 and over.', 403);
     { const off = (await gameCfg()).off; if (off[mode] || (mode === 'mini' && off.mini)) bad('That playlist is turned off right now.', 403); }   /* (v14.3.3) */
-    const nf = !!(b && b.nofill), sq = mmSquad(b), t = now(), M0 = b && b.fresh ? await mmForget(u) : await mmMine(u), Q = await mmLoad(sq, mode, nf), qk = mmKey(mode, sq, Q.nf);
+    if (b && b.lan && (await gameCfg()).lan === false) bad('Local network play is turned off right now.', 403);
+    const lan = b && b.lan ? (await netId(h)) || 'x' : '', nf = !!(b && b.nofill), sq = mmSquad(b), t = now(), M0 = b && b.fresh ? await mmForget(u) : await mmMine(u), Q = await mmLoad(sq, mode, nf, lan), qk = mmKey(mode, sq, Q.nf, lan);
     for (const [k, p] of Object.entries(Q.players)) if (t - p.seen > MM_GONE) delete Q.players[k];
     const key = u.name.toLowerCase();
     if (M0) { if (Q.players[key]) { delete Q.players[key]; await store.set(qk, Q); } return mmView(u, Q, M0); }   // already in a match: show it
@@ -156,6 +161,19 @@ export function createApi(store, opts = {}) {
     }
     u.failed = 0; u.lockUntil = 0; u.lastSeen = now(); await saveUser(u);
     return { token: await newSession(u), user: me(u), prefs: u.prefs, progress: u.progress };
+  }
+  /* v14.3.14 deleting an account (the player's own, or the admin's): the account, its email, its leaderboard row, its private messages, its
+     place in matchmaking and it from everyone's friends. Reports about it are kept (moderation records). */
+  async function deleteUser(u) {
+    const k = u.name.toLowerCase();
+    for (const f of Object.keys(u.friends || {})) { const o = await store.get('u/' + f); if (o && o.friends && o.friends[k]) { delete o.friends[k]; await store.set('u/' + f, o); } try { await store.del(pairKey(u.name, f)); } catch (e) { /* none */ } }
+    if (u.email) await store.del(emailKey(u.email)); try { await store.del('mm/u/' + k); } catch (e) { /* none */ } await store.del('u/' + k);
+    const idx = await names(); delete idx[k]; await store.set('names', idx); const lb = (await store.get('lb')) || {}; delete lb[k]; await store.set('lb', lb);
+  }
+  async function deleteMe(u, b, tokenKey) {                        // your own account: your password confirms it is you
+    if (await scrypt(str(b.password, LIMITS.passMax + 1), u.salt) !== u.hash) bad('Your password is wrong.', 403);
+    if (str(b.confirm, 20).toUpperCase() !== 'DELETE') bad('Type DELETE to confirm.');
+    await deleteUser(u); try { await store.del(tokenKey); } catch (e) { /* gone anyway */ } return { ok: true, deleted: u.name };
   }
   async function setEmail(u, b) {                                  // add or change your email (your password confirms it is you)
     if (await scrypt(str(b.password, LIMITS.passMax + 1), u.salt) !== u.hash) bad('Your password is wrong.', 403);
@@ -352,13 +370,7 @@ export function createApi(store, opts = {}) {
       return { user: strip(u) };
     },
     'POST /admin/user/password': async (b) => { const u = await getUser(b.name); if (!u) bad('No such player.', 404); const pass = str(b.password, LIMITS.passMax + 1); if (pass.length < LIMITS.passMin) bad(`At least ${LIMITS.passMin} characters.`); u.salt = crypto.randomBytes(16).toString('hex'); u.hash = await scrypt(pass, u.salt); u.epoch = (u.epoch || 0) + 1; await saveUser(u); return { ok: true }; },
-    'POST /admin/user/delete': async (b) => {                   // removes the account, its email, its leaderboard row and it from everyone's friends
-      const u = await getUser(b.name); if (!u) bad('No such player.', 404); const k = u.name.toLowerCase();
-      for (const f of Object.keys(u.friends || {})) { const o = await store.get('u/' + f); if (o && o.friends && o.friends[k]) { delete o.friends[k]; await store.set('u/' + f, o); } }
-      if (u.email) await store.del(emailKey(u.email)); await store.del('u/' + k);
-      const idx = await names(); delete idx[k]; await store.set('names', idx); const lb = (await store.get('lb')) || {}; delete lb[k]; await store.set('lb', lb);
-      return { ok: true };
-    },
+    'POST /admin/user/delete': async (b) => { const u = await getUser(b.name); if (!u) bad('No such player.', 404); await deleteUser(u); return { ok: true }; },
     'GET /admin/reports': async () => { const keys = (await store.list('r/')).sort().reverse().slice(0, 300), out = []; for (const k of keys) out.push({ key: k, ...(await store.get(k)) }); return { reports: out }; },
     'GET /admin/keys': async (b, q) => ({ keys: (await store.list(str(q.prefix, 100))).sort().slice(0, 1000) }),
     'GET /admin/raw': async (b, q) => ({ key: q.key, value: await store.get(str(q.key, 300)) }),
@@ -374,9 +386,10 @@ export function createApi(store, opts = {}) {
   /* ---- routing ---- */
   const routes = {
     'POST /register': (b) => register(b), 'POST /login': (b) => login(b),
+    'POST /account/delete': async (b, q, h) => { const { u, tokenKey } = await auth(h); return deleteMe(u, b || {}, tokenKey); },
     'POST /logout': async (b, q, h) => { const { tokenKey } = await auth(h); await store.del(tokenKey); return { ok: true }; },
     'GET /me': async (b, q, h) => { const { u } = await auth(h); return { user: me(u), prefs: u.prefs, progress: u.progress }; },
-    'POST /mm/poll': async (b, q, h) => mmPoll((await auth(h)).u, b), 'POST /mm/code': async (b, q, h) => mmCode((await auth(h)).u, b),
+    'POST /mm/poll': async (b, q, h) => mmPoll((await auth(h)).u, b, h), 'GET /net': async (b, q, h) => ({ net: await netId(h) }), 'POST /mm/code': async (b, q, h) => mmCode((await auth(h)).u, b),
     'POST /mm/done': async (b, q, h) => mmDone((await auth(h)).u), 'GET /mm/counts': async () => mmCounts(),
     'POST /password': async (b, q, h) => changePassword((await auth(h)).u, b), 'POST /email': async (b, q, h) => setEmail((await auth(h)).u, b),
     'POST /reset/request': (b) => requestReset(b), 'POST /reset/confirm': (b) => confirmReset(b),

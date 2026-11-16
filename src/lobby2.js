@@ -160,7 +160,7 @@ Object.assign(Party, {
   P.drawPlay = function () {
     const V = CONFIG.view, Q = Progress.quests(), R = Progress.untilReset(), g = LobbyPick.shown(), member = Party.role === 'member', leader = Party.role === 'leader';
     this.box(28, 104, 340, 330); this.T(46, 116, 'DAILY QUESTS', 24, '#ffd23f'); this.T(352, 120, R.daily, 17, '#9fb2bf', { ox: 1 });
-    Q.daily.forEach((q, i) => { const y = 156 + i * 82; { const qt = this.T(46, y, (q.done ? '✓ ' : '') + q.text, 19, q.done ? '#7dff6a' : '#ffffff', { bold: false }); if (qt.width > 300) { qt.setScale(300 / qt.width); } }   /* (v14.3.4: one line, so a long quest doesn't run into its bar) */ this.bar(46, y + 48, 230, 10, q.got / q.n, q.done ? 0x7dff6a : 0xffd23f); this.T(352, y + 42, `${q.got}/${q.n}   +${q.xp}`, 16, '#9fb2bf', { ox: 1 }); });
+    Q.daily.forEach((q, i) => { const y = 156 + i * 82; { const qt = this.T(46, y, (q.done ? '✓ ' : '') + q.text, 19, q.done ? '#7dff6a' : '#ffffff', { bold: false }); if (qt.width > 300) { qt.setScale(300 / qt.width); } }   /* (v14.3.4: one line, so a long quest doesn't run into its bar) */ const nt = this.T(352, y + 42, `${q.got}/${q.n}   +${q.xp}`, 16, '#9fb2bf', { ox: 1 }); this.bar(46, y + 48, Math.min(230, 352 - nt.width - 46 - 12), 10, q.got / q.n, q.done ? 0x7dff6a : 0xffd23f); });   /* (v14.3.14: the bar stops short of the numbers) */
     this.T(46, 400, `WEEKLY: ${Q.weekly.filter(q => q.done).length} / ${Q.weekly.length} done`, 18, '#c9d6df'); this.tap(28, 104, 340, 330, () => this.setTab(3));
     /* the game you've picked: bottom left */
     const x = 28, y = 478, w = 430, h = 198; this.box(x, y, w, h, 0x0c1424, 0.9, g.col || 0x2d5068);

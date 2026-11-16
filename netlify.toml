@@ -4,7 +4,7 @@
 # (Drag-and-drop deploys do not include functions.)
 [build]
   publish = "."
-  command = "npm install --no-audit --no-fund && node tools/make-playlist.js"   # (writes assets/music/playlist.json from your music folders on every deploy)
+  command = "npm install --no-audit --no-fund && node tools/make-playlist.js && node tools/make-offline-list.js"   # (writes assets/music/playlist.json from your music folders on every deploy)
 
 [functions]
   directory = "netlify/functions"
@@ -14,3 +14,13 @@
   for = "/server/*"
   [headers.values]
     X-Robots-Tag = "noindex"
+
+# v14.3.14 the offline copy: browsers must always check these two for a new version
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+[[headers]]
+  for = "/offline-files.json"
+  [headers.values]
+    Cache-Control = "no-cache"
