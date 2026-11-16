@@ -31,6 +31,25 @@ const SFX = {
   rl_shell:    s => s.mech([['shell', 0.3]], 0.55),
   rl_pump:     s => s.mech([['pumpBack', 0.02], ['pumpFwd', 0.16]], 0.3),
   drift:       s => s.noise({ dur: 0.12, vol: 0.06, from: 2600, to: 2300, q: 5 }),
+  /* v14.3.17 party invite: a soft, warm console-style chime. Three sine/triangle voices of an add9 chord swell in one after another
+     through a gentle low-pass (no 8-bit edge), with a quiet airy shimmer on top and a slow fade, about 1.3 s. */
+  invite:      s => {
+    const c = s.ctx, t = c.currentTime, out = c.createGain(), lp = c.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(900, t); lp.frequency.linearRampToValueAtTime(3200, t + 0.35); lp.frequency.linearRampToValueAtTime(1400, t + 1.3); lp.Q.value = 0.5;
+    out.gain.value = 0.5; lp.connect(out); out.connect(s.sfxBus);
+    const voice = (f, at, v, dur, wave = 'sine') => { const o = c.createOscillator(), o2 = c.createOscillator(), g = c.createGain(); o.type = wave; o2.type = 'sine'; o.frequency.value = f; o2.frequency.value = f * 1.004;
+      g.gain.setValueAtTime(0.0001, t + at); g.gain.exponentialRampToValueAtTime(v, t + at + 0.06); g.gain.exponentialRampToValueAtTime(v * 0.45, t + at + 0.4); g.gain.exponentialRampToValueAtTime(0.0001, t + at + dur);
+      o.connect(g); o2.connect(g); g.connect(lp); o.start(t + at); o2.start(t + at); o.stop(t + at + dur + 0.05); o2.stop(t + at + dur + 0.05); };
+    voice(146.83, 0, 0.16, 1.3, 'triangle');   // D3 underneath
+    voice(440, 0, 0.12, 1.2);                   // A4
+    voice(587.33, 0.09, 0.12, 1.15);            // D5
+    voice(659.25, 0.18, 0.11, 1.1);             // E5 (the 9th: the "open" console colour)
+    voice(1174.66, 0.18, 0.03, 0.9);            // D6, faint sparkle
+    const n = c.createBufferSource(), bp = c.createBiquadFilter(), ng = c.createGain(); n.buffer = s.noiseBuffer; bp.type = 'bandpass'; bp.frequency.value = 6500; bp.Q.value = 0.8;
+    ng.gain.setValueAtTime(0.0001, t); ng.gain.exponentialRampToValueAtTime(0.025, t + 0.2); ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.9); n.connect(bp); bp.connect(ng); ng.connect(s.sfxBus); n.start(t); n.stop(t + 1);
+  },
+  /* v14.3.17 a dry fire: the trigger on an empty gun. A crisp hammer snap with a little metal ring, no shot */
+  dry:         s => { s.noise({ dur: 0.022, vol: 0.32, from: 4200, q: 7 }); s.noise({ dur: 0.03, vol: 0.14, from: 1500, q: 3 }); s.tone({ wave: 'triangle', from: 2350, to: 2300, dur: 0.05, vol: 0.035 }); },
   reload:      s => { s.noise({ dur: 0.04, vol: 0.18, from: 3000, q: 3 }); s.noise({ dur: 0.05, vol: 0.2, from: 1800, q: 4, at: s.ctx.currentTime + 0.22 }); }
 };
 

@@ -516,6 +516,7 @@ class GameScene extends Phaser.Scene {
     if (!this.demo) { const mi = this.setup.mini || (this.online && this.online.match && this.online.match.mini); if (mi && mi.kind === 'br' && !mi.music) Sound.stopMusic(); else Sound.playMusic('match'); }   /* (Volt Royale: no music unless its Music option is On) */
     if (this.online) {                                         // leave cleanly if the host goes away or the room returns to its lobby
       const o = this.online;
+      o.session.played = true;   // (v14.3.17: leaving the room after this goes back to the lobby)
       if (o.role === 'client') { o.session.onClosed = reason => { if (['lost', 'timeout', 'peer-unavailable', 'ice', 'network'].includes(reason) && this.match && this.match.state !== 'over' && typeof Rejoin !== 'undefined' && Rejoin.get()) return this.leaveOnline('Connection to the host was lost. The game is still going: choose "Back into your game" to get back in your cart.'); this.leaveOnline(netErrorText({ type: reason })); }; o.session.onLobby = () => this.scene.start('Room', { role: 'client', session: o.session }); }
       else { o.idle = { ax: 0, ay: 0, pressed: {} }; o.session.onError = () => {}; }
     }
@@ -535,7 +536,7 @@ class GameScene extends Phaser.Scene {
   leaveOnline(message) {
     Controls.owner = null; Controls.claimed.clear();
     const o = this.online; if (o.role === 'host') o.session.close(); else o.session.leave();
-    Settings.restoreRules(); Sound.playMusic('menu'); this.scene.stop('Pause'); this.scene.start('OnlineMenu', { message: message || '' });
+    Settings.restoreRules(); Sound.playMusic('menu'); this.scene.stop('Pause'); this.scene.start('Main'); if (message) { try { Toasts.show(esc(message), [], 6000); } catch (e) { /* no notice */ } }   /* (v14.3.17: out of a game: straight back to the lobby) */
   }
   updateOnline(delta) {                                        // an online match: the host simulates, clients predict their own cart and draw host snapshots
     const o = this.online, m = this.match, dt = Math.min(delta / 1000, 0.05), pad = Controls.combined, menuOpen = this.scene.isActive('Pause') || FriendsBar.open || Forms.isOpen;   // (the friends window or a form is open: your cart coasts)
@@ -563,7 +564,7 @@ class GameScene extends Phaser.Scene {
       const tapA = this.resultTap === 'a' && this.resultReady(), tapB = this.resultTap === 'b' && this.resultReady(); if (this.resultTap && this.resultReady()) this.resultTap = null;
       if (m.state === 'over' && o.session.seasonFx && this.resultReady() && (Controls.menu().a || tapA) && !menuOpen) { Controls.owner = null; Controls.claimed.clear(); o.session.close('party_done'); Sound.playMusic('menu'); this.scene.start('SeasonHub'); return; }
       if (m.state === 'over' && this.resultReady() && (Controls.menu().a || tapA) && !menuOpen) { o.session.backToLobby(); if (o.session.cfg.mini) { if (!(typeof mixNext === 'function' && mixNext(o.session))) o.session.setConfig({ mini: randomMapFor(o.session.cfg.mini) }); } this.scene.start('Room', { role: 'host', session: o.session, again: true }); return; }   /* (play again: straight back in, a new map) */
-      if (m.state === 'over' && this.resultReady() && (this.holdBack() || tapB) && !menuOpen) { o.session.backToLobby(); this.scene.start('Room', { role: 'host', session: o.session }); return; }
+      if (m.state === 'over' && this.resultReady() && (this.holdBack() || tapB) && !menuOpen) { Controls.owner = null; Controls.claimed.clear(); try { o.session.close('party_done'); } catch (e) { /* closed */ } Settings.restoreRules(); Sound.playMusic('menu'); this.scene.start('Main'); return; }   /* (v14.3.17: back from the results: the lobby, not the room screen) */
     } else {
       this.pre3d(dt); o.sim.frame(dt, [{ id: o.session.myId, input: menuOpen ? idle : Controls.mine }, ...guests.map(([id, src]) => ({ id, input: menuOpen ? idle : src }))]);
       if (m.mini) { const me = o.sim.locals[0] && o.sim.locals[0].me; if (me && me.chair) Object.assign(m.ball, { x: me.chair.x, y: me.chair.y }); }   // minigames: the cameras follow your own cart

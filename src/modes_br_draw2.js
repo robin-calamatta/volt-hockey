@@ -38,8 +38,8 @@
       cart.group.rotation.x += G.down ? 0.12 : 0;
     }
     if (me && g.st) {                                                        // inside the storm: everything goes purple and hazy
-      const S = g.st, inStorm = Math.hypot(me.x - S.x, me.y - S.y) > S.r && !me.out, f = this.scene.fog; this.stormK = (this.stormK || 0) + ((inStorm ? 1 : 0) - (this.stormK || 0)) * Math.min(1, dt * 3);
-      if (f && f.isFogExp2) { if (!this.fog0) this.fog0 = { c: f.color.clone(), d: f.density }; f.color.copy(this.fog0.c).lerp(new THREE.Color(0x6a3dbf), this.stormK * 0.85); f.density = this.fog0.d + this.stormK * 0.03; }
+      const S = g.st, inStorm = Math.hypot(me.x - S.x, me.y - S.y) > S.r && !me.out, f = this.scene.fog; { const k0 = isFinite(this.stormK) ? this.stormK : 0, kd = isFinite(dt) && dt > 0 ? Math.min(1, dt * 3) : 0; this.stormK = Math.max(0, Math.min(1, k0 + ((inStorm ? 1 : 0) - k0) * kd)); }   /* (v14.3.17: never NaN: a NaN fog paints the whole map one flat colour) */
+      if (f && f.isFogExp2) { if (!f._v0 || !isFinite(f._v0.d)) f._v0 = { c: f.color.clone(), d: isFinite(f.density) ? Math.min(0.08, f.density) : 0.01 }; this.fog0 = f._v0;   /* (v14.3.17: kept per fog, not per view: a fog from the last match was carried over) */ f.color.copy(this.fog0.c).lerp(new THREE.Color(0x6a3dbf), this.stormK * 0.85); f.density = this.fog0.d + this.stormK * 0.03; }
     }
   };
 }
@@ -72,6 +72,7 @@ Object.assign(GameScene.prototype, {
   },
   brTeamPanel(m, me, watching) {                                           // bottom left: you and your team-mates (face, name, health, armour), above the speed meter
     const V = CONFIG.view, sq = m.mini.squad || 1; if (!this.brT || !this.brT.g.scene) this.brT = { g: this.add.graphics().setDepth(30), rows: Array.from({ length: 5 }, () => ({ face: this.add.image(0, 0, '__WHITE').setDepth(31).setDisplaySize(30, 30), name: this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '15px', fontStyle: 'bold', color: '#ffffff' }).setDepth(31).setOrigin(0, 0.5), st: this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '13px', fontStyle: 'bold', color: '#ffd23f' }).setDepth(31).setOrigin(1, 0.5) })) };
+    try { this.brCardTimers(m, me); } catch (e) { /* never stop the panel */ }
     const T = this.brT, g = T.g; g.clear(); const team = me ? m.chairs.filter(c => c.gs.team === me.gs.team).sort((a, b) => (a === me ? -1 : b === me ? 1 : a.k - b.k)) : [];
     T.rows.forEach((r, i) => { const c = team[i], show = c && (sq > 1 || c === me) && m.state !== 'over'; [r.face, r.name, r.st].forEach(o => o.setVisible(!!show)); if (!show) return;
       const G = c.gs, w = 218, x = 14, y = V.height - 104 - (Math.min(5, team.length) - 1 - i) * 38 - 44, isW = watching === c;   /* (v14.3.12: room for all five in Fives: it only had three rows) */
@@ -80,8 +81,23 @@ Object.assign(GameScene.prototype, {
       r.name.setText((c === me ? 'YOU' : (MG.pname(c) || m.name(c))).slice(0, 12)).setPosition(x + 36, y - 6).setColor(c.out ? '#7d8a96' : c === me ? '#ffd23f' : '#ffffff');
       const bx = x + 36, bw = w - 44; if (!c.out && !G.down) { g.fillStyle(0x223040, 1).fillRect(bx, y + 5, bw, 4).fillStyle(0x3d8bff, 1).fillRect(bx, y + 5, bw * G.sh / BR.maxShield, 4); g.fillStyle(0x3a2025, 1).fillRect(bx, y + 10, bw, 5).fillStyle(G.hp > 50 ? 0x5ad45a : G.hp > 25 ? 0xffc23d : 0xff4d4d, 1).fillRect(bx, y + 10, bw * Math.max(0, G.hp) / BR.hp, 5); }
       else if (G.down) { g.fillStyle(0x3a2025, 1).fillRect(bx, y + 8, bw, 6).fillStyle(0xff2a2a, 0.6 + 0.4 * Math.sin(this.time.now / 120)).fillRect(bx, y + 8, bw * G.dhp / BR.downHp, 6); }
-      const card = !c.out ? '' : (m.gs.L || []).some(L => L[1] === 'card' && L[5] === c.k) || m.chairs.some(o => o.gs.cards && o.gs.cards.includes(c.k)) ? '🎴 CARD' : 'OUT';
-      r.st.setText(isW ? '👁 WATCHING' : G.down ? '✚ DOWN' : c.out ? card : G.cards && G.cards.length ? '🎴' : '').setPosition(x + w - 6, y - 6).setColor(G.down ? '#ff6b6b' : '#ffd23f'); });
+      /* v14.3.17: a rez card on the ground counts down (it expires): the time left shows on its owner's row, for the whole team */
+      const gl = c.out && (m.gs.L || []).find(L => L[1] === 'card' && L[5] === c.k), left = gl && gl[8] > 0 ? Math.max(0, Math.ceil(gl[8] - (m.gs.t || 0))) : null;
+      const card = !c.out ? '' : gl ? (left !== null ? `🎴 ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : gl[8] === -1 ? 'CARD GONE' : '🎴 CARD') : m.chairs.some(o => o.gs.cards && o.gs.cards.includes(c.k)) ? '🎴 CARRIED' : 'OUT';
+      r.st.setText(isW ? '👁 WATCHING' : G.down ? '✚ DOWN' : c.out ? card : G.cards && G.cards.length ? '🎴' : '').setPosition(x + w - 6, y - 6).setColor(G.down ? '#ff6b6b' : left !== null && left <= 20 && Math.sin(this.time.now / 140) > 0 ? '#ff6b6b' : '#ffd23f'); });
+  },
+  /* v14.3.17 the team's rez cards lying on the ground, with how long each has left before it expires (top middle, for everyone on the
+     team, the card's owner too while they watch). */
+  brCardTimers(m, me) {
+    const V = CONFIG.view; if (!this.brCT || !this.brCT.scene) this.brCT = this.add.text(V.width / 2, 164, '', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#ffd23f', backgroundColor: '#0d151bc0', padding: { x: 10, y: 4 }, align: 'center' }).setOrigin(0.5, 0).setDepth(31);
+    const T = this.brCT; if (!me || m.state === 'over' || (m.mini.squad || 1) < 2) { T.setVisible(false); return; }
+    const lines = [];
+    for (const L of m.gs.L || []) { if (L[1] !== 'card' || !(L[8] > 0)) continue; const o = m.chairs[L[5]]; if (!o || o.gs.team !== me.gs.team) continue;
+      const left = Math.max(0, Math.ceil(L[8] - (m.gs.t || 0))), tm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+      lines.push(o === me ? `🎴 YOUR REZ CARD: ${tm} left. A teammate has to pick it up` : `🎴 ${MG.up(MG.pname(o) || m.name(o))}'S REZ CARD: ${tm} left. Pick it up and take it to a rez garage`); }
+    T.setVisible(lines.length > 0); if (!lines.length) return;
+    const urgent = lines.length && (m.gs.L || []).some(L => L[1] === 'card' && L[8] > 0 && L[8] - (m.gs.t || 0) <= 20 && m.chairs[L[5]] && m.chairs[L[5]].gs.team === me.gs.team);
+    T.setText(lines.slice(0, 3).join('\n')).setColor(urgent && Math.sin(this.time.now / 140) > 0 ? '#ff6b6b' : '#ffd23f');
   },
   brPrompts(m, c, p0, vp) {                                                // the middle of the screen: what is happening right now
     const V = CONFIG.view, g = m.gs, G = c.gs, X = this.brX, G2 = X.g; if (!X.prompt) X.prompt = this.add.text(V.width / 2, V.height / 2 + 120, '', { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: '#ffffff', backgroundColor: '#0d151bb8', padding: { x: 12, y: 5 }, align: 'center' }).setOrigin(0.5).setDepth(32);

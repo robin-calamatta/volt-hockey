@@ -1,5 +1,5 @@
 {
- "v": "175fbe6c3db7f262",
+ "v": "e61f1f865f8a27b3",
  "files": [
   "index.html",
   "manifest.webmanifest",
@@ -117,6 +117,7 @@
   "src/ui_overlay.js",
   "src/victory.js",
   "src/view3d.js",
+  "src/viewport.js",
   "src/voice.js",
   "src/xpshow.js",
   "lib/peerjs.min.js",

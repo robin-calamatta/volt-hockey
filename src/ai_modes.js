@@ -74,7 +74,8 @@ const cpuDiffOf = (c, m) => c.cpuDiff || m.difficulty || {};
       return r;
     }
     /* 2. squads: come to a team-mate in a fight, or regroup when strayed */
-    const seenFoe = MG.live(m).some(o => o.gs.team !== G.team && !o.gs.down && MH.dist(c, o) < 18 && Math.abs((o.gs.z || 0) - (G.z || 0)) < 1);
+    const shotBy = Object.keys(G.dby || {}).map(k => m.chairs[k]).filter(o => o && !o.out && !o.gs.down && now - G.dby[o.k] < 4);   // (v14.3.17: whoever is shooting at it right now)
+    const seenFoe = shotBy.length > 0 || MG.live(m).some(o => o.gs.team !== G.team && !o.gs.down && MH.dist(c, o) < 18 && Math.abs((o.gs.z || 0) - (G.z || 0)) < 1);
     if (!seenFoe && mates.length) {
       const hurt = mates.filter(o => o.gs.hurtAt !== undefined && now - o.gs.hurtAt < 3 && MH.dist(c, o) < AIM.help).sort((p, q) => MH.dist(c, p) - MH.dist(c, q))[0];
       const cx = mates.reduce((s, o) => s + o.x, 0) / mates.length, cy = mates.reduce((s, o) => s + o.y, 0) / mates.length, far = Math.hypot(c.x - cx, c.y - cy);
@@ -87,7 +88,7 @@ const cpuDiffOf = (c, m) => c.cpuDiff || m.difficulty || {};
     /* 3. fighting: focus the enemy the team is on, ping it, and aim / react by level */
     const focus = mates.map(o => o.gs.tgt).find(k => k !== undefined && m.chairs[k] && !m.chairs[k].out);
     let r;
-    if (focus !== undefined && MH.dist(c, m.chairs[focus]) < 25) {                                                    // see only the shared target (if it's in view) so the base picks it
+    if (focus !== undefined && MH.dist(c, m.chairs[focus]) < 25 && !shotBy.some(o => o !== m.chairs[focus])) {   /* (v14.3.17: not when someone else is shooting at it: it turns on them) */                                                    // see only the shared target (if it's in view) so the base picks it
       const live0 = MG.live, T = m.chairs[focus]; MG.live = mm => { const L = live0(mm), v = L.filter(o => o.gs.team === G.team || o === T); return v.length > 1 ? v : L; };
       try { r = ai.call(this, c, m, ...a); } finally { MG.live = live0; }
     } else r = ai.call(this, c, m, ...a);

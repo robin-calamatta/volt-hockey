@@ -632,6 +632,17 @@ class ClientSim {
     const k = Math.exp(-C.fadeRate * dt); for (const o of [...this.off.c, this.off.b]) { o.x *= k; o.y *= k; o.h *= k; }
     m.chairs.forEach((c, j) => { const o = this.off.c[j]; if (o) { c.x += o.x; c.y += o.y; c.heading += o.h; } });
     m.ball.x += this.off.b.x; m.ball.y += this.off.b.y;
+    /* v14.3.17 a ball in your own cup is drawn in your cup. The cart and the ball each had their own smoothing of a snapshot's correction,
+       so after a hiccup (a slow phone, a late burst of snapshots) the two were smoothed differently and the ball was drawn up to a couple of
+       metres off: it seemed to vanish behind you and come back a second later. Now, while the prediction has the ball in your cup, it's
+       drawn exactly where it sits in the cup of the cart on screen, and any smoothing carries on from there once it leaves. */
+    if (this.snap.s.st === STATE_CODE.play && !m.mini) for (const L of this.locals) {
+      const k = L.predIndex, rc = now.c[k], c = m.chairs[k]; if (!rc || !c) continue;
+      const Cp = CONFIG.cup, face = Cp.frontX - Cp.recess + Cp.colliderRadius + CONFIG.ball.radius, dx = now.b.x - rc.x, dy = now.b.y - rc.y, co = Math.cos(rc.heading), si = Math.sin(rc.heading), lx = dx * co + dy * si, ly = -dx * si + dy * co;
+      if (lx < face - 0.12 || lx > face + 0.25 || Math.abs(ly) > Cp.halfWidth + 0.08) continue;
+      const c2 = Math.cos(c.heading), s2 = Math.sin(c.heading), bx = c.x + lx * c2 - ly * s2, by = c.y + lx * s2 + ly * c2;
+      this.off.b.x = bx - now.b.x; this.off.b.y = by - now.b.y; m.ball.x = bx; m.ball.y = by; break;
+    }
     this.goalGate(m, this.snap.s.b);
   }
   /* The ball is drawn a little ahead of the host's, so it could reach the net before the host has counted the goal. Hold it at the mouth until the host's own ball is in. */

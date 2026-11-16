@@ -70,6 +70,7 @@ const Social = {
     for (const name of d.incoming) if (!this.seen.has('req:' + name)) { this.seen.add('req:' + name); Toasts.show(`<b>${esc(name)}</b> wants to be your friend.`, [{ label: 'Accept', go: true, fn: () => this.accept(name) }, { label: 'Later' }]); }
     for (const inv of d.invites) if (!this.seen.has('inv:' + inv.id)) {
       this.seen.add('inv:' + inv.id);
+      try { Sound.play('invite'); } catch (e) { /* no sound */ }   // v14.3.17 a soft chime for every invite
       Toasts.show(`<b>${esc(inv.from)}</b> invited you to ${inv.kind === 'party' ? 'their party' : 'a game (room ' + esc(inv.code) + ')'}.`, [{ label: 'Join', go: true, fn: () => this.acceptInvite(inv) }, { label: 'No thanks', fn: () => this.dismiss(inv.id) }], 20000);
     }
     for (const [k, n] of Object.entries(d.unread || {})) if (n && !this.seen.has('dm:' + k + ':' + n) && !(Chat.dmWith && Chat.dmWith.toLowerCase() === k)) {

@@ -339,7 +339,7 @@ MODES.br = {
     const G = c.gs, it = G.inv[G.sel]; if (!it || G.cd > 0 || c.out) return;
     const gun = BR_GUNS[it.k];
     if (gun) {
-      if (it.a <= 0) { G.cd = 0.4; if (c.player) { this.psfx(m, c, 'back'); this.say(m, c, 'OUT OF AMMO'); } return; }
+      if (it.a <= 0) { G.cd = 0.4; if (c.player) { this.psfx(m, c, 'dry'); this.say(m, c, 'OUT OF AMMO'); } return; }
       it.a--; G.cd = gun.cd; const f = c.toWorld(0.8, 0), err = c.player ? 0 : (Math.random() - 0.5) * (0.08 + ((m.difficulty || {}).reaction || 0.2) * 0.6), aim = this.aim(c, m, gun), pitch = this.aimP, cp = Math.cos(pitch), vz = Math.round(Math.sin(pitch) * gun.spd * 1000) / 1000;
       for (let p = 0; p < (gun.pellets || 1); p++) { const a = aim + err + (Math.random() - 0.5) * gun.spread * (gun.pellets ? 1 : 1.4) * (G.ads ? (gun.pellets ? 0.6 : 0.3) : 1);   /* aiming tightens the spread */ MG.add(m, { t: 'bul', w: it.k, k: c.k, x: MG.r2(f.x), y: MG.r2(f.y), z: G.z, vx: MG.r2(Math.cos(a) * gun.spd * cp + c.vx * 0.3), vy: MG.r2(Math.sin(a) * gun.spd * cp + c.vy * 0.3), vz, until: MG.r2(m.gs.t + gun.life) }); }
       m.sfx('gun_' + it.k); return;
@@ -419,7 +419,7 @@ MODES.br = {
   },
   ai(c, m) {
     const G = c.gs, g = m.gs, S = g.st, M = this.map(m); if (c.out) return { x: 0, y: 0, speed: 0 };
-    const sees = o => { if (Math.abs(o.gs.z - G.z) > 1 || o.gs.lv !== G.lv) return false; const d = MH.dist(c, o); if (d > 20 || (d > 7 && Math.abs(normalizeAngle(Math.atan2(o.y - c.y, o.x - c.x) - c.heading)) > 1.5)) return false;   // what is in front of it (or very close)
+    const sees = o => { if (Math.abs(o.gs.z - G.z) > 1 || o.gs.lv !== G.lv) return false; const d = MH.dist(c, o), hitBy = G.dby && G.dby[o.k] !== undefined && g.t - G.dby[o.k] < 4; if (d > (hitBy ? 45 : 20) || (!hitBy && d > 7 && Math.abs(normalizeAngle(Math.atan2(o.y - c.y, o.x - c.x) - c.heading)) > 1.5)) return false;   /* (v14.3.17: whoever just shot it is seen wherever they are, so it turns round and fights back) */   // what is in front of it (or very close)
       const near = w => w.x1 > Math.min(c.x, o.x) - 1 && w.x0 < Math.max(c.x, o.x) + 1 && w.y1 > Math.min(c.y, o.y) - 1 && w.y0 < Math.max(c.y, o.y) + 1, walls = brWallsNear(M, Math.min(c.x, o.x) - 1, Math.min(c.y, o.y) - 1, Math.max(c.x, o.x) + 1, Math.max(c.y, o.y) + 1).filter(w => w.lv === G.lv && near(w)), TB = M._tb || (M._tb = M.trees.map(t => ({ x0: t.x - t.r, y0: t.y - t.r, x1: t.x + t.r, y1: t.y + t.r })));   // (cached per map, and only the walls between the two)
       return MG.clearPath(c.x, c.y, o.x, o.y, walls, 0.05) && (G.lv > 0 || MG.clearPath(c.x, c.y, o.x, o.y, TB.filter(near), 0)); };
     if (G.hp < 55 && G.inv.some(it => it.k === 'med') && G.cd <= 0) { G.sel = G.inv.findIndex(it => it.k === 'med'); c.wantUse = true; }
@@ -432,8 +432,10 @@ MODES.br = {
         const gun = BR_GUNS[it.k], lead = d / gun.spd, a = Math.atan2(foe.y + (foe.vy || 0) * lead - c.y, foe.x + (foe.vx || 0) * lead - c.x), off = Math.abs(normalizeAngle(a - c.heading));
         if (off < 0.08 + 0.4 / Math.max(1, d) && d < gun.range * 1.3 && G.cd <= 0) c.wantUse = true;
         if (G.hp < 40 && G.inv.some(x => x.k === 'wall') && !(G.wallAt > m.simTime)) { G.wallAt = m.simTime + 6; G.sel = G.inv.findIndex(x => x.k === 'wall'); c.wantUse = true; }
-        return { x: Math.cos(a), y: Math.sin(a), speed: off > 0.5 ? 0.15 : d > gun.range ? 0.7 : d < gun.range * 0.4 ? 0.05 : 0.3 };
+        { const dd = normalizeAngle(a - c.heading), fa = Math.abs(dd) > 1.2 ? c.heading + Math.sign(dd) * 1.2 : a;   /* (v14.3.17: an enemy behind it: turn round. Pointing the stick straight at them made the cart reverse towards them, still facing away, so it never shot) */
+          return { x: Math.cos(fa), y: Math.sin(fa), speed: off > 0.5 ? 0.15 : d > gun.range ? 0.7 : d < gun.range * 0.4 ? 0.05 : 0.3 }; }
       }
+      if (it && BR_GUNS[it.k] && (G.rl > 0 || G.am[BR_AMMO[BR_GUNS[it.k].type].i] > 0)) { const a = Math.atan2(foe.y - c.y, foe.x - c.x), dd = normalizeAngle(a - c.heading), fa = Math.abs(dd) > 1.2 ? c.heading + Math.sign(dd) * 1.2 : a; return { x: Math.cos(fa), y: Math.sin(fa), speed: 0.15 }; }   // (v14.3.17: reloading: keep facing them, ready to fire)
     }
     // where to go: into the circle, to loot, or hunting
     let goal = null, gl = 0; const inStorm = Math.hypot(c.x - S.x, c.y - S.y) > S.r - 3, safe = { x: S.fx || S.x, y: S.fy || S.y };

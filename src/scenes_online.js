@@ -169,7 +169,7 @@ class JoinCodeScene extends Phaser.Scene {
 /* The room: shows the code and who is on which side. The host sets teams, sizes and difficulty and starts the match. */
 class RoomScene extends ListMenuScene {
   constructor() { super('Room'); }
-  init(data) { this.role = data.role; this.session = data.session || null; this.cursorAt = data.cursor || 0; this.capturing = false; this.rules = !!data.rules; this.preset = data.preset || (data.session && data.session.preset) || null; this.again = !!data.again; }   // preset: a party leader's match / practice / season game (partyGame)
+  init(data) { this.role = data.role; this.session = data.session || null; this.cursorAt = data.cursor || 0; this.capturing = false; this.rules = !!data.rules; this.preset = data.preset || (data.session && data.session.preset) || null; this.again = !!data.again; this.wasInGame = !!(data.session && data.session.played); }   // preset: a party leader's match / practice / season game (partyGame)
   create() {
     const host = this.role === 'host'; this.opening = false;
     if (host && !this.session) {
@@ -257,6 +257,7 @@ class RoomScene extends ListMenuScene {
     if (this.session) { try { this.role === 'host' ? this.session.close(this.preset ? 'party_done' : undefined) : this.session.leave(); } catch (x) { /* already closed */ } }
     if (this.preset && this.preset.season) return this.scene.start('SeasonHub');
     if (this.preset) return this.scene.start('Main');
+    if (this.wasInGame) { this.scene.start('Main'); if (message) { try { Toasts.show(esc(message), [], 6000); } catch (e) { /* no notice */ } } return; }   /* (v14.3.17: after a game: the lobby) */
     this.scene.start('OnlineMenu', { message });
   }
   fail(e) { this.exit(netErrorText(e)); }

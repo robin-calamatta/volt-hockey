@@ -16,8 +16,17 @@ const PlayWhere = {
   /* v14.3.13 where you play: 'net' (🌐 ONLINE, over the internet), 'lan' (📶 LAN, people on your network only) or 'local' (🏠 THIS SCREEN) */
   choices() { const c = [['🌐  ONLINE', 'net']]; if (GameCfg.lan !== false) c.push(['📶  LAN', 'lan']); c.push(['🏠  THIS SCREEN', 'local']); return GameCfg.online === false ? [] : c; },
   where() { return !this.online() ? 'local' : NetMode.lan() ? 'lan' : 'net'; },
-  pick(w) { if (w === 'local') return this.set(false); const lan = w === 'lan'; if (Settings.netLan !== lan) { Settings.netLan = lan; Settings.save(); if (lan) NetMode.load(true); } if (this.online()) { Sound.play('blip'); this.apply(); } else this.set(true);
-    if (lan && Settings.netLan) Toasts.show('📶 <b>LAN</b>: matchmaking and rooms only find people on your network (the same Wi-Fi). Great for a room full of players.', [], 3500); },
+  pick(w) { if (w === 'local') { this.set(false); return this.note('local'); } const lan = w === 'lan'; if (Settings.netLan !== lan) { Settings.netLan = lan; Settings.save(); if (lan) NetMode.load(true); } if (this.online()) { Sound.play('blip'); this.apply(); } else this.set(true);
+    if (this.online()) this.note(lan ? 'lan' : 'online'); },
+  /* v14.3.17 a notice for each choice; picking another one takes the last notice away straight away */
+  NOTES: { local: '🏠 <b>THIS SCREEN</b>: play here on this device: split screen with controllers, and CPUs fill the empty carts. No internet needed.',
+    online: '🌐 <b>ONLINE</b>: matchmaking and rooms find players anywhere on the internet. Log in to play.',
+    lan: '📶 <b>LAN</b>: matchmaking and rooms only find people on your network (the same Wi-Fi). Great for a room full of players.' },
+  note(w) {
+    const old = this.noteBox; if (old && old.w === w && old.on()) { Toasts.show(this.NOTES[w], [], 3500); return; } this.noteBox = null; if (old) { try { old.close(); } catch (e) { /* gone */ } }
+    const html = this.NOTES[w]; if (!html) return; const close = Toasts.show(html, [], 3500), r = document.getElementById('toasts'), box = r && [...r.children].reverse().find(b => b.innerHTML.startsWith(html.slice(0, 12)));
+    this.noteBox = { w, on: () => !!(box && box.isConnected && box.style.opacity !== '0'), close: () => { if (box && box.isConnected) { box.style.transition = 'opacity .12s'; box.style.opacity = '0'; setTimeout(close, 120); } else close(); } };
+  },
   set(on) { if (on && GameCfg.online === false) { Sound.play('back'); Toasts.show('Online play is turned off right now. Play on 🏠 THIS SCREEN.', [], 3500); return; } if (this.online() === !!on) return; Settings.playOnline = !!on; Settings.save(); this.apply(); Sound.play('select'); },
   init() {
     if (this.base) return; Settings.playOnline = false;   /* v14.3.12: the game opens on THIS SCREEN every time */ this.base = LOBBY_MODES.slice(); if (typeof BR_LOBBY_MODE !== 'undefined' && !this.base.includes(BR_LOBBY_MODE)) this.base.push(BR_LOBBY_MODE);

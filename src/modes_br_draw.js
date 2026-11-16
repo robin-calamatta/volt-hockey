@@ -201,7 +201,7 @@ Object.assign(GameScene.prototype, {
     const H = this.brH, all = [H.g, H.hp, H.name, ...H.slots.flatMap(s => [s.img, s.txt, s.key])];
     if (!show) { all.forEach(o => o.setVisible(false)); H.slots.forEach(s => s.inHand && s.inHand.setVisible(false)); return false; }
     all.forEach(o => o.setVisible(true));
-    const V = CONFIG.view, G = c.gs, sw = 96, sh = 62, gap = 8, bwid = BR.slots * sw + (BR.slots - 1) * gap, x0 = V.width - 16 - bwid, y0 = V.height - 74, g = H.g; g.clear();   // the inventory: bottom right
+    const V = CONFIG.view, G = c.gs, sw = 96, sh = 62, gap = 8, bwid = BR.slots * sw + (BR.slots - 1) * gap, x0 = V.width - 112 - bwid,   /* (v14.3.17: further in from the right edge, clear of a host badge in the corner) */  y0 = V.height - 74, g = H.g; g.clear();   // the inventory: bottom right
     const bw = 260, bx = 16, by = V.height - 24;                              // health (green to red) and shield (blue) bars: bottom left, under the speed meter
     g.fillStyle(0x0d151b, 0.75).fillRoundedRect(bx - 6, by - 20, bw + 100, 34, 6);
     g.fillStyle(0x223040, 1).fillRect(bx, by - 14, bw, 9).fillStyle(0x3d8bff, 1).fillRect(bx, by - 14, bw * Math.max(0, G.sh) / BR.maxShield, 9);

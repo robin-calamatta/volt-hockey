@@ -17,7 +17,7 @@ const isTeamMini = k => k !== 'br' && !!(MODES[k] && ((GAME_INFO[k] || {}).teams
     if (!IK.noItems) settings.push({ label: () => `Power-ups   ◀ ${itemsOn() ? 'On' : 'Off'} ▶`, change: flipItems, select: flipItems });
     const flipCpu = () => miniSave({ nocpu: { ...(o().nocpu || {}), [k]: !(o().nocpu || {})[k] } });
     settings.push({ label: () => `CPU carts   ◀ ${(o().nocpu || {})[k] ? 'Off (players only)' : 'On'} ▶`, change: flipCpu, select: flipCpu });
-    settings.push({ label: () => `CPU skill   ◀ ${Settings.difficulty} ▶`, change: d => Settings.cycleDifficulty(d) });
+    if (k !== 'br') settings.push({ label: () => `CPU skill   ◀ ${Settings.difficulty} ▶`, change: d => Settings.cycleDifficulty(d) });
     settings.push({ label: () => 'How to play', select: () => this.scene.start('HowTo', { kind: k, back: { scene: 'MiniSetup', data: { kind: k } } }) });
     settings.push({ label: () => 'Host an online room instead', select: () => this.online() });
     TeamSelect.build(this, {

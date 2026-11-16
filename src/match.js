@@ -236,6 +236,21 @@ class Match {
         }
       }
     }
+    /* v14.3.17 cradling: a ball sitting in a cart's cup turns with the cart. The cup used to drag the ball only along the way the cup was
+       moving, so in any turn the ball carried straight on, slid off the end of the cup and ended up behind the cart. Now a ball in the
+       cup (in front of its face, between its ends, and not hit hard) is also pulled back against the face, as the cup's curve does.
+       It lets go while the cart spins (90 degree shots and passes), and how hard it holds goes with the Ball grip setting. */
+    if (Settings.ballGrip > 0) {
+      const C = CONFIG.cup, faceX = C.frontX - C.recess + C.colliderRadius + B.radius; let best = null, bd = 1e9;
+      for (const c of live) { if (c.spinLeft > 0 || c.out || c.binLeft > 0) continue; const dx = b.x - c.x, dy = b.y - c.y; if (Math.abs(dx) > 1 || Math.abs(dy) > 1) continue;
+        const co = Math.cos(c.heading), si = Math.sin(c.heading), lx = dx * co + dy * si, ly = -dx * si + dy * co;
+        if (lx < faceX - 0.06 || lx > faceX + 0.16 || Math.abs(ly) > C.halfWidth + 0.06) continue;
+        const ty = Math.max(-C.halfWidth * 0.5, Math.min(C.halfWidth * 0.5, ly)), wx = c.x + faceX * co - ty * si, wy = c.y + faceX * si + ty * co;
+        const pvx = c.vx - (c.omega || 0) * (wy - c.y), pvy = c.vy + (c.omega || 0) * (wx - c.x), rel = Math.hypot(b.vx - pvx, b.vy - pvy);
+        if (rel > 3.5) continue;                                       // hit hard (a shot, a check): it flies
+        const d = Math.hypot(b.x - wx, b.y - wy); if (d < bd) { bd = d; best = { wx, wy, pvx, pvy }; } }
+      if (best) { const k = Math.min(1, Settings.ballGrip * 0.8 * h), pull = 10; b.vx += (best.pvx + (best.wx - b.x) * pull - b.vx) * k; b.vy += (best.pvy + (best.wy - b.y) * pull - b.vy) * k; }
+    }
     const speed = Math.hypot(b.vx, b.vy);           // rolling friction
     if (speed > 0) { const k = Math.max(0, speed - (Settings.ballFriction + B.dragPerSecond * speed) * h) / speed; b.vx *= k; b.vy *= k; }
     b.x += b.vx * h; b.y += b.vy * h;

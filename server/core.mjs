@@ -47,13 +47,28 @@ export function createApi(store, opts = {}) {
       turnCache = { at: now(), list }; return list;
     } catch (e) { console.error('TURN credentials:', e.message); return turnCache.list; }
   }
+  /* v14.3.16 Cloudflare's TURN relay (1,000 GB a month free): TURN_CF_KEY_ID + TURN_CF_API_TOKEN (Cloudflare dashboard > Realtime > TURN
+     server). Short-lived credentials are made here (they last 24 hours, and are made again after 12), so the token stays on the server. */
+  let cfCache = { at: 0, list: [] };
+  async function cfTurn() {
+    const id = typeof opts.cfTurnId === 'function' ? opts.cfTurnId() : opts.cfTurnId, tok = typeof opts.cfTurnToken === 'function' ? opts.cfTurnToken() : opts.cfTurnToken;
+    if (!id || !tok) return [];
+    if (now() - cfCache.at < 12 * 3600 * 1000 && cfCache.list.length) return cfCache.list;
+    try {
+      const r = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(id)}/credentials/generate-ice-servers`, { method: 'POST', headers: { authorization: 'Bearer ' + tok, 'content-type': 'application/json' }, body: JSON.stringify({ ttl: 86400 }), signal: AbortSignal.timeout(5000) });
+      if (!r.ok) throw new Error('Cloudflare TURN ' + r.status);
+      const j = await r.json(), list = (Array.isArray(j.iceServers) ? j.iceServers : [j.iceServers]).filter(x => x && x.urls)
+        .map(x => ({ ...x, urls: (Array.isArray(x.urls) ? x.urls : [x.urls]).filter(u => !/:53(\?|$)/.test(u)) })).filter(x => x.urls.length);   // (port 53 times out in browsers)
+      cfCache = { at: now(), list }; return list;
+    } catch (e) { console.error('Cloudflare TURN credentials:', e.message); return cfCache.list; }
+  }
   const iceServers = () => { try { return JSON.parse((typeof opts.ice === 'function' ? opts.ice() : opts.ice) || 'null'); } catch (e) { return null; } };   // TURN relay for voice / parties on strict networks (ICE_SERVERS)
   const sendEmail = opts.sendEmail || null, siteUrl = () => (typeof opts.siteUrl === 'function' ? opts.siteUrl() : opts.siteUrl) || '';
   const getUser = name => name ? store.get(key(name)) : null;
   const saveUser = u => store.set(key(u.name), u);
   const online = u => !!u && now() - (u.lastSeen || 0) < LIMITS.onlineMs;
   const me = u => ({ name: u.name, adult: !!u.adult, br: canBR(u), created: u.created, email: u.email ? maskEmail(u.email) : '' });
-  const GAME_DEFAULTS = { brThird: true, online: true, lan: true, broadcast: true, rizeSkip: false, brOnline: 100, off: {}, settings: {} };   /* brOnline: v14.3.12 carts (people first, then CPUs) in an online Volt Royale match */   /* off: v14.3.3 game modes turned off (hockey, season, practice, br, mini, or one minigame's id) */
+  const GAME_DEFAULTS = { brThird: true, online: true, lan: true, broadcast: true, rizeSkip: false, brOnline: 100, brSwitchMs: 0, brCpu: 'Superstar', off: {}, settings: {} };   /* brOnline: v14.3.12 carts (people first, then CPUs) in an online Volt Royale match */   /* off: v14.3.3 game modes turned off (hockey, season, practice, br, mini, or one minigame's id) */
   const gameCfg = async () => { const g = { ...GAME_DEFAULTS, ...((await store.get('cfg/game')) || {}) }; g.off = g.off && typeof g.off === 'object' ? g.off : {}; g.brOnline = brOnlineN(g.brOnline); BR_ONLINE = g.brOnline; return g; };
   let BR_ONLINE = 100; const brOnlineN = v => Math.max(10, Math.min(100, Math.round(+v || 100)));
   /* v14.2.22 Volt Royale public matchmaking. One queue per team size (1 to 5). Queued players poll every couple of seconds; a match forms when
@@ -378,7 +393,7 @@ export function createApi(store, opts = {}) {
     'POST /admin/raw/delete': async (b) => { await store.del(str(b.key, 300)); return { ok: true }; },
     /* v14.2.6: game-wide switches (the Game tab). brThird: third person allowed in Volt Royale */
     'GET /admin/game': async () => ({ game: await gameCfg() }),
-    'POST /admin/game': async (b) => { const cur = await gameCfg(); for (const k of Object.keys(GAME_DEFAULTS)) if (typeof b[k] === 'boolean') cur[k] = b[k]; if (b.brOnline !== undefined) cur.brOnline = brOnlineN(b.brOnline);
+    'POST /admin/game': async (b) => { const cur = await gameCfg(); for (const k of Object.keys(GAME_DEFAULTS)) if (typeof b[k] === 'boolean') cur[k] = b[k]; if (b.brOnline !== undefined) cur.brOnline = brOnlineN(b.brOnline); if (typeof b.brCpu === 'string' && ['Easy', 'Normal', 'Hard', 'Pro', 'Superstar', 'Legend'].includes(b.brCpu)) cur.brCpu = b.brCpu; if (b.brSwitchMs !== undefined) cur.brSwitchMs = Math.max(0, Math.min(3000, Math.round(+b.brSwitchMs || 0)));   /* (v14.3.17: Volt Royale weapon switch delay, ms) */
       if (b.settings && typeof b.settings === 'object') { const S = {}; for (const [k, v] of Object.entries(b.settings).slice(0, 80)) { if (!/^[A-Za-z0-9]{1,30}$/.test(k) || !v || typeof v !== 'object') continue; const o = {}; if (['boolean', 'number'].includes(typeof v.def) || (typeof v.def === 'string' && v.def.length <= 24)) o.def = v.def; if (v.lock === true) o.lock = true; if (Object.keys(o).length) S[k] = o; } cur.settings = S; }   /* v14.3.12: player settings: starting values and locks */
       if (b.off && typeof b.off === 'object') { const off = {}; for (const [k, v] of Object.entries(b.off).slice(0, 80)) if (/^[a-z]{2,16}$/.test(k) && v === true) off[k] = true; cur.off = off; } await store.set('cfg/game', cur); BR_ONLINE = cur.brOnline; return { game: cur }; }
   };
@@ -394,7 +409,7 @@ export function createApi(store, opts = {}) {
     'POST /password': async (b, q, h) => changePassword((await auth(h)).u, b), 'POST /email': async (b, q, h) => setEmail((await auth(h)).u, b),
     'POST /reset/request': (b) => requestReset(b), 'POST /reset/confirm': (b) => confirmReset(b),
     'PUT /prefs': async (b, q, h) => putPrefs((await auth(h)).u, b), 'PUT /progress': async (b, q, h) => putProgress((await auth(h)).u, b),
-    'GET /ice': async () => ({ iceServers: [...(iceServers() || []), ...(await turnCredentials())] }),
+    'GET /ice': async () => ({ iceServers: [...(await cfTurn()), ...(iceServers() || []), ...(await turnCredentials())] }),
     'GET /game': async () => ({ game: await gameCfg() }),   // (v14.2.6: game-wide switches the admin sets)
     'GET /leaderboard': () => leaderboard(), 'GET /profile': (b, q) => profile(q.name), 'GET /search': async (b, q, h) => search((await auth(h)).u, q),
     'POST /sync': async (b, q, h) => sync((await auth(h)).u, b),

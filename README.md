@@ -3,6 +3,54 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.3.18: the ball no longer vanishes from a guest's cup
+
+**Deploy the whole zip** (only game files changed; the server is the same as v14.3.17).
+
+- **Online guests, especially on phones:** the ball in your cup could vanish and come back to your cup a moment later. The game was right that the ball was in your cup. But it smoothed out each correction from the host separately for your cart and for the ball, and after a hiccup (a phone drawing fewer frames a second, or a late burst of updates from the host) the two drifted apart, so the ball was drawn up to a couple of metres away for up to a second and a half. Now, while the ball is in your cup, it's drawn in your cup.
+  - With a guest at 25 to 35 frames a second on a bursty connection, the ball was drawn out of the cup for up to 1.4 s at a time; now never for more than a tenth of a second (only at the edge of the cup).
+- (v14.3.17's cup grip when you turn is still in: that one is the ball physics, for everybody.)
+
+## v14.3.17: phone sign-in and panel, the ball stays on your stick, Volt Royale fixes, admin CPU skill and switch delay
+
+**Deploy the whole zip:** the server changed (two new admin settings on the Game tab).
+
+### Phones
+- **Log in / sign up with the on-screen keyboard open:** the form sits in the part of the screen the keyboard leaves free, and the box you're typing in scrolls into view. The same goes for the account, chat and legal pages.
+- **The Friends and Party panel scrolls all the way to the bottom.**
+- **The "Powered by Netlify" badge** is a Netlify setting, not part of the game: in Netlify, open the project, then **Project configuration > General > Powered by Netlify badge**, and turn it off. No redeploy needed.
+
+### Volt Hockey
+- **The ball stays on your stick when you turn** (on every screen, online or not). When you turned with the ball, it could roll round the cup and end up behind you, then come back a moment later. Now a ball sitting in your cup is held in it as you turn. It still comes loose with a hard hit, a spin, or a check, and stealing works as before.
+
+### Volt Royale
+- **Characters showing only their legs:** fixed. With more than 31 carts, some drivers shared a hidden drawing layer with your own driver (the one hidden in first person), so they vanished too. Every driver now shows.
+- **CPUs turn round and shoot back.** A CPU shot from behind used to reverse towards you, still facing away, and never fire. It now turns round (in under a second), keeps facing you while it reloads, and fights whoever is shooting at it rather than a squad-mate's target. It no longer stops to heal while someone is shooting at it.
+- **CPU skill:** Volt Royale has no CPU skill picker. Every CPU plays at the skill set on the admin page (Superstar unless changed).
+- **No delay when you switch weapons.** A gun keeps its own time between shots, so switching from a sniper and straight back doesn't skip its wait. The admin page can add a delay.
+- **An empty gun clicks** (out of bullets in the gun, or no ammo left for it).
+- **Rez card countdown:** while a squad-mate's rez card lies on the ground, the whole squad sees how long is left, including the player it belongs to (top of the screen and in the team panel, red for the last 20 seconds).
+- **The item bar** sits further in from the right, clear of the corner badge.
+- **Landing on a phone:** a guard against the map turning flat white (the storm haze can no longer go wrong). If it still happens, a screenshot helps.
+
+### Everywhere
+- **Party invites** play a soft chime.
+- **Leaving a game goes back to the lobby**, not the online menu or the room screen: quitting, being dropped, and backing out of the results (online, the host's room closes for everyone).
+- **The 🌐 ONLINE / 📶 LAN / 🏠 THIS SCREEN switch** says what each one does, and the last notice goes away as soon as you pick another.
+
+### Admin page (Game tab)
+- **Volt Royale: delay after switching weapons (ms):** 0 (the default) up to 3000.
+- **Volt Royale: CPU skill:** Easy to Legend, Superstar by default.
+
+## v14.3.16: Cloudflare's free TURN relay (1,000 GB a month)
+
+- The relay server, used for online play and voice when two players can't connect directly, can now be **Cloudflare Realtime TURN**. Its free allowance is 1,000 GB a month, against Metered's free 500 MB.
+- Set two Netlify environment variables: `TURN_CF_KEY_ID` and `TURN_CF_API_TOKEN`, from Cloudflare dashboard > Realtime > TURN server > Create.
+  - The server makes short-lived credentials from them: they last 24 hours and are renewed every 12. The token never reaches players' browsers.
+  - Cloudflare's servers come first in the list.
+- `ICE_SERVERS` and `TURN_CREDENTIALS_URL` still work and are added after Cloudflare's. Remove the Metered ones once Cloudflare's are in, so browsers don't try a relay that's out of quota.
+- Check: `/api/ice` should list `turn.cloudflare.com`.
+
 ## v14.3.15: website only (Google Play project removed); offline play and install-as-an-app stay
 
 - **Removed the Google Play / Android project from v14.3.14:** the `android/` folder, the GitHub build workflow (`.github/`) and `.well-known/assetlinks.json`, plus their Netlify settings. Nothing else needs them. No signing key or GitHub secrets are needed.

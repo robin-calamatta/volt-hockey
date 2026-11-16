@@ -87,3 +87,17 @@ BR_LOOT.push(['nade', 2.4]);
     return r;
   };
 }
+/* v14.3.17 no wait after switching weapons. Every gun shared one "ready to fire" timer, so after a sniper shot (or a heal) the next weapon
+   you picked had to wait out that timer too. Now each weapon keeps its own wait (switching away from a sniper and back doesn't skip it),
+   and the weapon you switch to is ready at once, or after the admin's "delay after switching weapons" (Game tab, in ms, 0 by default). */
+{ const B = MODES.br, sw = () => Math.max(0, +((typeof GameCfg !== 'undefined' && GameCfg.brSwitchMs) || 0)) / 1000;
+  const around = (fn, c, m, call) => {
+    const G = c && c.gs; if (!G || !m || !m.gs) return call(); const t = m.gs.t || 0, prev = G.hol ? null : G.inv[G.sel];
+    if (prev && G.cd > 0) prev.cdT = t + G.cd;                                       // the weapon put away keeps its own wait
+    const r = call(), now = G.hol ? null : G.inv[G.sel];
+    if (now !== prev) { const rem = now && now.cdT ? Math.max(0, now.cdT - t) : 0; G.cd = now ? Math.max(rem, sw()) : 0; }
+    return r;
+  };
+  for (const k of ['cycle', 'holster']) { const f = B[k]; if (typeof f === 'function') B[k] = function (c, m, ...a) { return around(k, c, m, () => f.call(this, c, m, ...a)); }; }
+  const ia = B.invAct; B.invAct = function (c, act, m) { return around('invAct', c, m, () => ia.call(this, c, act, m)); };
+}

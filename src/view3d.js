@@ -334,12 +334,12 @@ class View3D {
     this.cartGeoKey = key; return this.cartGeo;
   }
   buildCarts() {
-    if (this.carts) for (const c of this.carts) this.scene.remove(c.group, c.ring);
+    if (this.carts) for (const c of this.carts) this.scene.remove(c.group, c.ring); this.soloL = [];
     const G = this.cartGeometry(), num = this.numberTextures || (this.numberTextures = {});
     this.carts = this.m.chairs.map((ch, i) => {
       const team = this.teamColor(ch.side), k = ch.index + ch.side * 3, skin = CROWD_SKIN[(k * 2 + 1) % CROWD_SKIN.length], hair = CROWD_HAIR[(k * 3 + 2) % CROWD_HAIR.length];
       const cols = { wood: [0xd8a46c, 0.55], woodEdge: [0xb07a45, 0.6], black: [0x1b1d20, 0.6], grey: [0x9aa1a7, 0.85], plastic: [0xf4f4f2, 0.35], team: [team, 0.45], white: [0xf0f0f0, 0.5], selfTeam: [team, 0.6], selfWhite: [0xffffff, 0.6], selfSkin: [skin, 0.7], selfHair: [hair, 0.9], pants: [0x2f3b55, 0.8], shoes: [0xffffff, 0.6], selfPants: [0x2f3b55, 0.8], selfBlack: [0x15171a, 0.7], selfWood: [0xd8a46c, 0.55] };
-      const group = new THREE.Group(), self = 1 + i;                 // layer 1 + i: this cart's driver, hidden from their own first-person view
+      const group = new THREE.Group(), self = 1 + (i % 27);          // layer 1 + i: this cart's driver, hidden from their own first-person view (v14.3.17: only 32 layers exist, see soloLayer)
       for (const [k2, geo] of Object.entries(G.parts)) {
         const [col, rough, metal] = cols[k2], mesh = new THREE.Mesh(geo, this.mat(col, { rough, metal })); mesh.castShadow = true;
         if (k2.startsWith('self')) mesh.layers.set(self); group.add(mesh);
@@ -459,6 +459,19 @@ class View3D {
 
   /* ----- cameras ----- */
   camFor(key) { let c = this.cams.get(key); if (!c) { c = { cam: new THREE.PerspectiveCamera(60, 16 / 9, 0.05, 160), yaw: null, pos: null, chair: null, mode: null, fx: null }; this.cams.set(key, c); } return c; }
+  /* v14.3.17 three.js has only 32 layers. In Volt Royale there are more carts than that, so cart 33's driver shared a layer with
+     cart 1's, and when you looked through cart 1's eyes cart 33's driver vanished too (only the legs were left). Now carts share
+     layers 1 to 27, and the cart a camera hides its driver from gets one of layers 28 to 31 to itself. */
+  soloLayer(cart) {
+    if (!this.carts || this.carts.length <= 27 || !cart) return cart && cart.layer;
+    const solo = this.soloL || (this.soloL = []), now = performance.now();
+    let e = solo.find(x => x.cart === cart); if (e) { e.t = now; return cart.layer; }
+    const used = new Set(solo.filter(x => this.carts.includes(x.cart)).map(x => x.layer)); let L = [28, 29, 30, 31].find(l => !used.has(l));
+    if (!L) { solo.sort((a, b) => a.t - b.t); const old = solo.shift(); L = old.layer; this.relayer(old.cart, old.nat); }
+    for (let j = solo.length - 1; j >= 0; j--) if (!this.carts.includes(solo[j].cart)) solo.splice(j, 1);
+    solo.push({ cart, layer: L, nat: cart.layer, t: now }); this.relayer(cart, L); return L;
+  }
+  relayer(cart, L) { const from = cart.layer; if (from === L) return; const m = (1 << from) >>> 0; cart.group.traverse(o => { if (o.layers && o.layers.mask === m) o.layers.set(L); }); cart.layer = L; }
   /* Place viewport vp's camera. vp: { key, chair, mode, rect: { x, y, w, h } (game pixels) }. Returns the camera. */
   placeCamera(vp, dt) {
     const C = CONFIG.court, V3 = CONFIG.view3d, st = this.camFor(vp.key), cam = st.cam, ch = vp.chair || (vp.mode === 'bench' ? vp.benchChair : null), aspect = vp.rect.w / vp.rect.h;
@@ -473,7 +486,7 @@ class View3D {
       const pitch = F.pitch * D - st.ly * (st.ly > 0 ? LK.down : LK.up) * D;                                  // stick down looks down
       cam.fov = this.widen(Settings.fov3d || 74, aspect); cam.position.set(ex, F.eyeY, ey);
       cam.lookAt(ex + Math.cos(yaw) * Math.cos(pitch), F.eyeY + Math.sin(pitch), ey + Math.sin(yaw) * Math.cos(pitch));
-      const cart = this.carts.find(c => c.ch === ch); if (cart) cam.layers.disable(cart.layer);
+      const cart = this.carts.find(c => c.ch === ch); if (cart) cam.layers.disable(this.soloLayer(cart));
     } else if (vp.mode === 'bench' && vp.benchChair) {         // in the sin bin: watch from your seat at the boards, following the ball
       const bc = vp.benchChair, sl = this.binSlot(bc), K3 = CONFIG.view3d.cart, b = this.m.ball, F = V3.first;
       const ex = sl.x + Math.cos(sl.heading) * (K3.seatX - 0.05), ey = sl.y + Math.sin(sl.heading) * (K3.seatX - 0.05), eh = F.eyeY;
@@ -481,7 +494,7 @@ class View3D {
       const yaw = st.yaw + st.lx * LK.yaw * D, pitch = Math.max(-0.6, Math.atan2(0.1 - eh, Math.hypot(b.x - ex, b.y - ey))) - st.ly * (st.ly > 0 ? LK.down : LK.up) * D;
       cam.fov = this.widen(Settings.fov3d || 74, aspect); cam.position.set(ex, eh, ey);
       cam.lookAt(ex + Math.cos(yaw) * Math.cos(pitch), eh + Math.sin(pitch), ey + Math.sin(yaw) * Math.cos(pitch));
-      const cart = this.carts.find(c => c.ch === bc); if (cart) cam.layers.disable(cart.layer);
+      const cart = this.carts.find(c => c.ch === bc); if (cart) cam.layers.disable(this.soloLayer(cart));
     } else if (vp.mode === 'third' && ch) {
       const T = V3.third, dist = Settings.chaseDist || 3.5; st.yaw = follow(st.yaw, ch.heading, T.follow, T.maxTurn);
       const oy = st.yaw + st.lx * LK.orbit * D, cy = Math.cos(oy), sy = Math.sin(oy), lim = T.keepIn;               // the right stick swings the camera round the cart

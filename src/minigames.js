@@ -32,7 +32,8 @@ function miniLabel(cfg) {
 class MiniMatch extends Match {
   constructor(opts) {
     super({ ...opts, practice: true });
-    const cfg = this.mini = { ...opts.mini }; this.kind = cfg.kind; this.noBall = true; this.nets = []; this.creases = [];
+    const cfg = this.mini = { ...opts.mini }; this.kind = cfg.kind;
+    if (this.kind === 'br') { const n = (typeof GameCfg !== 'undefined' && GameCfg.brCpu) || 'Superstar'; this.difficulty = CONFIG.difficulties[n] || CONFIG.difficulties.Superstar; this.diffBySide = null; }   // v14.3.17 Volt Royale: every CPU plays at the skill set on the admin page (Superstar unless changed); no picker this.noBall = true; this.nets = []; this.creases = [];
     this.boxes = []; this.zaps = []; this.slicks = []; this.order = []; this.boxIn = MINI.item.boxFirst; this.idN = 0; this.result = null; this.clock = cfg.minutes * 60;
     const taken = this.players.map(p => p.name), names = CONFIG.playerNames.filter(n => !taken.includes(n));
     this.chairs.forEach((c, i) => { c.k = i; c.cpuName = names[i % names.length]; c.balloons = cfg.balloons; c.out = false; c.item = ''; c.boostLeft = c.oilLeft = c.stunLeft = c.safeLeft = 0; c.pops = 0; c.catches = 0; c.lap = 0; c.prog = 0; c.finish = 0; });

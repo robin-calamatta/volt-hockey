@@ -148,7 +148,7 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
     cycle(c, m, d = 1) { const G = c.gs; if (!G.inv.length || c.out || G.down) return; G.use = null; G.rl = 0; if (G.hol) { G.hol = 0; G.sel = Math.min(G.last, G.inv.length - 1); } else G.sel = (G.sel + (d < 0 ? G.inv.length - 1 : 1)) % G.inv.length; if (c.player) this.psfx(m, c, 'blip'); },
     reload(c, m) {
       const G = c.gs, it = gunOf(c); if (!it || G.rl > 0 || G.down || G.use) return; const gun = BR_GUNS[it.k], A = BR_AMMO[gun.type];
-      if (it.a >= gun.mag) return; if (G.am[A.i] <= 0) { if (c.player && !(G.noAmmoAt > m.simTime)) { G.noAmmoAt = m.simTime + 2; this.say(m, c, 'NO ' + A.name); m.sfx('back'); } return; }
+      if (it.a >= gun.mag) return; if (G.am[A.i] <= 0) { if (c.player && !(G.noAmmoAt > m.simTime)) { G.noAmmoAt = m.simTime + 2; this.say(m, c, 'NO ' + A.name); if (G.dryAt !== m.simTime) this.psfx(m, c, 'dry'); } return; }
       G.rl = gun.rl; G.rlT = gun.rl; G.rlS = G.sel; G.rlN = 0; if (c.player) this.psfx(m, c, 'rl_' + it.k);
     },
     /* ---- RT: fire, or start using a heal (it takes time); boosts and walls are instant ---- */
@@ -156,7 +156,7 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
       const G = c.gs; if (c.out || G.down || G.use) return; if (G.hol) { this.holster(c, m); return; }
       const it = G.inv[G.sel]; if (!it || G.cd > 0) return; const gun = BR_GUNS[it.k];
       if (gun) { if (G.rl > 0 && gun.shell && it.a > 0) G.rl = 0;   /* a shotgun can fire part-way through loading */
-        if (G.rl > 0) return; if (it.a <= 0) { this.reload(c, m); G.cd = 0.25; return; } const a0 = it.a, r = M0.use.call(this, c, m); if (it.a < a0) { G.shotT = m.gs.t; G.shotN = (G.shotN || 0) + 1; } return r; }   // (shotT: the recoil)
+        if (G.rl > 0) return; if (it.a <= 0) { if (c.player) { this.psfx(m, c, 'dry'); G.dryAt = m.simTime; } this.reload(c, m); G.cd = 0.25; return; }   /* (v14.3.17: click) */ const a0 = it.a, r = M0.use.call(this, c, m); if (it.a < a0) { G.shotT = m.gs.t; G.shotN = (G.shotN || 0) + 1; } return r; }   // (shotT: the recoil)
       const I = BR_ITEMS[it.k]; if (!I) return;
       if (I.heal) { if (!this.helps(c, I)) { if (c.player) this.say(m, c, I.hp && !I.sh ? (G.hp >= (I.cap || 100) ? (I.cap < 100 ? 'BANDAGES ONLY HEAL UP TO 75' : 'HEALTH IS FULL') : '') : I.shCap && G.sh >= I.shCap && G.sh < BR.maxShield ? `PLATES ONLY GO UP TO ${I.shCap}` : 'CART ARMOUR IS FULL'); G.cd = 0.5; return; } G.use = { k: it.k, s: G.sel, left: I.time, tot: I.time, tk: -1 }; m.sfx('blip'); return; }
       if (it.k === 'boost') { G.boost = 3; c.vx += Math.cos(c.heading) * 2.2; c.vy += Math.sin(c.heading) * 2.2; } else if (it.k === 'wall') { const p = c.toWorld(1.6, 0); MG.add(m, { t: 'dwall', x: MG.r2(p.x), y: MG.r2(p.y), a: MG.r2(c.heading), lv: G.lv, z: G.z, hp: 150, until: m.gs.t + 25 }); }
@@ -265,7 +265,7 @@ GAME_INFO.br.label = cfg => `${cfg.map === 'random' ? 'Random map' : (BR_MAPS[cf
         if (MH.dist(c, dn) < 2 && Math.abs(dn.gs.z - G.z) < 1) { c.wantInt = true; return { x: dn.x - c.x, y: dn.y - c.y, speed: 0 }; }
         const save = c.goTo; c.goTo = { x: dn.x, y: dn.y, lv: dn.gs.lv }; const out = M0.ai.call(this, c, m); c.goTo = save; if (out && MH.dist(c, dn) < 6 && !(out.speed > 0.3)) { const a = Math.atan2(dn.y - c.y, dn.x - c.x); return { x: Math.cos(a), y: Math.sin(a), speed: 0.6 }; } return out;
       }
-      if (!foeNear) {                                                      // heal up when it is calm
+      if (!foeNear && !(G.hurtAt !== undefined && g.t - G.hurtAt < 3 && G.inv.some(it => BR_GUNS[it.k] && it.a > 0))) {   // heal up when it is calm (v14.3.17: not while someone is shooting at it from further off and it can shoot back)
         const find = ks => G.inv.findIndex(it => ks.includes(it.k));
         const want = G.hp < 40 ? find(['medkit', 'fullkit', 'band']) : G.hp < 75 ? find(['band', 'medkit']) : G.sh < 50 ? find(['armour', 'plate', 'fullkit']) : -1;
         if (want >= 0 && G.cd <= 0 && this.helps(c, BR_ITEMS[G.inv[want].k])) { G.sel = want; c.wantUse = true; return { x: Math.cos(c.heading), y: Math.sin(c.heading), speed: 0.15 }; }
