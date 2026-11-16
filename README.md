@@ -3,6 +3,14 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.3.22: emotes on phones
+
+**Deploy the whole zip** (only game files changed; the server is the same as v14.3.17).
+
+- **The EMOTE touch button opens the emote wheel and keeps it open:** tap an emoji to send it. Tap outside the wheel, the ✕ in its middle, or EMOTE again to close it. Before, the wheel was hold-and-point like a controller's, which needs a second thumb on the stick, and it closed as soon as you let go.
+- **Volt Royale:** a tap on the button still opens your bag; hold it to open the emote wheel, which then stays open the same way.
+- Controllers and keyboards work as before (hold, point, let go).
+
 ## v14.3.21: forms stay open when you tap outside them
 
 **Deploy the whole zip** (only game files changed; the server is the same as v14.3.17).

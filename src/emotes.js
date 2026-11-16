@@ -13,12 +13,33 @@ const Emotes = {
     const m = sc.match; if (!m || sc.demo || sc.scene.key !== 'Game') return; /* (touch button names: TouchPad.profile) */ const now = performance.now(), live = m.state !== 'over';
     for (const p of Progress.mine(sc)) {
       const src = this.srcOf(sc, p); if (!src || !src.held) continue; const st = this.st.get(p) || {}; this.st.set(p, st);
+      /* v14.3.22 the touch EMOTE button: a hold-and-point wheel needs a second thumb on the stick, and letting go closed it. On touch the
+         wheel opens and stays open: tap an emoji to send it, tap outside it (or the button again) to close. Volt Royale: a tap is still the
+         bag, so there a hold opens it. */
+      const TS = Controls.sources && Controls.sources.touch, tdown = !!(src === Controls.mine && TS && TS.held && TS.held.quick), tq = tdown || !!(st.tq && st.t0);   // (the touch source counts a tap between two frames as a press)
+      if (st.touch && st.open && !live) this.closeTouch(st);
+      if (tq && live) {
+        if (tdown) { if (!st.t0) { st.t0 = now; st.tq = true; st.wasOpen = st.open; if (st.open) this.closeTouch(st); else if (sc.match.kind !== 'br') this.openTouch(sc, p, st); }
+          else if (sc.match.kind === 'br' && !st.open && now - st.t0 > this.holdMs) this.openTouch(sc, p, st); }
+        else { if (!st.open && !st.wasOpen && sc.match.kind === 'br') src.bagTap = true; st.t0 = 0; st.tq = false; }
+        continue;
+      }
       if (src.held.quick && live) { if (!st.t0) st.t0 = now; if (!st.open && now - st.t0 > this.holdMs) { st.open = true; st.sel = -1; Sound.play('blip'); } }
       else { if (st.open && !st.mouse) { if (st.sel >= 0) this.send(sc, p, this.wheel()[st.sel]); st.open = false; } else if (st.t0 && !st.open) src[sc.match.kind === 'br' ? 'bagTap' : 'quickTap'] = true; /* a quick tap: the bag (Volt Royale) or quick chat */ st.t0 = 0; }
       if (st.open && !st.mouse) { const r = Math.hypot(src.rx || 0, src.ry || 0) > 0.5 ? [src.rx, src.ry] : Math.hypot(src.ax || 0, src.ay || 0) > 0.5 ? [src.ax, src.ay] : null; if (r) { const s = ((Math.round(Math.atan2(r[1], r[0]) / (Math.PI / 4)) % 8) + 8) % 8; if (s !== st.sel) { st.sel = s; Sound.play('blip'); } } }
     }
     this.draw(sc); this.driftBar(sc);
   },
+  openTouch(sc, p, st) {
+    st.open = true; st.mouse = true; st.touch = true; st.sel = -1; Sound.play('blip');
+    if (st.domHook) return;
+    st.domHook = e => { if (!sc.sys || !sc.sys.isActive() || sc.match.state === 'over') { this.closeTouch(st); return; } if (!st.open || !st.geom) return; const el = e.target; if (el && el.closest && TouchPad.els && TouchPad.els.quick && TouchPad.els.quick.contains(el)) return;   // (the button itself: toggles)
+      const r = voltGame.canvas.getBoundingClientRect(), V = CONFIG.view, gx = (e.clientX - r.left) / r.width * V.width, gy = (e.clientY - r.top) / r.height * V.height, G = st.geom, d = Math.hypot(gx - G.cx, gy - G.cy);
+      if (d < G.rr + 60) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); if (d > 50) { const s = ((Math.round(Math.atan2(gy - G.cy, gx - G.cx) / (Math.PI / 4)) % 8) + 8) % 8; st.sel = s; this.send(sc, p, this.wheel()[s]); } }
+      this.closeTouch(st); };
+    document.addEventListener('pointerdown', st.domHook, true);
+  },
+  closeTouch(st) { st.open = false; st.mouse = false; st.touch = false; if (st.domHook) { document.removeEventListener('pointerdown', st.domHook, true); st.domHook = null; } },
   driftBar(sc) {                                                          // the drift bar: charges white, blue, orange, purple while you drift; BOOST! when you let go
     const V = CONFIG.view, F = CONFIG.drift; if (!sc.drG || !sc.drG.scene) { sc.drG = sc.add.graphics().setDepth(44); sc.drT = sc.add.text(0, 0, '', { fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5).setDepth(45).setStroke('#0d151b', 4); }
     const g = sc.drG; g.clear(); sc.drT.setVisible(false);
@@ -58,10 +79,10 @@ const Emotes = {
     const mine = Progress.mine(sc);
     mine.forEach((p, i) => { const st = this.st.get(p); if (!st || !st.open) return;            // the wheel
       const vp = sc.vps && sc.vps.find(v => v.p === p), R = vp ? vp.rect : { x: 0, y: 0, w: V.width, h: V.height }, cx = R.x + R.w / 2, cy = R.y + R.h / 2, rr = Math.min(170, R.h * 0.36), W = this.wheel();
-      g.fillStyle(0x0d151b, 0.72).fillCircle(cx, cy, rr + 30).lineStyle(3, 0xffd23f, 0.9).strokeCircle(cx, cy, rr + 30).fillStyle(0x1b2a6b, 0.9).fillCircle(cx, cy, 46);
-      txt(cx, cy, st.mouse ? '✕' : st.sel >= 0 ? this.icon(W[st.sel]) : '🙌', st.mouse ? '30px' : '40px'); if (st.sel >= 0 && ACTIONS[W[st.sel]]) txt(cx, cy + 34, ACTIONS[W[st.sel]].name, '15px');
+      st.geom = { cx, cy, rr }; g.fillStyle(0x0d151b, 0.72).fillCircle(cx, cy, rr + 30).lineStyle(3, 0xffd23f, 0.9).strokeCircle(cx, cy, rr + 30).fillStyle(0x1b2a6b, 0.9).fillCircle(cx, cy, 46);
+      if (st.touch) txt(cx, cy + rr + 50, 'Tap an emoji to send it', '18px'); txt(cx, cy, st.mouse ? '✕' : st.sel >= 0 ? this.icon(W[st.sel]) : '🙌', st.mouse ? '30px' : '40px'); if (st.sel >= 0 && ACTIONS[W[st.sel]]) txt(cx, cy + 34, ACTIONS[W[st.sel]].name, '15px');
       for (let s = 0; s < 8; s++) { const a = s * Math.PI / 4, x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr; if (s === st.sel) g.fillStyle(0xffd23f, 0.95).fillCircle(x, y, 40); else g.fillStyle(0x2a3a48, 0.9).fillCircle(x, y, 34); txt(x, y, this.icon(W[s]), s === st.sel ? '44px' : '36px'); }
-      if (st.mouse && !st.hook) { st.hook = true; sc.input.once('pointerdown', ptr => { st.hook = false; if (!st.open) return; const d = Math.hypot(ptr.x - cx, ptr.y - cy); if (d > 70 && d < rr + 60) { const s = ((Math.round(Math.atan2(ptr.y - cy, ptr.x - cx) / (Math.PI / 4)) % 8) + 8) % 8; this.send(sc, p, W[s]); } st.open = false; st.mouse = false; }); }
+      if (st.mouse && !st.touch && !st.hook) { st.hook = true; sc.input.once('pointerdown', ptr => { st.hook = false; if (!st.open) return; const d = Math.hypot(ptr.x - cx, ptr.y - cy); if (d > 70 && d < rr + 60) { const s = ((Math.round(Math.atan2(ptr.y - cy, ptr.x - cx) / (Math.PI / 4)) % 8) + 8) % 8; this.send(sc, p, W[s]); } st.open = false; st.mouse = false; }); }
     });
     for (let i = n; i < sc.emoT.length; i++) sc.emoT[i].setVisible(false);
   }
