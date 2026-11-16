@@ -649,7 +649,7 @@ class ClientSim {
   goalGate(m, hbRow) {
     const R = CONFIG.ball.radius, B = m.ball, hb = { x: hbRow[0], y: hbRow[1] };
     for (const n of m.nets) {
-      const dir = n.end === 0 ? -1 : 1, line = n.mouthX - dir * R, inside = o => dir * (o.x - line) > 0 && o.y > n.y1 && o.y < n.y2;
+      const dir = n.end === 0 ? -1 : 1, line = n.mouthX - dir * R, inside = o => dir * (o.x - line) > 0 && dir * (o.x - n.backX) < 0 && o.y > n.y1 && o.y < n.y2;   /* (v14.3.19: in the net = between the mouth and the back of the net. Behind the net counted too, so a ball carried round the back was pulled to the mouth or swapped for the host's: it vanished from your cup) */
       if (inside(B) && !inside(hb)) { B.x = line; if (dir * B.vx > 0) B.vx = 0; }
       else if (inside(hb)) { B.x = hb.x; B.y = hb.y; B.vx = hbRow[2]; B.vy = hbRow[3]; }
     }

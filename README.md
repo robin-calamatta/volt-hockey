@@ -3,6 +3,12 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.3.19: the ball no longer vanishes behind the net for guests
+
+**Deploy the whole zip** (only game files changed; the server is the same as v14.3.17).
+
+- **Carrying the ball round the back of the net as an online guest:** the ball vanished from your cup until you came out the other side. A guest's screen holds the ball at the goal mouth until the host has counted a goal, but it took "inside the net" to mean anywhere behind the goal line level with the net, including the space behind the net. So a ball carried round the back was pulled to the goal mouth or swapped for the host's older position. Now only a ball between the mouth and the back of the net counts.
+
 ## v14.3.18: the ball no longer vanishes from a guest's cup
 
 **Deploy the whole zip** (only game files changed; the server is the same as v14.3.17).
