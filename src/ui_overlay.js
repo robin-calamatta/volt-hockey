@@ -20,7 +20,7 @@ const PadNav = {
   open(el, opts = {}) {
     this.css(); this.guard(el); this.close(el); this.stack.push({ el, onBack: opts.onBack || (() => {}), onKey: opts.onKey || null, modal: !!opts.modal });
     if (opts.modal) this.blockGame(true);
-    if (opts.focusFirst || this.padRecently()) this.focus(this.focusables(el)[0]);
+    if (opts.focusFirst || this.padRecently()) { const F = this.focusables(el); this.focus(F.find(x => !x.classList.contains('fx')) || F[0]); }   /* (v14.3.21: start on the first real item, not the ✕ in the corner) */
     this.loop();
   },
   close(el) { const was = this.stack.length; this.stack = this.stack.filter(s => s.el !== el); if (was !== this.stack.length && !this.stack.some(s => s.modal)) this.blockGame(false); },

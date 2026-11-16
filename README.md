@@ -3,6 +3,20 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.3.21: forms stay open when you tap outside them
+
+**Deploy the whole zip** (only game files changed; the server is the same as v14.3.17).
+
+- **Log in, sign up and the other forms** (forgot password, account, delete account): a tap outside the box no longer closes the form. On a phone with the keyboard up, almost anywhere you tapped was "outside", and you lost what you'd typed. Every form now has a **✕** in its top corner (it stays in view when the form scrolls). Escape, a controller's B and "Play as guest" still close it too.
+- A controller still starts on the form's first item, not on the ✕.
+
+## v14.3.20: phones: close the game modes menu, page through the Locker
+
+**Deploy the whole zip** (only game files changed; the server is the same as v14.3.17).
+
+- **Game modes menu:** a **✕ CLOSE** button, and tapping anywhere above the menu, close it without changing your pick. Before, only a controller's B or ▲ closed it, so on a phone you had to pick something.
+- **Locker (player skins, cart skins, emotes):** the list now pages on a phone or with a mouse. Tap **▼ MORE** / **▲ UP**, swipe up or down on the items, or use the mouse wheel. A "page 2 of 5" count shows where you are. Before, the list only moved with a controller's cursor, so a phone was stuck on the first page. A skin is now picked when your finger lifts, so a swipe doesn't wear the one it started on.
+
 ## v14.3.19: the ball no longer vanishes behind the net for guests
 
 **Deploy the whole zip** (only game files changed; the server is the same as v14.3.17).

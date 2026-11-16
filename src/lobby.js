@@ -76,15 +76,25 @@ class LobbyHomeScene extends Phaser.Scene {
       this.tap(40, y, 276, 42, () => { L.slot = i; L.col = 1; L.item = 0; L.pick = -1; this.preview = null; this.redraw(); }); });
     const s = S[L.slot], items = this.lockerItems(), cols = s.colors ? 5 : 3, tw = s.colors ? 70 : 118, th = s.colors ? 70 : 118, x0 = 860, y0 = 150;
     this.box(844, 100, 410, 560); this.T(860, 108, s.wheel ? (L.pick >= 0 ? `PICK AN EMOTE FOR SLOT ${L.pick + 1}` : 'YOUR WHEEL: pick a slot') : s.name, 22, '#ffd23f');
-    const vis = Math.floor((650 - y0) / (th + 10)), row0 = Math.max(0, Math.floor(L.item / cols) - vis + 1);   // (a long list scrolls with the cursor)
-    if (row0 > 0) this.T(1240, 112, '▲ more', 14, '#9fb2bf', { ox: 1 }); if (Math.ceil(items.length / cols) > row0 + vis) this.T(1240, 640, '▼ more', 14, '#9fb2bf', { ox: 1 });
+    /* v14.3.20 the list keeps its own scroll position: the cursor still scrolls it (controller), and on a phone or with a mouse the
+       ▲ / ▼ buttons, a swipe up or down on the items, or the mouse wheel scroll it a page at a time (it used to move only with the
+       controller's cursor, so a phone was stuck on the first page) */
+    const vis = Math.floor((650 - y0) / (th + 10)), rows = Math.ceil(items.length / cols), maxTop = Math.max(0, rows - vis), cr = Math.floor(L.item / cols);
+    if (L.top === undefined || L.topSlot !== L.slot + ':' + L.pick) { L.top = Math.max(0, cr - vis + 1); L.topSlot = L.slot + ':' + L.pick; }
+    if (L.col === 1 && !L.touchScroll) { if (cr < L.top) L.top = cr; if (cr >= L.top + vis) L.top = cr - vis + 1; }
+    L.top = Math.max(0, Math.min(maxTop, L.top)); const row0 = L.top;
+    const scroll = dr => { const t = Math.max(0, Math.min(maxTop, L.top + dr)); if (t === L.top) return; L.top = t; L.touchScroll = true; Sound.play('blip'); this.redraw(); };
+    this.lockerScroll = { x: 844, y: 140, w: 410, h: 520, page: Math.max(1, vis - 1), by: scroll, rowH: th + 10 };
+    if (row0 > 0) { this.box(1160, 104, 84, 36, 0x2a4a6b, 0.95, 0xffffff, 8); this.T(1202, 122, '▲ UP', 16, '#ffffff', { ox: 0.5, oy: 0.5, depth: 12 }); this.tap(1150, 98, 104, 48, () => scroll(-Math.max(1, vis - 1))); }
+    if (rows > row0 + vis) { this.box(1160, 618, 84, 36, 0x2a4a6b, 0.95, 0xffffff, 8); this.T(1202, 636, '▼ MORE', 16, '#ffffff', { ox: 0.5, oy: 0.5, depth: 12 }); this.tap(1150, 612, 104, 48, () => scroll(Math.max(1, vis - 1))); }
+    if (rows > vis) this.T(1140, 636, `page ${Math.floor(row0 / Math.max(1, vis - 1)) + 1} of ${Math.ceil(maxTop / Math.max(1, vis - 1)) + 1}`, 14, '#9fb2bf', { ox: 1, oy: 0.5, depth: 12 });
     items.forEach((it, i) => { const cx = x0 + (i % cols) * (tw + 10), cy = y0 + (Math.floor(i / cols) - row0) * (th + 10), on = L.col === 1 && i === L.item, eq = it.equipped, own = it.own;
-      if (cy < y0 || cy + th > 650) return;
+      if (cy < y0 || cy + th > 650 || (rows > row0 + vis && cy + th > 612)) return;   /* (and not under the ▼ MORE button) */
       if (s.colors) { const g = this.add.graphics().setDepth(11); g.fillStyle(Phaser.Display.Color.HexStringToColor(it.id).color, 1).fillRoundedRect(cx, cy, tw, th, 10).lineStyle(on ? 4 : 2, on ? 0x5fd6ff : eq ? 0xffd23f : 0x000000, on || eq ? 1 : 0.4).strokeRoundedRect(cx, cy, tw, th, 10); this.ui.push(g); if (eq) this.T(cx + tw / 2, cy + th / 2, '✓', 28, '#10181e', { ox: 0.5, oy: 0.5, depth: 12 }); }
       else { this.box(cx, cy, tw, th, own ? 0x1b2a45 : 0x141820, 0.95, on ? 0x5fd6ff : eq ? 0xffd23f : 0x2d5068, 10); this.T(cx + tw / 2, cy + 44, it.icon, 44, '#ffffff', { ox: 0.5, oy: 0.5, depth: 12 }).setFontFamily('sans-serif').setAlpha(own ? 1 : 0.4);
         this.T(cx + tw / 2, cy + 86, it.name, 15, own ? '#ffffff' : '#7d8a96', { ox: 0.5, align: 'center', wrap: tw - 8, depth: 12 }); if (!own) this.T(cx + tw - 8, cy + 6, '🔒 ' + it.tier, 14, '#ffd23f', { ox: 1, depth: 12 }); if (eq) this.T(cx + 8, cy + 6, '✓', 18, '#ffd23f', { depth: 12 }); }
-      this.tap(cx, cy, tw, th, () => { L.col = 1; L.item = i; this.lockerHover(); this.lockerPick(); }); });
-    const it = items[L.item]; if (L.col === 1 && it && !it.own) this.T(1049, 640, `Unlocks at Season pass tier ${it.tier} (you are tier ${Progress.tier()})`, 16, '#ffd23f', { ox: 0.5 });
+      { const z = this.tap(cx, cy, tw, th, () => {}); z.removeAllListeners('pointerdown'); z.on('pointerup', () => { if (this.lockerSwiped) return; Sound.resume(); L.col = 1; L.item = i; L.touchScroll = false; this.lockerHover(); this.lockerPick(); }); } });   /* (picked when the finger lifts, so a swipe to scroll doesn't wear the item it started on) */
+    const it = items[L.item]; if (L.col === 1 && it && !it.own) this.T(1049, 592, `Unlocks at Season pass tier ${it.tier} (you are tier ${Progress.tier()})`, 16, '#ffd23f', { ox: 0.5 });
   }
   lockerItems() {
     const s = LOCKER_SLOTS[this.lk.slot], look = Progress.look();
@@ -160,7 +170,7 @@ class LobbyHomeScene extends Phaser.Scene {
       const L = this.lk, S = LOCKER_SLOTS, items = this.lockerItems(), cols = S[L.slot].colors ? 5 : 3;
       if (L.col === 0) { if (e.up) { L.slot = (L.slot + S.length - 1) % S.length; L.pick = -1; this.redrawSoon(); } if (e.down) { L.slot = (L.slot + 1) % S.length; L.pick = -1; this.redrawSoon(); } if (e.right || e.a) { L.col = 1; L.item = Math.max(0, items.findIndex(i => i.equipped)); this.lockerHover(); } if (e.b) this.setTab(0); }
       else { let mv = 0; if (e.left) { if (L.item % cols === 0) { L.col = 0; this.preview = null; L.pick = -1; this.redrawSoon(); } else mv = -1; } if (e.right && L.item + 1 < items.length) mv = 1; if (e.up && L.item >= cols) mv = -cols; if (e.down && L.item + cols < items.length) mv = cols;
-        if (mv) { L.item += mv; this.lockerHover(); } if (e.a) this.lockerPick(); if (e.b) { if (L.pick >= 0) { L.item = L.pick; L.pick = -1; } else { L.col = 0; this.preview = null; } Sound.play('back'); this.redraw(); } }
+        if (mv) { L.item += mv; L.touchScroll = false; this.lockerHover(); } if (e.a) this.lockerPick(); if (e.b) { if (L.pick >= 0) { L.item = L.pick; L.pick = -1; } else { L.col = 0; this.preview = null; } Sound.play('back'); this.redraw(); } }
     }
     else if (tab === 'PASS') { if (e.left && this.passCur > 0) { this.passCur--; this.passHover(); } if (e.right && this.passCur < SEASON1.tiers - 1) { this.passCur++; this.passHover(); } if (e.b) this.setTab(0); }
     else if (tab === 'CAREER') { if (e.a) this.scene.start('Leaderboard'); if (e.y) this.askName(); if (e.b) this.setTab(0); }
@@ -168,3 +178,12 @@ class LobbyHomeScene extends Phaser.Scene {
   }
   redrawSoon() { Sound.play('blip'); this.redraw(); }
 }
+
+/* v14.3.20 the Locker's item list: swipe up or down on it (phones), or the mouse wheel, to scroll */
+{ const P = LobbyHomeScene.prototype, cr = P.create;
+  P.create = function (...a) { const r = cr.apply(this, a); const inBox = p => { const B = this.lockerScroll; return B && LOBBY_TABS[this.tab] === 'LOCKER' && !this.overlay && p.x >= B.x && p.x <= B.x + B.w && p.y >= B.y && p.y <= B.y + B.h; };
+    this.input.on('pointerdown', p => { this.lockerSwiped = false; this.lkDrag = inBox(p) ? { y: p.y } : null; });
+    this.input.on('pointermove', p => { const D = this.lkDrag, B = this.lockerScroll; if (!D || !p.isDown || !B) return; const dy = p.y - D.y; if (Math.abs(dy) < Math.max(28, B.rowH * 0.55)) return; this.lockerSwiped = true; D.y = p.y; B.by(dy < 0 ? 1 : -1); });
+    this.input.on('pointerup', () => { this.lkDrag = null; });
+    this.input.on('wheel', (p, objs, dx, dy) => { if (inBox(p) && dy) this.lockerScroll.by(dy > 0 ? 1 : -1); });
+    return r; }; }

@@ -198,7 +198,10 @@ Object.assign(Party, {
     const shade = this.add.graphics(); shade.fillGradientStyle(0x05070f, 0x05070f, 0x05070f, 0x05070f, 0, 0, 0.95, 0.95).fillRect(0, top - 140, V.width, 140).fillStyle(0x05070f, 0.95).fillRect(0, top, V.width, V.height - top); C.add(shade);
     const edge = this.add.graphics(); edge.lineStyle(3, 0xffd23f, 0.9).lineBetween(0, top, V.width, top); C.add(edge);
     const add = o => { const k = this.ui.indexOf(o); if (k >= 0) this.ui.splice(k, 1); C.add(o); return o; }, T = (...a) => add(this.T(...a)), box = (...a) => add(this.box(...a)), tap = (x, y, w, h, fn) => { const z = this.add.zone(x + w / 2, y + h / 2, w, h).setInteractive({ useHandCursor: true }); z.on('pointerdown', () => { Sound.resume(); fn(); }); C.add(z); };
-    T(40, top + 16, 'GAME MODES', 20, this.gameRow === 0 ? '#ffd23f' : '#9fb2bf'); T(V.width - 40, top + 16, 'A  pick      ▲ ▼  row      B  close', 16, '#9fb2bf', { ox: 1 });
+    /* v14.3.20 touch and mouse: ✕ CLOSE, or tap anywhere above the menu, closes it without picking (only a controller's B did) */
+    { const z = this.add.zone(V.width / 2, (top - 140) / 2 - 70, V.width, top + 140).setInteractive(); z.on('pointerdown', () => { Sound.resume(); this.closeModes(); }); C.add(z); }
+    T(40, top + 16, 'GAME MODES', 20, this.gameRow === 0 ? '#ffd23f' : '#9fb2bf'); T(V.width - 200, top + 16, 'A  pick      ▲ ▼  row      B  close', 16, '#9fb2bf', { ox: 1 });
+    box(V.width - 186, top - 50, 150, 44, 0x2a4a6b, 0.95, 0xffffff, 10); T(V.width - 111, top - 28, '✕  CLOSE', 20, '#ffffff', { ox: 0.5, oy: 0.5 }); tap(V.width - 196, top - 60, 170, 64, () => this.closeModes());
     const n = LOBBY_MODES.length, cw = Math.min(196, (V.width - 80 - (n - 1) * 12) / n);
     LOBBY_MODES.forEach((M, i) => { const x = 40 + i * (cw + 12), y = top + 48, on = this.gameRow === 0 && i === this.mcur, sel = M.id === this.mode().id;
       box(x, y, cw, 128, M.col, on ? 1 : 0.6, on ? 0xffffff : sel ? 0xffd23f : 0x000000); T(x + cw / 2, y + 42, M.icon, 40, '#ffffff', { ox: 0.5, oy: 0.5 }).setFontFamily('sans-serif'); const t = T(x + cw / 2, y + 78, M.name, 20, '#ffffff', { ox: 0.5 }); if (t.width > cw - 12) t.setScale((cw - 12) / t.width);

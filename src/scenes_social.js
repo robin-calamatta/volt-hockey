@@ -19,14 +19,17 @@ const Forms = {
       #form .link{background:none;border:0;color:#7fd3ff;padding:2px 0;font-size:17px;text-decoration:underline}
       #form .err{color:#ff7a59;min-height:22px;margin-top:8px;font-size:17px}#form .ok{color:#3dff9a}#form .note{color:#9fb2bf;font-size:15px;margin-top:6px;line-height:1.3}
       #form .list{max-height:46vh;overflow:auto;display:flex;flex-direction:column;gap:6px}#form .list div{display:flex;align-items:center;gap:8px}#form .list span{flex:1}
-      #form .pads{color:#9fb2bf;font-size:14px;text-align:center;margin-top:8px}`;
+      #form .pads{color:#9fb2bf;font-size:14px;text-align:center;margin-top:8px}
+      #form .box{position:relative}#form .box>.fx{position:sticky;top:0;float:right;margin:-6px -10px 0 8px;width:44px;height:44px;padding:0;font-size:22px;line-height:1;border-radius:22px;background:#1b2a35;z-index:2}`;
     document.head.append(css);
   },
   show(html, wire) {
     this.close(true); this.css(); this.isOpen = true; Controls.keys = {};
     const el = this.el = document.createElement('div'); el.id = 'form';
     el.innerHTML = `<div class="box">${html}<div class="pads">Gamepad: move with the D-pad, A selects (and opens the keyboard), B goes back</div></div>`; document.body.append(el);
-    el.addEventListener('pointerdown', e => { if (e.target === el) this.close(); });
+    /* v14.3.21 a tap outside the box no longer closes it (on a phone, with the keyboard up, almost anywhere was "outside"): ✕ closes it,
+       as do Escape and a controller's B */
+    { const box = el.querySelector('.box'), x = document.createElement('button'); x.type = 'button'; x.className = 'fx'; x.textContent = '✕'; x.title = 'Close'; x.setAttribute('aria-label', 'Close'); x.onclick = () => this.close(); box.prepend(x); }
     el.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') this.close(); });
     for (const b of el.querySelectorAll('[data-peek]')) b.onclick = () => { const inp = el.querySelector(`[name=${b.dataset.peek}]`); const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; inp.dataset.peek = show ? '1' : ''; b.textContent = show ? '🙈' : '👁'; };
     wire(el);
