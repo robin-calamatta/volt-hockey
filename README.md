@@ -3,6 +3,19 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.3.24: Volt Royale door health bars you can see
+
+**Deploy the whole zip** (only game files changed; the server is the same as v14.3.17).
+
+- **A door that's been hit shows a health bar over it:** "DOOR" and the health it has left over a bar that goes green, then yellow, then red. It shows for 8 seconds after each hit (by anyone: shots, melee, grenades), for doors within 40 m that you can see on your floor, and it's bigger the closer you are. It's drawn on the screen, so it's clear in first and third person and for online guests, and it stays below the scoreboard even right up against the door. (The old one was a small plain bar in the 3D world, easy to miss.)
+
+## v14.3.23: Volt Royale no longer ends early
+
+**Deploy the whole zip** (only game files changed; the server is the same as v14.3.17).
+
+- **A match could end with dozens of players and squads still in:** VICTORY ROYALE went off for one squad, and everyone else got "your squad finished 2nd" (or similar). While a CPU decides what to do, it briefly looks at a narrowed list of who's still in: only its own squad when it's running from the storm, or its own squad and the one enemy its squad is ganging up on. If the CPU knocked someone out during that moment (a melee hit, say), the check for "is only one squad left?" read that narrowed list, saw just the CPU's own squad, and started the victory. The rules (who's still in, who a hit or melee lands on, the end of the match, the players and squads left on screen) now always use the full list; only a CPU's choice of whom to fight uses the narrowed one.
+- **Tested:** the exact situation (a CPU knocking out its target's last squad member while thinking): before, the victory started with 39, 20 and 10 squads still in (Solos, Duos, Fours); now the match carries on. Then a full match of every squad size (Solos, Duos, Trios, Fours, Fives) on both maps (Valley and Frost) with 40, 60 or 100 players: every one ran to the end (4 to 7½ minutes), ended only when one squad was left, and gave every squad a place.
+
 ## v14.3.22: emotes on phones
 
 **Deploy the whole zip** (only game files changed; the server is the same as v14.3.17).

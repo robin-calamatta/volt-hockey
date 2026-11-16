@@ -82,7 +82,7 @@ Object.assign(BR_COLS, { seat: 0x2f5fa8, stone: 0x9a948a, hangar: 0xc8ced4, silo
       const hp = g.dh ? g.dh[D.d.door] / BR_DOOR.hp : 1; D.panel.material.color.setHex(hp > 0.66 ? 0x7a4f2c : hp > 0.33 ? 0x6a4122 : 0x553318);
       /* v14.3.12 a health bar over a door being bashed or shot: shows for 8 seconds after each hit, green to red */
       if (hp !== D.hp0) { if (D.hp0 !== undefined && hp < D.hp0) D.hitT = t; D.hp0 = hp; if (D.bar) this.doorBarDraw(D, hp); }
-      const showBar = hp > 0 && hp < 1 && s !== 2 && D.hitT !== undefined && t - D.hitT < 8;
+      const showBar = false;   /* (v14.3.24: the door's health bar is drawn on the screen now, bigger and clearer: brExtras) */
       if (showBar && !D.bar) { const cv = G3.canvas(128, 20), tx = new THREE.CanvasTexture(cv); D.bar = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, depthTest: false, transparent: true })); D.bar.userData.cv = cv; D.bar.renderOrder = 5;
         D.bar.position.set(D.d.cx === undefined ? D.d.x0 + D.d.len / 2 : D.d.cx, 2.55, D.d.cy === undefined ? D.d.y0 + D.d.len / 2 : D.d.cy); D.bar.scale.set(1.3, 0.2, 1); this.scene.add(D.bar); this.doorBarDraw(D, hp); }
       if (D.bar) { D.bar.visible = showBar && D.grp.visible !== false; if (D.bar.visible) D.bar.material.opacity = Math.min(1, (8 - (t - D.hitT)) / 1.5); } }
@@ -147,6 +147,18 @@ Object.assign(BR_COLS, { seat: 0x2f5fa8, stone: 0x9a948a, hangar: 0xc8ced4, silo
         parts.forEach(([txt, col], j) => T(X.nums, ni++, '30px').setVisible(true).setText(txt).setColor(col).setPosition(q.x + side + (j - (parts.length - 1) / 2) * 44, q.y).setScale(pop * (o.hd ? 1.3 : 1)).setAlpha(a));
         if (o.hd) T(X.nums, ni++, '16px').setVisible(true).setText('HEADSHOT').setColor('#ffd23f').setPosition(q.x + side, q.y - 26).setScale(1).setAlpha(a);
       }
+      /* v14.3.24 door health bars: over any door that's been hit in the last 8 seconds (by anyone), close by and in view. "DOOR" and the
+         health left over a bar, green to yellow to red; bigger the closer you are. (It was a small plain bar in the 3D world, easy to miss.) */
+      { const M0 = MODES.br.map(m), now = performance.now() / 1000, H = X.doorHit || (X.doorHit = []), eye = me || vp.spect, R = vp.rect;
+        if (M0.doors && g.dh) M0.doors.forEach((d, i) => {
+          const hp = Math.max(0, g.dh[i]) / BR_DOOR.hp, s = g.dr ? g.dr[i] : 0, rec = H[i] || (H[i] = { hp, t: -99 }); if (hp < rec.hp - 1e-6) rec.t = now; rec.hp = hp;
+          if (!(hp > 0 && hp < 1 && s !== 2 && now - rec.t < 8) || !eye) return;
+          const dist = Math.hypot(eye.x - d.cx, eye.y - d.cy); if (dist > 40 || (eye.gs && (eye.gs.lv || 0) !== 0)) return;
+          const q = this.v3.project(vp, d.cx, 2.45, d.cy); if (q.behind || q.x < R.x || q.x > R.x + R.w || q.y > R.y + R.h) return;
+          const k = Math.max(0.7, Math.min(1.35, 9 / Math.max(1, dist))), w = 130 * k, bh = 13 * k, x = q.x - w / 2, y = Math.max(R.y + 132, q.y - bh), a = Math.min(1, (8 - (now - rec.t)) / 1.5), col = hp > 0.6 ? 0x5fe07a : hp > 0.3 ? 0xffd23f : 0xff4a3d;
+          G3.fillStyle(0x05070f, 0.85 * a).fillRoundedRect(x - 3, y - 3, w + 6, bh + 6, 4).fillStyle(col, a).fillRect(x, y, w * hp, bh).lineStyle(2, 0xffffff, 0.9 * a).strokeRoundedRect(x - 3, y - 3, w + 6, bh + 6, 4);
+          T(X.nums, ni++, '18px').setVisible(true).setText(`DOOR  ${Math.ceil(hp * BR_DOOR.hp)}`).setColor('#ffffff').setPosition(q.x, y - 14 * k).setScale(k).setAlpha(a);
+        }); }
       /* markers: your team-mates' rez cards (always), and the rez garages when you carry a card */
       const M = MODES.br.map(m), R = vp.rect, mark = (x, h, y, col, icon, label) => { const q = this.v3.project(vp, x, h, y); let sx = q.x, sy = q.y; const off = q.behind || sx < R.x + 30 || sx > R.x + R.w - 30 || sy < R.y + 40 || sy > R.y + R.h - 60;
           if (off) { let dx = q.cx, dy = -q.cy; if (q.behind) { dx = -dx; dy = -Math.abs(dy) - 1; } const a = Math.atan2(dy, dx), cx = R.x + R.w / 2, cy = R.y + R.h / 2, k = Math.min((R.w / 2 - 40) / Math.max(1e-3, Math.abs(Math.cos(a))), (R.h / 2 - 70) / Math.max(1e-3, Math.abs(Math.sin(a)))); sx = cx + Math.cos(a) * k; sy = cy + Math.sin(a) * k;

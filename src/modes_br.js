@@ -322,7 +322,7 @@ MODES.br = {
     c.gs.by = by && by !== c ? by.k : -1;
     if (by && by !== c) { by.gs.kills++; MG.notice(m, `${MG.up(m.name(by))} ELIMINATED ${MG.up(m.name(c))}`, 2); if (Math.random() < 0.4) m.line(`${m.name(c)} is out. ${m.name(by)} gets the elimination.`); }
     else MG.notice(m, `${MG.up(m.name(c))} WAS CAUGHT IN THE STORM`, 2);
-    const alive = new Set(MG.live(m).map(o => o.gs.team));
+    const alive = new Set(MG.liveAll(m).map(o => o.gs.team));   /* (v14.3.23: MG.liveAll, never the CPU's narrowed view: a CPU's melee during its thinking ended the match with 18 squads left) */
     if (alive.size <= 1) this.end(m, [...alive][0]);
   },
   end(m, team) {
@@ -355,7 +355,7 @@ MODES.br = {
   aim(c, m, gun) {                                                        // where a shot goes: your heading turned by the right stick, tilted up or down (this.aimP), with a little aim assist for people
     const G = c.gs, L = this.map(m); let a = c.heading + (c.player && c.player._look ? c.player._look.x * CONFIG.view3d.look.yaw * Math.PI / 180 : 0), p = brPitch(c);
     let best = null, bo = c.player ? 0.16 : 0.45;
-    for (const o of MG.live(m)) {
+    for (const o of MG.liveAll(m)) {
       if (o.gs.team === G.team) continue; const d = MH.dist(c, o); if (d > gun.range * 1.3 || d < 0.3) continue;
       const lead = d / gun.spd, oa = Math.atan2(o.y + (o.vy || 0) * lead - c.y, o.x + (o.vx || 0) * lead - c.x), op = Math.atan2(o.gs.z - G.z + 0.25, d), off = Math.abs(normalizeAngle(oa - a));
       if (off > bo || (c.player && Math.abs(op - p) > 0.28)) continue;
@@ -469,7 +469,7 @@ MODES.br = {
       return MH.to(c, wp.x, wp.y, dg < 3 && gl === G.lv ? Math.max(0.3, 0.3 * dg) : 0.9); }   /* (slowing down near what it's after: at full speed it circled round it, too wide a turn to reach it) */
   },
   hud(m) {
-    const S = m.gs.st, live = MG.live(m), teams = new Set(live.map(c => c.gs.team)).size, sq = m.mini.squad || 1, t = Math.ceil(S.wait > 0 ? S.wait : Math.max(0, S.shrink));
+    const S = m.gs.st, live = MG.liveAll(m), teams = new Set(live.map(c => c.gs.team)).size, sq = m.mini.squad || 1, t = Math.ceil(S.wait > 0 ? S.wait : Math.max(0, S.shrink));
     return { clock: S.ph >= BR_PHASES.length ? 'FINAL' : `${S.wait > 0 ? '⏳' : '🌀'} ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, a: 'VOLT ROYALE', b: sq > 1 ? `${live.length} LEFT  ·  ${teams} TEAMS` : `${live.length} LEFT`,   /* (v14.3.7: how many carts and teams are still in, as text: no team logos) */ mid: S.wait > 0 ? 'Storm closes in' : 'THE STORM IS MOVING', left: MG.peopleLine(m, c => c.out ? 'OUT' : `❤${Math.ceil(c.gs.hp)} 🛡${Math.ceil(c.gs.sh)} ✖${c.gs.kills}`) };
   },
   tag(c, m, vp) {                                                          // your team-mates' names (enemies show nothing: no tags through walls)

@@ -158,7 +158,7 @@ const brSlotItem = (G, s) => G.inv.find(it => it.s === s) || null;
     melee(c, m, bash) {
       const G = c.gs; if (c.out || G.down || G.mcd > 0 || G.use) return; G.mcd = BR_MELEE.cd; G.melT = MG.r2(m.gs.t); const M = this.map(m);
       let hit = null, bd = BR_MELEE.range + R_CART();
-      for (const o of MG.live(m)) { if (o === c || o.gs.team === G.team || o.gs.lv !== G.lv || Math.abs(o.gs.z - G.z) > 1) continue; const d = MH.dist(c, o), a = Math.abs(ANG(Math.atan2(o.y - c.y, o.x - c.x) - c.heading)); if (d < bd && a < BR_MELEE.arc) { bd = d; hit = o; } }
+      for (const o of MG.liveAll(m)) { if (o === c || o.gs.team === G.team || o.gs.lv !== G.lv || Math.abs(o.gs.z - G.z) > 1) continue; const d = MH.dist(c, o), a = Math.abs(ANG(Math.atan2(o.y - c.y, o.x - c.x) - c.heading)); if (d < bd && a < BR_MELEE.arc) { bd = d; hit = o; } }
       if (hit) { this.hurt(m, hit, bash ? BR_MELEE.bash : BR_MELEE.dmg, c, false, { melee: 1 }); const a = Math.atan2(hit.y - c.y, hit.x - c.x); hit.vx += Math.cos(a) * BR_MELEE.push; hit.vy += Math.sin(a) * BR_MELEE.push; this.sfxNear(m, bash ? 'shield_bash' : 'melee_hit', c.x, c.y); return; }
       if (G.lv === 0) for (const d of M.doors || []) { if (m.gs.dr[d.door] !== 0) continue; const dd = Math.hypot(d.cx - c.x, d.cy - c.y), a = Math.abs(ANG(Math.atan2(d.cy - c.y, d.cx - c.x) - c.heading)); if (dd < BR_MELEE.range + 0.8 && a < 1.2) { this.hitDoor(m, d.door, BR_MELEE.door); return; } }
       this.sfxNear(m, 'melee_whiff', c.x, c.y);

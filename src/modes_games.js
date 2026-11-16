@@ -4,6 +4,9 @@
 
 const MG = {
   live: m => m.chairs.filter(c => !c.out),
+  /* v14.3.23 everyone still in, always. A Volt Royale CPU's thinking (ai_modes.js) briefly narrows MG.live to what it should care about (this is the real list);
+     the rules (who is still in, who a hit lands on, the end of the match) must never see that narrowed list */
+  liveAll: m => m.chairs.filter(c => !c.out),
   add(m, o) { const g = m.gs; g.objs = g.objs || []; o.id = g.nid = (g.nid || 0) + 1; g.objs.push(o); return o; },
   all: (m, t) => (m.gs.objs || []).filter(o => o.t === t),
   remove(m, o) { m.gs.objs = (m.gs.objs || []).filter(x => x !== o); },
