@@ -3,6 +3,32 @@
 Phaser 3 game with a Three.js 3D view, no build step. Serve the folder (`npx serve` or `python3 -m http.server`) and open `index.html`.
 Phaser loads from a CDN; download `phaser.min.js` and change the first script tag to run offline. Three.js (r149) is bundled in `lib/three.min.js`.
 
+## v14.3.26: phones that won't turn: PLAY SIDEWAYS ANYWAY
+
+**Deploy the whole zip** (only game files changed; the server is the same as v14.3.25).
+
+- **Stuck on "Turn your phone sideways":** the game waited for the browser to turn to landscape. On an iPhone with **rotation lock** on, or inside a chat or social app's **built-in browser** (Heya, Instagram, TikTok, Facebook, Messenger, Snapchat...), it never does, so those players never got past that screen.
+- **PLAY SIDEWAYS ANYWAY:** a button on that screen. On Android it first asks for full screen locked to landscape. Otherwise the game turns itself a quarter turn on the upright screen: hold the phone sideways and play. Everything lines up: the joystick and buttons, taps on the menus, the emote wheel, chat and the 3D view. It's remembered on that phone, and the game turns back by itself as soon as the browser really is sideways.
+
+## v14.3.25: a real broadcast booth: new commentators, always on the call
+
+**Deploy the whole zip:** the server changed (a new admin setting on the Game tab).
+
+### New voices, new style
+- **Two new commentators:** an animated play-by-play man and a deep, steady colour man. Every line was re-recorded (about 1,550 clips) with Kyutai's Pocket TTS, copying the two voices from a reference broadcast. Each line was checked with speech recognition, and the best of up to three takes kept.
+- **Rewritten like an NFL booth:** short, punchy calls that build ("Four in the zone… winds up… SHOT! SAVED! Oh, what a stop!"). The play-by-play man is calm and quieter between plays, and climbs to a shout on the big moments, recorded in his calm voice and his full-volume voice. Calm calls play quieter and big calls louder.
+- **The colour man reacts** a couple of seconds after every goal, and after some big saves and hits ("Are you kidding me? He got everything on that one."). He waits for the call to finish.
+- **Smoother calls:** "Comets number three" is one recording (every team and shirt number), and so is every score from "nothing to nothing" to "nine to nine". A call is a few natural pieces with a breath between them, not word by word.
+
+### Always on the call
+- **The running play-by-play:** every second or two, who has the ball and what they're doing: "Number three, through the middle." "Number three, over to Number five." "Picked off! Comets! Number two." "Loose ball!" It names the team whenever the ball changes sides (both teams have a Number three), follows the carrier (out of the end, through centre, up the left or right side, into the zone, along the boards, behind the net), and calls loose balls. It never talks over another call, a shot, save, hit, penalty or goal cuts in, and it doesn't repeat what a call has just said. It's spoken only from the recordings (never the browser's robot voice), and shows as captions too.
+
+### Admin page (Game tab)
+- **Commentary: call players by:** *Numbers* (the default: "Number three has it", "Comets number three scores!") or *Names* ("Robin has it"). A name the commentators haven't recorded (there are about 200) is called by number.
+
+### For later
+- `tools/make_commentary.py` re-records the clips (setup in the file), from the reference clips in `tools/voice_refs`; `tools/commentary_index.js` lists them for the game.
+
 ## v14.3.24: Volt Royale door health bars you can see
 
 **Deploy the whole zip** (only game files changed; the server is the same as v14.3.17).

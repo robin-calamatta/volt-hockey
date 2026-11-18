@@ -1,5 +1,5 @@
 {
- "v": "5cc10fe45e0411ef",
+ "v": "7e712586266da3e9",
  "files": [
   "index.html",
   "manifest.webmanifest",
@@ -95,6 +95,7 @@
   "src/ready.js",
   "src/rig3d.js",
   "src/rize.js",
+  "src/rotate.js",
   "src/scenes.js",
   "src/scenes_3d.js",
   "src/scenes_mini.js",

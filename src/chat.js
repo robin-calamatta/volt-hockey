@@ -104,7 +104,7 @@ const Chat = {
     this.build(); this.quickOpen = true; this.quickSrc = src; this.quickAt = performance.now();
     this.quickEl.innerHTML = QUICK.map((q, i) => `<button data-i="${i + 1}" class="${src && this.quickIdx === i ? 'on' : ''}">${i + 1}. ${esc(q)}</button>`).join('') + `<div class="hint">${src ? 'D-pad up: next   A: send   B: close' : 'Keys 1-9 send these any time'}</div>`;
     this.quickEl.querySelectorAll('button').forEach(b => b.onclick = () => { this.sendQuick(+b.dataset.i); this.hideQuick(); });
-    const r = this.root.getBoundingClientRect(); Object.assign(this.quickEl.style, { display: 'flex', left: (r.left || 12) + 'px', bottom: (innerHeight - (this.open ? r.top : r.bottom) + 6) + 'px' });
+    const r = Rot.rect(this.root); Object.assign(this.quickEl.style, { display: 'flex', left: (r.left || 12) + 'px', bottom: (innerHeight - (this.open ? r.top : r.bottom) + 6) + 'px' });
   },
   hideQuick() { this.quickOpen = false; this.quickSrc = null; this.quickEl.style.display = 'none'; },
 
@@ -207,7 +207,7 @@ const VoiceOrbs = {
   hue(n) { let h = 0; for (const ch of String(n)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return this.cols[h % this.cols.length]; },
   draw(el, sp) {
     this.css(); el.classList.add('orbs'); if (!el.dataset.tap) { el.dataset.tap = 1; el.addEventListener('pointerdown', e => { if (!this.on()) return; e.stopPropagation(); this.openUntil = performance.now() + 4000; }); }
-    let gutter = 0, top = 8, left = 6; try { const r = voltGame.canvas.getBoundingClientRect(); gutter = r.left; top = Math.max(6, r.top + 6); } catch (e) { /* none */ }
+    let gutter = 0, top = 8, left = 6; try { const r = Rot.rect(voltGame.canvas); gutter = r.left; top = Math.max(6, r.top + 6); } catch (e) { /* none */ }
     const gut = gutter >= 26; el.classList.toggle('gut', gut); el.classList.toggle('open', performance.now() < this.openUntil);
     el.style.cssText = `display:flex;flex-direction:column;position:fixed;z-index:31;left:${gut ? Math.max(2, (gutter - 22) / 2) : left}px;top:${gut ? top - 2 : top - 2}px;right:auto`;
     const ini = n => { const w = String(n || '?').trim().split(/\s+/); return esc(((w[0] || '?')[0] + (w[1] ? w[1][0] : (w[0][1] || ''))).toUpperCase()); };

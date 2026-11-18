@@ -27,7 +27,7 @@ const Render3D = {
   sync() {                                                     // lie exactly under the Phaser canvas (which letterboxes itself to fit the window)
     const gc = window.voltGame && voltGame.canvas; if (!gc || !this.r) return null;
     if (gc.style.position !== 'relative') { gc.style.position = 'relative'; gc.style.zIndex = '1'; }
-    const b = gc.getBoundingClientRect(), Q = this.quality(), pr0 = Math.min(window.devicePixelRatio || 1, Q.pixelRatio), cap = Math.sqrt((Q.maxMP || 3.7) * 1e6 / Math.max(1, b.width * b.height));
+    const b = Rot.rect(gc), Q = this.quality(),   /* (v14.3.26: Rot.rect: the game's box on the page, turned or not) */ pr0 = Math.min(window.devicePixelRatio || 1, Q.pixelRatio), cap = Math.sqrt((Q.maxMP || 3.7) * 1e6 / Math.max(1, b.width * b.height));
     /* v14.3.12 a big screen (a TV at 4K) or a slow graphics card: drawing at most a set number of pixels, and fewer while frames take too long (back up again when they're quick) */
     const D = this.dyn || (this.dyn = { k: 1, slow: 0, fast: 0, at: performance.now() }), now = performance.now(), ft = window.voltGame ? voltGame.loop.delta : 16; D.ft = (D.ft || 16) * 0.95 + ft * 0.05;
     if (now - D.at > 1500 && !document.hidden) { D.at = now; if (D.ft > 21 && D.k > 0.5) D.k = Math.max(0.5, D.k * 0.85); else if (D.ft < 15 && D.k < 1) D.k = Math.min(1, D.k * 1.1); }

@@ -62,14 +62,49 @@ class Match {
   strength() { return [0, 1].map(s => this.chairs.filter(c => c.side === s && !c.benched).length); }   // carts on the court per side (for the power-play display)
   removePlayer(p) { if (p.chair) { p.chair.player = null; p.chair = null; } this.players = this.players.filter(q => q !== p); }   // a CPU takes over the cart
   /* ----- commentary: short play-by-play lines. 'heard' is read by the screen (caption + voice); the host also sends them to clients. pri 2 always plays, pri 1 only if it has been quiet a moment. ----- */
-  name(c) { return c ? (c.player && c.player.name ? c.player.name : `${TEAMS[this.teams[c.side]].name} number ${c.index + 1}`) : 'somebody'; }
+  /* v14.3.25 players are called by number unless the admin page says names (then a player's name, when it has been recorded) */
+  useNames() { return typeof GameCfg !== 'undefined' && GameCfg.commentNames === 'names'; }
+  name(c) { return c ? (this.useNames() && c.player && c.player.name ? c.player.name : `${TEAMS[this.teams[c.side]].name} number ${c.index + 1}`) : 'somebody'; }
   W(c, key) { return { [key]: c ? this.name(c) : '', [key + 'T']: c ? TEAMS[this.teams[c.side]].name : '', [key + 'N']: c ? c.index + 1 : 0 }; }
+  Ws(c, key) { return { [key]: c ? (this.useNames() && c.player && c.player.name ? c.player.name : `Number ${c.index + 1}`) : '', [key + 'T']: c ? TEAMS[this.teams[c.side]].name : '', [key + 'N']: c ? c.index + 1 : 0, [key + 'Q']: 1 }; }   // the short form for the running play-by-play
   V(x = {}) { const t = TEAMS[this.teams[0]].name, u = TEAMS[this.teams[1]].name; return { team: t, opp: u, a: this.score[0], o: this.score[1], sa: this.shots[0], sb: this.shots[1], p: this.period, ...x }; }
   call(key, vars, pri = 1) {
     if (this.remote) return;
     if (pri < 2 && this.simTime - (this.lastCallAt === undefined ? -99 : this.lastCallAt) < 3.5) return;
     const t = Commentary.pick(key, vars); if (!t) return;
     this.lastCallAt = this.simTime; this.hear(t); if (this.callQueue) this.callQueue.push(t);
+    if (this.pz) this.pz.ev = null;   // (v14.3.25: a call has just covered it: the running play-by-play doesn't repeat it)
+    /* v14.3.25 the colour man reacts a couple of seconds after a big moment (every goal, some saves and hits) */
+    const rk = /^goal/.test(key) ? 'rGoal' : key === 'save' && Math.random() < 0.5 ? 'rSave' : key === 'hit' && Math.random() < 0.35 ? 'rHit' : null;
+    if (rk) this.react = { key: rk, at: Date.now() / 1000 + (rk === 'rGoal' ? 3.2 : 2.2) };   // (real time: the game's clock stands still while a goal is celebrated)
+  }
+  reactTick() { const R = this.react; if (!R || Date.now() / 1000 < R.at || this.remote) return; this.react = null; if (this.state === 'over') return; this.call(R.key, this.V(), 2); }
+  /* v14.3.25 the running play-by-play: never blocks the other calls, never talks over them (Commentator skips it while anything is playing) */
+  chat(key, vars) { if (this.remote) return; const t = Commentary.pick(key, vars); if (!t) return; this.lastChatAt = this.simTime; this.hear(t); if (this.callQueue) this.callQueue.push(t); }
+  chatter(live, h) {
+    if (this.state !== 'play' || this.ballIn[0] || this.ballIn[1] || (typeof Settings !== 'undefined' && Settings.commentaryMode === 'off')) { this.pz = null; return; }
+    const now = this.simTime, b = this.ball, W = this.width, P = this.pz || (this.pz = { holder: null, since: now, last: null, lastAt: -99, said: -99, loose: 0, zone: '', ev: null });
+    const lc = this.lastChair, holder = lc && !lc.out && this.lastTouch === lc.side && Math.hypot(lc.x - b.x, lc.y - b.y) < 1.5 ? lc : null;
+    if (holder !== P.holder) {
+      if (holder) { const prev = P.last, t = now - P.lastAt;
+        const tm = { ...this.Ws(holder, 'who'), team: TEAMS[this.teams[holder.side]].name };   // (the team is named whenever the ball changes sides: both teams have a Number 3)
+        P.ev = prev && prev !== holder && t < 3.5 ? (prev.side === holder.side ? ['pzPass', { ...this.Ws(prev, 'who'), ...this.Ws(holder, 'who2') }] : ['pzTake', tm]) : !prev || prev.side !== holder.side ? ['pzWin', tm] : ['pzHas', this.Ws(holder, 'who')];
+        P.evAt = now; P.last = holder; P.zone = ''; if (now - (this.lastCallAt === undefined ? -99 : this.lastCallAt) < 0.6) P.ev = null; }   // (a steal or rush call this moment already said it)
+      P.holder = holder; P.since = now;
+    }
+    if (holder) P.lastAt = now;
+    if (holder) P.loose = 0; else P.loose += h;
+    const gap = now - P.said, quiet = now - (this.lastCallAt === undefined ? -99 : this.lastCallAt);
+    if (gap < 1.4 || quiet < 1.1) return;
+    if (P.ev && now - P.evAt < 1.2) { this.chat(P.ev[0], P.ev[1]); P.ev = null; P.said = now; return; }
+    P.ev = null;
+    if (holder && now - P.since > 1.2 && gap > 2.2) {           // carrying it: where to
+      const s = holder.side, prog = s ? (W - holder.x) / W : holder.x / W, H = this.height, wall = Math.min(holder.y, H - holder.y), net = this.nets.find(n => n.end !== s) || this.nets[1 - s];
+      const behind = net && (s ? holder.x < net.backX : holder.x > net.backX), left = s ? holder.y > H / 2 : holder.y < H / 2;
+      const z = behind ? 'pzBehind' : wall < 1.3 ? 'pzBoards' : prog < 0.36 ? 'pzOwn' : prog > 0.64 ? 'pzZone' : Math.abs(holder.y - H / 2) > H * 0.22 ? (left ? 'pzLeft' : 'pzRight') : 'pzMid';
+      this.chat(z === P.zone ? 'pzHold' : z, this.Ws(holder, 'who')); P.zone = z; P.said = now; return;
+    }
+    if (!holder && P.loose > 1.0 && gap > 3) { this.chat('pzLoose', {}); P.said = now; }
   }
   hear(t) { if (!this.heard) this.heard = []; this.heard.push(t); if (this.heard.length > 6) this.heard.shift(); }
   say(text) { this.banner = text; this.bannerLeft = 2.5; }
@@ -167,6 +202,7 @@ class Match {
     try { return fn(); } finally { items.forEach((o, i) => { o.x = keep[i][0]; o.y = keep[i][1]; if (keep[i][2] !== undefined) o.heading = keep[i][2]; }); }
   }
   step(h) {
+    if (!this.mini) this.reactTick();
     this.bannerLeft -= h; this.noticeLeft -= h;
     if (this.state === 'countdown') {
       this.timer -= h; const n = Math.ceil(this.timer);
@@ -210,7 +246,7 @@ class Match {
       if (crossed && b.y > n.y1 && b.y < n.y2) this.scoreGoal(1 - n.end);
     }
     this.countShots();
-    this.checkBallTrap(live, h); this.checkCreaseIdle(h); this.checkFrozen(live, h); this.watchPlay(live, h);
+    this.checkBallTrap(live, h); this.checkCreaseIdle(h); this.checkFrozen(live, h); this.watchPlay(live, h); if (!this.mini) this.chatter(live, h);
   }
   countShots() {                                    // a shot on net: the ball enters a crease and the last cart to touch it was an opponent's (saves and goals both count)
     const b = this.ball;

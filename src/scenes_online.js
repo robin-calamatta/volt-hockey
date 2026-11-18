@@ -144,7 +144,7 @@ class JoinCodeScene extends Phaser.Scene {
     this.add.text(CX, 380, 'Tap the boxes to type', { ...STYLE.hint, fontSize: '22px', color: '#9fb2bf' }).setOrigin(0.5);
   }
   placeInput() {
-    const el = this.input_, r = this.game.canvas.getBoundingClientRect(), k = r.width / CONFIG.view.width, N = this.chars.length;
+    const el = this.input_, r = Rot.rect(this.game.canvas), k = r.width / CONFIG.view.width, N = this.chars.length;
     el.style.left = r.left + (CX - N * 60) * k + 'px'; el.style.top = r.top + (300 - 70) * k + 'px'; el.style.width = N * 120 * k + 'px'; el.style.height = 140 * k + 'px';
   }
   back() { Sound.play('back'); this.scene.start('OnlineMenu'); }

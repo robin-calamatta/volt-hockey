@@ -68,7 +68,7 @@ fontReady.catch(() => {}).then(() => {
 (function keepFitted() {
   const stage = document.getElementById('stage');
   const fit = () => {
-    const vv = window.visualViewport, w = Math.round(vv ? vv.width : innerWidth), h = Math.round(vv ? vv.height : innerHeight);
+    const vv = window.visualViewport, turned = typeof Rot !== "undefined" && Rot.on, w = Math.round(vv && !turned ? vv.width : innerWidth), h = Math.round(vv && !turned ? vv.height : innerHeight);   // (v14.3.26: turned sideways by Rot: the turned size)
     stage.style.width = w + 'px'; stage.style.height = h + 'px';
     if (window.voltGame && voltGame.scale && voltGame.canvas) { try { voltGame.scale.refresh(); } catch (e) {} }   // (not before Phaser has made its canvas)
     if (window.TouchPad && TouchPad.place) TouchPad.place();

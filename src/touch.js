@@ -101,19 +101,19 @@ const TouchPad = {
   wire(id, el, d) {
     let pointer = null, drag = null;
     const stickMove = e => {
-      const r = el.getBoundingClientRect(), R = r.width / 2, dx = (e.clientX - (r.left + R)) / R, dy = (e.clientY - (r.top + R)) / R, m = Math.hypot(dx, dy), k = m > 1 ? 1 / m : 1;
+      const r = Rot.rect(el), P = Rot.pt(e.clientX, e.clientY), R = r.width / 2, dx = (P.x - (r.left + R)) / R, dy = (P.y - (r.top + R)) / R, m = Math.hypot(dx, dy), k = m > 1 ? 1 / m : 1;
       let x = dx * k, y = dy * k; const mag = Math.hypot(x, y);
       if (mag < TOUCH.stickDeadzone) { x = y = 0; } else { const s = (mag - TOUCH.stickDeadzone) / (1 - TOUCH.stickDeadzone) / mag; x *= s; y *= s; }
       if (d.right) { this.state.rx = x; this.state.ry = y; this.state.held.spinCCW = true; } else { this.state.ax = x; this.state.ay = y; } el.querySelector('.knob').style.transform = `translate(${dx * k * R * 0.55}px,${dy * k * R * 0.55}px)`;
     };
     el.addEventListener('pointerdown', e => {
       e.preventDefault(); if (typeof Sound !== 'undefined') Sound.resume();
-      if (this.editing) { drag = { dx: e.clientX - parseFloat(el.style.left), dy: e.clientY - parseFloat(el.style.top) }; this.selected = id; el.setPointerCapture(e.pointerId); this.place(); return; }
+      if (this.editing) { const P = Rot.pt(e.clientX, e.clientY); drag = { dx: P.x - parseFloat(el.style.left), dy: P.y - parseFloat(el.style.top) }; this.selected = id; el.setPointerCapture(e.pointerId); this.place(); return; }
       if (pointer !== null) return; pointer = e.pointerId; el.setPointerCapture(e.pointerId); el.classList.add('down');
       if (d.kind === 'stick') stickMove(e); else { const bt = el.btn = (this.press && this.press[id]) || d.button; this.state.held[bt] = true; this.state.tapped[bt] = true; }   // tapped: a quick tap between two frames still counts (press: what this button does in the game being played)
     });
     el.addEventListener('pointermove', e => {
-      if (this.editing && drag) { const m = TOUCH.edgeMargin; this.setLayout(id, { x: Math.min(1 - m, Math.max(m, (e.clientX - drag.dx) / innerWidth)), y: Math.min(1 - m, Math.max(m, (e.clientY - drag.dy) / innerHeight)) }); this.place(); return; }
+      if (this.editing && drag) { const m = TOUCH.edgeMargin, P = Rot.pt(e.clientX, e.clientY); this.setLayout(id, { x: Math.min(1 - m, Math.max(m, (P.x - drag.dx) / innerWidth)), y: Math.min(1 - m, Math.max(m, (P.y - drag.dy) / innerHeight)) }); this.place(); return; }
       if (e.pointerId === pointer && d.kind === 'stick') stickMove(e);
     });
     const end = e => {
@@ -235,8 +235,8 @@ function toggleFullscreen() {
     bar.addEventListener('click', e => { const b = e.target.closest('button'), a = b && b.dataset.a; if (a) this.action(a); });
     /* drag the toolbar by its handle */
     const h = bar.querySelector('.h'); let dr = null;
-    h.addEventListener('pointerdown', e => { e.preventDefault(); const r = bar.getBoundingClientRect(); dr = { dx: e.clientX - r.left, dy: e.clientY - r.top }; h.setPointerCapture(e.pointerId); });
-    h.addEventListener('pointermove', e => { if (!dr) return; const x = Math.max(0, Math.min(innerWidth - 60, e.clientX - dr.dx)), y = Math.max(0, Math.min(innerHeight - 30, e.clientY - dr.dy)); bar.style.left = x + 'px'; bar.style.top = y + 'px'; bar.style.transform = 'none'; });
+    h.addEventListener('pointerdown', e => { e.preventDefault(); const r = Rot.rect(bar), P = Rot.pt(e.clientX, e.clientY); dr = { dx: P.x - r.left, dy: P.y - r.top }; h.setPointerCapture(e.pointerId); });
+    h.addEventListener('pointermove', e => { if (!dr) return; const P = Rot.pt(e.clientX, e.clientY), x = Math.max(0, Math.min(innerWidth - 60, P.x - dr.dx)), y = Math.max(0, Math.min(innerHeight - 30, P.y - dr.dy)); bar.style.left = x + 'px'; bar.style.top = y + 'px'; bar.style.transform = 'none'; });
     h.addEventListener('pointerup', () => { dr = null; }); h.addEventListener('pointercancel', () => { dr = null; });
     document.body.append(bar); this.bar = bar;
   };

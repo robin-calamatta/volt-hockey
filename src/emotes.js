@@ -34,7 +34,7 @@ const Emotes = {
     st.open = true; st.mouse = true; st.touch = true; st.sel = -1; Sound.play('blip');
     if (st.domHook) return;
     st.domHook = e => { if (!sc.sys || !sc.sys.isActive() || sc.match.state === 'over') { this.closeTouch(st); return; } if (!st.open || !st.geom) return; const el = e.target; if (el && el.closest && TouchPad.els && TouchPad.els.quick && TouchPad.els.quick.contains(el)) return;   // (the button itself: toggles)
-      const r = voltGame.canvas.getBoundingClientRect(), V = CONFIG.view, gx = (e.clientX - r.left) / r.width * V.width, gy = (e.clientY - r.top) / r.height * V.height, G = st.geom, d = Math.hypot(gx - G.cx, gy - G.cy);
+      const r = Rot.rect(voltGame.canvas), P = Rot.pt(e.clientX, e.clientY), V = CONFIG.view, gx = (P.x - r.left) / r.width * V.width, gy = (P.y - r.top) / r.height * V.height, G = st.geom, d = Math.hypot(gx - G.cx, gy - G.cy);
       if (d < G.rr + 60) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); if (d > 50) { const s = ((Math.round(Math.atan2(gy - G.cy, gx - G.cx) / (Math.PI / 4)) % 8) + 8) % 8; st.sel = s; this.send(sc, p, this.wheel()[s]); } }
       this.closeTouch(st); };
     document.addEventListener('pointerdown', st.domHook, true);
